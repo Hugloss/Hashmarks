@@ -543,3 +543,17 @@ qualified Python source AST, while a request with no node claim remains
 file-level. This neither implements pytest collection semantics nor determines
 which tests an execution system should run. The independent historical
 advisory `plan(...)` compatibility behavior is unchanged.
+
+### Explicit Python nomination selectors never widen silently
+
+A non-`None` `symbol` or `qualname` is an explicit Python node-selection
+claim, not a suggestion to fall back to a broader file-level nomination.
+Only a nonblank, flat Python identifier beginning with `test_` can qualify
+a requested `test-node` candidate; it must still match exactly one
+top-level declaration in the already source-revision-qualified AST. Empty,
+non-test, nonidentifier, wrong-typed, dotted, or contradictory explicit
+selectors remain `source-evidence-unqualified`, **not** `test-file`.
+Only a request with both selectors absent yields an unqualified file-level
+nomination. This is repository syntax precision, not pytest test discovery
+or authorization to run tests. The historical advisory `plan(...)` continues
+its separate compatibility behavior.

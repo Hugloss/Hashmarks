@@ -316,6 +316,13 @@ class VerificationPlanMixin:
             raise _UnqualifiedNominationMember("python-test-symbol-not-flat")
         if isinstance(qualname, str) and "." in qualname:
             raise _UnqualifiedNominationMember("python-test-qualname-not-flat")
+        for selector in (symbol, qualname):
+            if selector is not None and (
+                not isinstance(selector, str)
+                or not selector.startswith("test_")
+                or not selector.isidentifier()
+            ):
+                raise _UnqualifiedNominationMember("python-test-selector-unqualified")
         if symbol is not None and qualname is not None and symbol != qualname:
             raise _UnqualifiedNominationMember("python-test-selection-conflict")
         return cls._verification_test_symbol(symbol, qualname)
