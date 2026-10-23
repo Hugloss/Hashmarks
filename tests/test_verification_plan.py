@@ -909,8 +909,8 @@ def test_explicit_unsupported_python_selector_never_reads_supporting_config(
             codemap.verification, "_pytest_manifest_declaration", forbidden
         )
         assert (
-            codemap.verification.nomination(
-                "tests/test_widget.py", symbol="helper"
-            )["reason"]
+            codemap.verification.nomination("tests/test_widget.py", symbol="helper")[
+                "reason"
+            ]
             == "source-evidence-unqualified"
         )
