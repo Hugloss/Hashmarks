@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 
 from hashmarks.python_ast_cache import read_python_ast
 
+from .go_module_declaration import declared_go_module
 from .python_exports import (
     AllExportStatus,
     PythonExportBinding,
@@ -535,23 +536,11 @@ class RepositoryImports:
 
     def _resolve_go_import_paths(self, target: str) -> list[str]:
         """Resolve Go module/package evidence without broad repository guessing."""
-        go_mod = self.workspace / "go.mod"
-        if not go_mod.is_file():
+        self.source.ensure_current("go.mod")
+        member, raw = self.source.member("go.mod", include_bytes=True)
+        if member.get("state") != "known-present" or raw is None:
             return []
-        try:
-            module_line = next(
-                (
-                    line.strip()
-                    for line in go_mod.read_text(
-                        encoding="utf-8", errors="replace"
-                    ).splitlines()
-                    if line.strip().startswith("module ")
-                ),
-                "",
-            )
-        except OSError:
-            return []
-        module_name = module_line.removeprefix("module ").strip()
+        module_name = declared_go_module(raw)
         if not module_name or not (
             target == module_name or target.startswith(module_name + "/")
         ):
