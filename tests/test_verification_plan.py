@@ -899,6 +899,9 @@ def test_explicit_unsupported_python_selector_never_reads_supporting_config(
     (tmp_path / "tests/test_widget.py").write_text(
         "def test_widget(): pass\n", encoding="utf-8"
     )
+    (tmp_path / "pyproject.toml").write_text(
+        "[tool.pytest.ini_options]\n", encoding="utf-8"
+    )
 
     def forbidden(*_args: object, **_kwargs: object) -> None:
         raise AssertionError("unqualified node selector inspected config metadata")
