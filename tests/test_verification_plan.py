@@ -798,7 +798,16 @@ def test_python_test_node_nomination_tracks_source_edits(
         (None, "test_widget", "test-node"),
         ("test_widget", "test_widget", "test-node"),
         (None, None, "test-file"),
-        ("helper", None, "test-file"),
+        ("helper", None, "unavailable"),
+        (None, "helper", "unavailable"),
+        ("", None, "unavailable"),
+        (None, "", "unavailable"),
+        ("  ", None, "unavailable"),
+        (None, "test_widget[case]", "unavailable"),
+        ("test widget", None, "unavailable"),
+        ("test_widget", 123, "unavailable"),
+        (123, None, "unavailable"),
+        (None, False, "unavailable"),
         ("test_widget", "test_other", "unavailable"),
         ("helper", "test_widget", "unavailable"),
         ("test_widget", "TestCase.test_widget", "unavailable"),
@@ -856,3 +865,52 @@ def test_legacy_plan_retains_flat_projection_while_nomination_refuses_nested(
     assert legacy["verification_target"]["test_symbol"] == "test_widget"
     assert exact["available"] is False
     assert exact["reason"] == "source-evidence-unqualified"
+
+
+def test_explicit_non_test_selector_cannot_widen_to_file_nomination(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests/test_widget.py").write_text(
+        "def helper(): pass\ndef test_widget(): pass\n", encoding="utf-8"
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        original = codemap.verification.nomination("tests/test_widget.py")
+        narrowed = codemap.verification.nomination(
+            "tests/test_widget.py", symbol="helper"
+        )
+        legacy = codemap.verification.plan("tests/test_widget.py", symbol="helper")
+    assert original["available"] is True
+    assert original["scope"] == "test-file"
+    assert narrowed["available"] is False
+    assert narrowed["reason"] == "source-evidence-unqualified"
+    assert narrowed["nomination_identity"] != original["nomination_identity"]
+    assert narrowed["execution_authority"] == "external"
+    assert legacy["available"] is True
+    assert legacy["scope"] == "test-file"
+
+
+def test_explicit_unsupported_python_selector_never_reads_supporting_config(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests/test_widget.py").write_text(
+        "def test_widget(): pass\n", encoding="utf-8"
+    )
+
+    def forbidden(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("unqualified node selector inspected config metadata")
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        monkeypatch.setattr(
+            codemap.verification, "_pytest_manifest_declaration", forbidden
+        )
+        assert (
+            codemap.verification.nomination(
+                "tests/test_widget.py", symbol="helper"
+            )["reason"]
+            == "source-evidence-unqualified"
+        )
