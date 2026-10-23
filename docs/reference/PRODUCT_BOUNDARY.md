@@ -515,3 +515,17 @@ authorize test execution, or report test outcomes. The established
 source-member revision ledger and nomination identity remain authoritative
 for the exact observed inputs. The legacy advisory `plan(...)` surface is
 not changed.
+
+### Python test-node source qualification
+
+A requested `test-node` projection for Python is admitted as repository
+evidence only if the already source-revision-qualified Python member bytes
+contain **exactly one top-level** function or async function with that name,
+as checked by Python's standard `ast` parser. Comments, nested functions,
+class methods requiring a qualified class target, duplicate declarations,
+missing definitions and malformed Python do not establish the precise
+`file::test_function` claim. They produce an unavailable nomination rather
+than a fabricated node. A file-level nomination without a node claim remains
+available under its original repository test-file scope. No test code is
+imported or executed, and the legacy advisory `plan(...)` is not changed.
+This parser qualifies syntax, not collected pytest membership or results.
