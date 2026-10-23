@@ -12,6 +12,7 @@ from hashmarks.operation_contract import operation_response, operation_schema
 from hashmarks.paths import normalize_relative_path
 
 from .decision_session import decision_scoped, reconcile_decision
+from .go_module_declaration import declared_go_module
 from .repository_domains import RepositoryDomain, classify_repository_path
 from .repository_observation import evidence_identity
 
@@ -353,9 +354,12 @@ class VerificationPlanMixin:
     ) -> tuple[str, str, str, str, str | None] | None:
         if not Path(rel).name.endswith("_test.go"):
             return None
-        if self._nomination_source_member("go.mod", members) is not None:
-            return ("go-test", "go-package", "go-mod-plus-test-file", "high", None)
-        return None
+        raw = self._nomination_source_member("go.mod", members)
+        if raw is None:
+            return None
+        if declared_go_module(raw) is None:
+            raise _UnqualifiedNominationMember("go.mod")
+        return ("go-test", "go-package", "go-mod-plus-test-file", "high", None)
 
     def _ecmascript_surface_nomination(
         self, rel: str, source: bytes, members: list[dict[str, object]]

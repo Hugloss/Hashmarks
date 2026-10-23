@@ -572,3 +572,19 @@ installed tooling. This is source-evidence precision, not proof of no tests,
 agent tool choice, pytest/Go/JS test collection, or execution authority.
 The historical `plan(...)` compatibility API retains its independent advisory
 semantics without changes.
+
+### Go module declarations share one syntax interpreter
+
+A present `go.mod` is not, by itself, proof of a declared Go module.
+Verification nomination and Go import-path correlation now use the same
+bounded `declared_go_module` interpreter on source bytes; comments, missing
+or duplicate `module` directives, invalid UTF-8 and malformed lines cannot
+promote Go package evidence. The verification-nomination path obtains bytes
+and revisions solely through the canonical Hashmarks source observer, and
+the import resolver uses that same source owner rather than reading a second,
+unqualified copy from the filesystem. This interpreter only establishes a
+positive authored module directive, **not** full Go module-file validity,
+dependency resolution, buildability, Go toolchain presence or test execution.
+An unqualified present `go.mod` yields `source-evidence-unqualified` for
+a Go nomination, not proof that the repository has no Go tests. The legacy
+advisory `plan(...)` remains unchanged.
