@@ -324,6 +324,14 @@ the canonical ownership packet includes `next_read`, both readable and structure
 initial presentations display that exact producer-supplied observation
 with a native JSON pointer. It is a source-inspection candidate, **not** an
 instruction to execute commands or a new independent owner selection.
+Readable next-read details are intentionally bounded: only the existing
+producer-supplied locator, reason, selection and authority fields are shown
+inline, with a 2 KiB encoded display limit. Extra fields and oversized
+records are reported as omitted from **text presentation only**, with the
+exact `/ownership/next_read` reference. All native evidence, including
+unrecognized future fields, remains losslessly available in the structured
+initial packet. Omission never proves absence or source unavailability.
+
 The structured next-read finding carries its **own native record qualifiers**
 and `producer_claim` assertion, not the qualified-owner display label: an
 owner observation can be proven while a suggested next read is still only a
