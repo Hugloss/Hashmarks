@@ -32,8 +32,6 @@ def declared_go_module(source: bytes) -> str | None:
     modules: list[str] = []
     for line in text.splitlines():
         content = line.strip()
-        if not content or content.startswith("//"):
-            continue
         if not re.match(r"module(?:[ \t]|$)", content):
             continue
         matched = _MODULE.fullmatch(content)
