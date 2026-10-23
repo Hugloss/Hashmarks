@@ -14,6 +14,26 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from .evidence_presentation import _Projection
 
+_MAX_NEXT_READ_INLINE_BYTES = 2048
+_NEXT_READ_TEXT_FIELDS = frozenset(
+    {
+        "reason",
+        "role",
+        "path",
+        "symbol",
+        "lines",
+        "authority",
+        "ambiguity_reason",
+        "selection_basis",
+        "discriminator",
+        "availability_reason",
+        "estimated_tokens",
+        "candidate_count",
+        "start_line",
+        "end_line",
+    }
+)
+
 _INITIAL_VERIFICATION_QUALIFIERS = (
     "reference_strength",
     "direct_reference",
@@ -727,11 +747,23 @@ def _initial_next_read_text(ownership: Mapping[str, object]) -> list[str]:
     next_read = ownership.get("next_read")
     if not isinstance(next_read, Mapping):
         return []
+    # Only known locator/reason fields belong in the bounded first-response
+    # text. The native initial packet still carries every producer field.
+    displayed = {
+        key: value for key, value in next_read.items()
+        if key in _NEXT_READ_TEXT_FIELDS
+    }
+    payload = json.dumps(
+        displayed, sort_keys=True, ensure_ascii=False, separators=(",", ":")
+    )
+    omitted = len(next_read) - len(displayed)
+    if len(payload.encode("utf-8")) > _MAX_NEXT_READ_INLINE_BYTES:
+        payload = '{"display":"native-details-only;inline-budget-exceeded"}'
+        omitted = len(next_read)
     return [
         "Producer next-read candidate: "
-        + json.dumps(
-            next_read, sort_keys=True, ensure_ascii=False, separators=(",", ":")
-        )
+        + payload
+        + f"; omitted fields: {omitted} (full details @ /ownership/next_read)"
         + " (@ /ownership/next_read; repository evidence only, not an execution instruction)."
     ]
 
