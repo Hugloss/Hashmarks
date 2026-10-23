@@ -920,7 +920,7 @@ def test_explicit_unsupported_python_selector_never_reads_supporting_config(
 
 
 @pytest.mark.parametrize(
-    ("filename", "test_source", "manifest_name", "manifest_source"),
+    "case",
     [
         (
             "tests/widget_test.go",
@@ -953,13 +953,11 @@ def test_explicit_unsupported_python_selector_never_reads_supporting_config(
 )
 def test_polyglot_explicit_node_selector_cannot_widen_to_file_or_package(
     tmp_path: Path,
-    filename: str,
-    test_source: str,
-    manifest_name: str,
-    manifest_source: str,
+    case: tuple[str, str, str, str],
     symbol: str | None,
     qualname: str | None,
 ) -> None:
+    filename, test_source, manifest_name, manifest_source = case
     (tmp_path / "tests").mkdir()
     (tmp_path / filename).write_text(test_source, encoding="utf-8")
     (tmp_path / manifest_name).write_text(manifest_source, encoding="utf-8")
