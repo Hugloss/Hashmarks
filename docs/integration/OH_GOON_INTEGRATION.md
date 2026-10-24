@@ -49,6 +49,94 @@ Hashmarks may expose repository ambiguity, alternative candidates, likely repair
 
 The agent can query Hashmarks again after repository bytes change, but its own workflow history does not become repository authority.
 
+## Evidence across repair candidates
+
+Obtain `codemap.tasks.evidence(task)` from each admitted candidate before the
+agent reasons about that candidate. Preserve its packet identity, producer
+identity, receipt and provenance together. A source capture remains the
+execution layer's authority; a refreshed observation does not replace an older
+capture or supply execution results.
+
+`codemap.changes.task_delta(task, changed_paths, previous_evidence=packet)`
+compares changes within one repository and CodeMap continuity cut. The previous
+packet must match the task, repository identity, pre-sync generation, and bound
+evidence context. The operation validates those claims before synchronization.
+Use it after an external edit to that same repository, before another sync.
+Repository identity is not universally a workspace identity: Git-backed roots
+with the same base tree may share it, while Git-free roots are workspace-bound.
+An equal Git-tree identity and generation can therefore admit an older packet
+in a different root. A differing selected source revision remains qualified as
+`previous_index_binding: "mismatch"`; `path_changes` describes the receiving
+index's own before/after synchronization, not the difference between captures.
+Those facts do not prove that the captures are interchangeable.
+
+The execution layer still needs a fresh task packet from every newly admitted
+attempt before reasoning, even when repository identities compare equal.
+Consumers must not rewrite the previous packet's identities to make it
+admissible. The external campaign may retain both packets as separate
+observations linked by its own candidate/run provenance.
+
+Verification membership and source correspondence are also separate. Reobserve
+an earlier report against the new candidate using its original nominated source
+revisions; changed implementation, test or configuration inputs remain a
+`mismatch`. A new externally supplied report may name the same flat membership
+with current revision claims and obtain `proven` source equivalence. Its source
+observations and observation identity change; the member identity need not.
+Neither matching source claims nor unchanged membership upgrades unknown
+repository freshness or proves execution. Inputs outside the report's explicit
+union are not inferred to be covered.
+
+### Deterministic narrow dogfood workload
+
+The existing `resolve_inputs` regression in `tests/test_hardening.py` exercises
+native path glob semantics for `*`, `?`, and character classes, including a
+nearby filename that must not match a single-character pattern. It provides a
+small actual Hashmarks repair workload without adding an agent harness:
+
+1. Export a reviewed source candidate to a disposable workspace and record its
+   source/producer identities outside the source tree. Before opening or copying
+   members, exclude native configuration by path metadata: `.codex/*`,
+   `.opencode/*`, and root `opencode.json` / `opencode.jsonc`. Record the exact
+   excluded paths in the external export receipt; retain the original native
+   files. An export rejected by source admission remains rejected preparation:
+   rebuild from the original source with the explicit exclusions instead of
+   deleting native files from the rejected candidate or reclassifying them as
+   ordinary source. The export has a fresh Git database, not the original
+   repository's history or native stores.
+   A bounded component subject must declare its exact selection before capture,
+   retain the original package initialization and actual runtime dependencies,
+   and account for every selected member during review. Label it as component
+   qualification; copied dependency/build metadata does not make it a complete
+   Hashmarks distribution or establish repository-wide review. Native checks
+   must load the copied component rather than fall back to the original
+   checkout or another installed Hashmarks package.
+2. Establish the passing baseline with
+   `uv run --frozen --offline --no-sync --group test python -m pytest -q tests/test_hardening.py -k resolve_inputs`.
+3. Keep `hashmarks/paths.py::has_glob` unchanged. Only in that disposable
+   candidate, replace `if not has_glob(pattern):` in
+   `hashmarks/inputs.py::resolve_inputs` with
+   `if not any(ch in pattern for ch in "*["):`. This introduces a second accepted
+   classifier that omits `?`: public `Glob("src/?.py").as_pattern()` accepts the
+   pattern while discovery misclassifies it as a literal and raises
+   `FileNotFoundError`. Prove that failure and preserve the `*` and bracket-class
+   controls. Record this as an intentional split-authority mutation, not a newly
+   discovered upstream defect. Authorize repairs in `hashmarks/inputs.py` and
+   the behavioral regression source; keep the canonical classifier and the
+   operator-owned independent verifier outside those write roots.
+4. Let the external agent review and propose a repair. The executor owns
+   admitting/applying that proposal and running the same native regression.
+5. Acquire fresh Hashmarks evidence from the repaired admitted candidate and
+   retain the real verification result under the external execution owner.
+
+This fixture qualifies neither an external Codex integration nor campaign
+convergence by itself. Those require the external controller's actual Runs and
+results. Hashmarks remains the repository observer throughout.
+
+The [shared dogfood acceptance contract](https://github.com/oh-goon/oh-goon/blob/main/docs/AGENT_SKILLS.md#hashmarks-dogfood-acceptance)
+owns cross-product scenario outcomes and required campaign evidence. Retained
+query diagnostics from a rejected preparation do not replace evidence from the
+exact admitted capture.
+
 ## Repository-work selection handoff
 
 The active selected-work handoff is

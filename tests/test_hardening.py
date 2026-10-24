@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from hashmarks import IdentityCycleError
+from hashmarks import Glob, IdentityCycleError, RepositoryIdentity
 from hashmarks.cas import CAS
 from hashmarks.file_store import FileDigestStore
 from hashmarks.graph import IdentityGraph
@@ -120,13 +120,44 @@ def test_resolve_inputs_rejects_parent_escape(tmp_path: Path) -> None:
         resolve_inputs(tmp_path, ["../outside"])
 
 
-def test_resolve_inputs_glob_and_missing_pattern(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("pattern", "expected"),
+    [
+        ("src/*.py", ["src/a.py", "src/aa.py"]),
+        ("src/?.py", ["src/a.py"]),
+        ("src/[ab].py", ["src/a.py"]),
+    ],
+)
+def test_resolve_inputs_glob_and_missing_pattern(
+    tmp_path: Path, pattern: str, expected: list[str]
+) -> None:
     (tmp_path / "src").mkdir()
     (tmp_path / "src" / "a.py").write_text("a")
+    (tmp_path / "src" / "aa.py").write_text("aa")
     (tmp_path / "src" / "b.txt").write_text("b")
-    assert resolve_inputs(tmp_path, ["src/*.py"]) == ["src/a.py"]
+    assert resolve_inputs(tmp_path, [pattern]) == expected
     with pytest.raises(FileNotFoundError, match="matched nothing"):
         resolve_inputs(tmp_path, ["missing/*.py"])
+
+
+def test_question_glob_in_directory_component(tmp_path: Path) -> None:
+    for directory in ("a", "aa"):
+        (tmp_path / directory).mkdir()
+        (tmp_path / directory / "item.py").write_text(directory)
+    pattern = Glob("?/item.py").as_pattern()
+    assert resolve_inputs(tmp_path, [pattern], require_matches=False) == ["a/item.py"]
+
+
+def test_question_glob_local_manifest(tmp_path: Path) -> None:
+    workspace = tmp_path / "repo"
+    (workspace / "src").mkdir(parents=True)
+    (workspace / "src" / "a.py").write_text("a")
+    (workspace / "src" / "aa.py").write_text("aa")
+    with RepositoryIdentity(
+        workspace, mode="local", state_dir=tmp_path / "state"
+    ) as identity:
+        assert identity.manifest([Glob("src/?.py")]).paths == ("src/a.py",)
+        assert identity.manifest(["src/?.py"]).paths == ("src/a.py",)
 
 
 def test_file_invalidation_never_adds_file_path_to_dirty_dirs(tmp_path: Path) -> None:
