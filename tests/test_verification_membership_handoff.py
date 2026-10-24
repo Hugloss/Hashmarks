@@ -44,9 +44,9 @@ def repository(tmp_path: Path) -> Iterator[CodeMap]:
         yield codemap
 
 
-def _report(repository: CodeMap) -> dict[str, object]:
+def _report(repository: CodeMap, *extra_inputs: str) -> dict[str, object]:
     inputs = []
-    for path in ("test_example.py", "pyproject.toml"):
+    for path in ("test_example.py", "pyproject.toml", *extra_inputs):
         member, _ = repository.source.member(path)
         inputs.append({"path": path, "member_revision": member["member_revision"]})
     return {
@@ -157,6 +157,121 @@ def test_source_or_configuration_change_is_not_rebound_to_old_collection(
     assert validate_native_consumer_bundle(before)["valid"] is True
     assert validate_native_consumer_bundle(after)["valid"] is True
     assert validate_native_consumer_bundle(after, require_fresh=True)["valid"] is False
+
+
+def _repair_capture(root: Path, *, git_backed: bool) -> None:
+    root.mkdir()
+    (root / "owner.py").write_text("def widget(): return 'old'\n")
+    (root / "test_example.py").write_text(
+        "from owner import widget\ndef test_top(): assert widget() == 'new'\n"
+    )
+    (root / "pyproject.toml").write_text("[tool.pytest.ini_options]\ntestpaths=['.']\n")
+    if not git_backed:
+        return
+    for command in (
+        ["git", "init", "--quiet"],
+        ["git", "add", "--all"],
+        [
+            "git",
+            "-c",
+            "user.name=Neutral fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "commit",
+            "--quiet",
+            "-m",
+            "same captured baseline",
+        ],
+    ):
+        subprocess.run(command, cwd=root, check=True)
+
+
+def _assert_reobserved_membership(
+    repository: CodeMap,
+    report: dict[str, object],
+    previous: dict[str, object],
+) -> None:
+    reobserved = repository.verification.observe_membership(report)
+    recollected = repository.verification.observe_membership(
+        _report(repository, "owner.py")
+    )
+    assert assert_object(reobserved["source_equivalence"])["state"] == "mismatch"
+    assert assert_object(recollected["source_equivalence"])["state"] == "proven"
+    assert (
+        previous["membership"] == reobserved["membership"] == recollected["membership"]
+    )
+    assert previous["observation_identity"] != recollected["observation_identity"]
+    assert previous["source_members"] != recollected["source_members"]
+    assert validate_native_consumer_bundle(previous)["valid"] is True
+    for observation in (reobserved, recollected):
+        assert assert_object(observation["repository"])["freshness"] == "unknown"
+        checked = validate_native_consumer_bundle(
+            observation,
+            expected_producer_implementation_identity=native_producer_implementation_identity(),
+        )
+        assert checked["valid"] is True, checked
+        assert (
+            checked["execution_authority"] == checked["result_authority"] == "external"
+        )
+        assert (
+            validate_native_consumer_bundle(observation, require_fresh=True)["valid"]
+            is False
+        )
+
+
+@pytest.mark.parametrize(
+    "git_backed", [False, pytest.param(True, marks=pytest.mark.host_git)]
+)
+@pytest.mark.parametrize(
+    "changed_path", ["owner.py", "test_example.py", "pyproject.toml"]
+)
+def test_repair_handoff_separates_membership_from_source_and_capture(
+    tmp_path: Path, git_backed: bool, changed_path: str
+) -> None:
+    task = "Change owner.py widget implementation and verify test_top"
+    for name in ("before", "after"):
+        _repair_capture(tmp_path / name, git_backed=git_backed)
+    with CodeMap(tmp_path / "before", state_dir=tmp_path / "before-state") as before:
+        before.index.sync()
+        previous = before.tasks.evidence(task)
+        report = _report(before, "owner.py")
+        membership = before.verification.observe_membership(report)
+        next_bytes = (before.workspace / changed_path).read_bytes().replace(
+            b"'old'", b"'new'"
+        ) + b"\n# next captured source\n"
+        (before.workspace / changed_path).write_bytes(next_bytes)
+        delta = before.changes.task_delta(
+            task, [changed_path], previous_evidence=previous
+        )
+        assert delta["path_changes"][0]["state"] == "changed"
+        assert delta["generation_after"] > delta["generation_before"]
+        _assert_reobserved_membership(before, report, membership)
+
+    with CodeMap(tmp_path / "after", state_dir=tmp_path / "after-state") as after:
+        (after.workspace / changed_path).write_bytes(next_bytes)
+        after.index.sync()
+        fresh = after.tasks.evidence(task)
+        assert fresh["provenance"]["freshness"] == "unknown"
+        if git_backed:
+            assert (
+                fresh["evidence_receipt"]["repository_identity"]
+                == previous["evidence_receipt"]["repository_identity"]
+            )
+            delta = after.changes.task_delta(
+                task, [changed_path], previous_evidence=previous
+            )
+            assert delta["path_changes"] == [
+                {"path": changed_path, "state": "unchanged"}
+            ]
+            if changed_path == "owner.py":
+                assert delta["previous_index_binding"] == "mismatch"
+                assert "candidate-source-revision" in delta["invalidated"]
+        else:
+            with pytest.raises(ValueError, match="repository-mismatch"):
+                after.changes.task_delta(
+                    task, [changed_path], previous_evidence=previous
+                )
+        _assert_reobserved_membership(after, report, membership)
 
 
 def test_deleted_source_remains_unavailable(repository: CodeMap) -> None:
