@@ -52,6 +52,70 @@ def test_standalone_search_does_not_promote_unknown_freshness_to_negative_eviden
     assert packet["freshness"] == "unknown"
 
 
+@pytest.mark.parametrize(
+    ("query", "source"),
+    [
+        ("部署順序", "def 部署順序(): return 1\n"),
+        ("räkna", "def räkna(): return 1\n"),
+        ("testé", "def testé(): return 1\n"),
+        ("Διατάξεις", "def Διατάξεις(): return 1\n"),
+        ("Réconcile.données", "class Réconcile:\n    def données(self): return 1\n"),
+    ],
+)
+def test_exact_unicode_symbol_queries_retrieve_indexed_owners(
+    index: RepositoryIndex, query: str, source: str
+) -> None:
+    (index.workspace / "owner.py").write_text(source, encoding="utf-8")
+    index.sync()
+
+    packet = _search(index).packet(query)
+
+    assert any(
+        row["path"] == "owner.py" and row["qualname"] == query
+        for row in assert_records(packet["results"])
+    )
+    assert packet["query_intent"] == "identifier"
+    assert packet["observed_exact_match_count"] == 1
+    assert packet["scope"] == "indexed-visible-symbol-surface"
+    assert packet["negative_evidence"] == "not-applicable"
+    assert packet["uniqueness_evidence"] == "not-admissible"
+    assert packet["freshness"] == "unknown"
+
+
+def test_missing_unicode_symbol_preserves_unknown_freshness_qualification(
+    index: RepositoryIndex,
+) -> None:
+    (index.workspace / "owner.py").write_text(
+        "def 部署順序(): return 1\n", encoding="utf-8"
+    )
+    index.sync()
+
+    packet = _search(index).packet("未定義")
+
+    assert packet["query_intent"] == "identifier"
+    assert packet["observed_exact_match_count"] == 0
+    assert packet["negative_evidence"] == "not-admissible"
+    assert packet["freshness"] == "unknown"
+
+
+@pytest.mark.parametrize(("count", "limit"), [(101, 1), (1025, 2048)])
+def test_bounded_unicode_symbol_lookup_preserves_incompleteness(
+    index: RepositoryIndex, count: int, limit: int
+) -> None:
+    for number in range(count):
+        (index.workspace / f"owner_{number:03}.py").write_text(
+            "def Διατάξεις(): return 1\n", encoding="utf-8"
+        )
+    index.sync()
+
+    packet = _search(index).packet("Διατάξεις", limit=limit)
+
+    assert 0 < len(assert_records(packet["results"])) < count
+    assert "find-exact-symbol-limit" in packet["omissions"]
+    assert packet["completeness"] == "incomplete"
+    assert packet["uniqueness_evidence"] in {"not-admissible", "not-applicable"}
+
+
 def test_search_import_does_not_load_context_tasks_or_facade() -> None:
     result = subprocess.run(
         [

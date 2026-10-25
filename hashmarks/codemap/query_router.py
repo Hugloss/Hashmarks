@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass
 from enum import Enum
 
-from .query_primitives import _query_terms
+from .query_primitives import _WORD_RE, _identifier_query_parts, _query_terms
 from .repository_domains import RepositoryDomain
 
 
@@ -19,7 +19,6 @@ class QueryIntent(str, Enum):
     HYBRID = "hybrid"
 
 
-_IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)?$")
 _PATHISH = re.compile(
     r"(?:^|\s)(?:\.?[\w.-]+/)+[\w./-]+|\b[\w.-]+\.(?:py|pyi|js|jsx|ts|tsx|go|rs|java|kt|c|h|cc|cpp|hpp|cs|rb|php|swift|toml|ya?ml|json|ini|cfg|conf|md)\b",
     re.I,
@@ -103,7 +102,6 @@ _CONCEPTUAL = {
     "boundaries",
     "overview",
 }
-_TOKEN = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 
 
 _DOMAIN_WORDS: tuple[tuple[RepositoryDomain, frozenset[str]], ...] = (
@@ -320,7 +318,7 @@ def _required_query_text(query: str) -> str:
 
 def route_query(query: str) -> QueryRoute:
     raw = _required_query_text(query)
-    words = {value.lower() for value in _TOKEN.findall(raw)}
+    words = {value.lower() for value in _WORD_RE.findall(raw)}
     preferred_domains = _preferred_domains(words)
 
     # Explicit filenames/paths are the strongest signal. Native semantic
@@ -361,7 +359,7 @@ def route_query(query: str) -> QueryRoute:
             True,
             "structural vocabulary",
         )
-    elif _IDENTIFIER.fullmatch(raw):
+    elif _identifier_query_parts(raw):
         intent, confidence, native, reason = (
             QueryIntent.IDENTIFIER,
             "high",
