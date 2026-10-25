@@ -1252,8 +1252,11 @@ class RepositorySource(
             raise OSError(
                 f"source observation unavailable for {path}: {observation['state']}"
             )
-        lines = raw.decode("utf-8", errors="replace").splitlines()
-        return "\n".join(lines[start - 1 : end])
+        lines = self._physical_lines(raw)
+        return "\n".join(
+            line.decode("utf-8", errors="replace").removesuffix("\n").removesuffix("\r")
+            for line in lines[start - 1 : end]
+        )
 
     def packet_identity(
         self,

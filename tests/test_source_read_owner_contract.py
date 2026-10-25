@@ -82,3 +82,23 @@ def test_source_read_requalifies_bytes_after_currentness_check(
         assert transition == "modify", "deleted or foreign source must not be disclosed"
         assert "needle_external" not in content
         assert ("needle_alpha" in signature) == ("needle_alpha" in content)
+
+
+@pytest.mark.parametrize("newline", ["\n", "\r\n"])
+def test_source_body_uses_physical_lines_and_preserves_unicode_contents(
+    tmp_path: Path, newline: str
+) -> None:
+    source = newline.join(
+        (
+            "marker = 'before\u2028after'",
+            "def owner():",
+            "    return 'body\u0085tail'",
+        )
+    )
+    (tmp_path / "owner.py").write_bytes(source.encode("utf-8"))
+    with CodeMap(tmp_path, state_dir=tmp_path / ".state") as codemap:
+        codemap.index.sync()
+        body = codemap.source.read("owner.py::owner")
+    assert body["lines"] == [2, 3]
+    assert body["content"] == "def owner():\n    return 'body\u0085tail'"
+    assert (tmp_path / "owner.py").read_bytes() == source.encode("utf-8")
