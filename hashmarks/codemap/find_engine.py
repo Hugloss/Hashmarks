@@ -270,6 +270,16 @@ class RepositorySearch(TaskRetrievalMixin, RetrievalDiagnosticsMixin):
         rows = self.reads.exact_symbol_candidates(ctx.terms, limit=bound)
         if len(rows) >= bound:
             ctx.bound_reasons.add("find-exact-symbol-limit")
+        if ctx.route.intent.value == "identifier" and not ctx.query.isascii():
+            # SQLite lower() does not fold non-ASCII names. The existing exact
+            # visible-symbol index preserves their original spelling.
+            exact_bound = min(bound, 1024)
+            exact_rows = self.store.visible_symbol_candidates(
+                ctx.query.strip(), limit=exact_bound
+            )
+            if len(exact_rows) >= exact_bound:
+                ctx.bound_reasons.add("find-exact-symbol-limit")
+            rows.extend({"row_type": "symbol", **row} for row in exact_rows)
         for row in rows:
             key = (str(row.get("path", "")), str(row.get("qualname", "")), "symbol")
             candidates[key] = row

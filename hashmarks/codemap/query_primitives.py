@@ -5,7 +5,14 @@ from functools import lru_cache
 
 from .python_ast import identifier_terms
 
-_WORD_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+_WORD_RE = re.compile(r"[^\W\d]\w*")
+
+
+def _identifier_query_parts(query: str) -> tuple[str, ...]:
+    parts = tuple(query.strip().split("."))
+    return (
+        parts if len(parts) <= 2 and all(part.isidentifier() for part in parts) else ()
+    )
 
 
 _TASK_STOPWORDS = frozenset(
@@ -153,7 +160,11 @@ def _query_terms(query: str) -> tuple[str, ...]:
     sets in scoring/reranking inner loops while retaining no repository authority.
     """
     terms: set[str] = set()
-    for token in _WORD_RE.findall(query):
+    tokens = _WORD_RE.findall(query)
+    parts = _identifier_query_parts(query)
+    if parts and not query.isascii():
+        tokens.extend((".".join(parts), *parts))
+    for token in tokens:
         terms.update(identifier_terms(token))
     # Very short terms are usually noise in code retrieval.
     return tuple(
