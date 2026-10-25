@@ -145,6 +145,80 @@ def _writes_name(node: ast.AST, name: str) -> bool:
     return any(bound == name for bound in _binding_writes(node))
 
 
+def _arguments_bind(arguments: ast.arguments, name: str) -> bool:
+    positional = [*arguments.posonlyargs, *arguments.args, *arguments.kwonlyargs]
+    positional.extend(
+        arg for arg in (arguments.vararg, arguments.kwarg) if arg is not None
+    )
+    return any(argument.arg == name for argument in positional)
+
+
+def _call_uses_name(node: ast.Call, name: str) -> bool:
+    target = node.func
+    while isinstance(target, ast.Attribute):
+        target = target.value
+    return isinstance(target, ast.Name) and target.id == name
+
+
+def _expression_bound_call(
+    node: ast.AST, name: str, line: int, bound: bool = False
+) -> bool:
+    start = getattr(node, "lineno", None)
+    if start is not None and not start <= line <= (
+        getattr(node, "end_lineno", None) or start
+    ):
+        return False
+    if (
+        isinstance(node, ast.Call)
+        and bound
+        and node.lineno == line
+        and _call_uses_name(node, name)
+    ):
+        return True
+    if isinstance(node, ast.Lambda):
+        defaults = [
+            *node.args.defaults,
+            *(value for value in node.args.kw_defaults if value is not None),
+        ]
+        return any(
+            _expression_bound_call(value, name, line, bound) for value in defaults
+        ) or _expression_bound_call(
+            node.body,
+            name,
+            line,
+            bound or _arguments_bind(node.args, name) or _writes_name(node.body, name),
+        )
+    if isinstance(node, (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)):
+        local = bound or any(
+            _writes_name(generator.target, name) for generator in node.generators
+        )
+        inside = [generator.iter for generator in node.generators[1:]]
+        inside.extend(
+            condition for generator in node.generators for condition in generator.ifs
+        )
+        inside.extend(
+            (node.key, node.value) if isinstance(node, ast.DictComp) else (node.elt,)
+        )
+        return _expression_bound_call(
+            node.generators[0].iter, name, line, bound
+        ) or any(_expression_bound_call(value, name, line, local) for value in inside)
+    return any(
+        _expression_bound_call(child, name, line, bound)
+        for child in _binding_children(node)
+    )
+
+
+def python_expression_call_binds(
+    body: Sequence[ast.stmt], name: str, line: int
+) -> bool:
+    """Observe call-site shadowing without leaking expression locals into their parent.
+
+    The compact call index has line coordinates only. A same-line collision
+    therefore preserves uncertainty for every call with that receiver spelling.
+    """
+    return any(_expression_bound_call(statement, name, line) for statement in body)
+
+
 def python_function_scope_binds(
     definitions: Mapping[str, tuple[ast.FunctionDef | ast.AsyncFunctionDef, ...]],
     qualname: str,
@@ -163,17 +237,7 @@ def python_function_scope_binds(
         if len(functions) != 1:
             return True
         function = functions[0]
-        arguments = [
-            *function.args.posonlyargs,
-            *function.args.args,
-            *function.args.kwonlyargs,
-        ]
-        arguments.extend(
-            arg
-            for arg in (function.args.vararg, function.args.kwarg)
-            if arg is not None
-        )
-        if any(argument.arg == name for argument in arguments) or any(
+        if _arguments_bind(function.args, name) or any(
             _writes_name(statement, name) for statement in function.body
         ):
             return True
