@@ -428,6 +428,10 @@ and the eight-hop bound still qualify resolution. Later assignments do not leave
 an earlier function declaration authoritative. Renamed facade chains retain the
 actual declaration's path and qualified name.
 
+Static `__all__` declarations define star-export membership, including explicitly
+listed leading-underscore names. Implicit exports exclude those names; dynamic
+or deleted `__all__` declarations retain unresolved export authority.
+
 The verification projection composes existing impact-test evidence with already
 qualified test callers of the selected symbol. It preserves the selected edit
 owner, the existing bounds and alternatives; it neither executes tests nor claims

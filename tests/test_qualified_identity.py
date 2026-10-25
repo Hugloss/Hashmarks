@@ -74,6 +74,73 @@ def test_ambiguous_reexport_has_no_qualified_identity(tmp_path: Path) -> None:
     assert result["qualified_identity"] is None
 
 
+@pytest.mark.parametrize(
+    ("name", "declaration", "exported"),
+    [
+        ("_build", "__all__ = ['_build']\n", True),
+        ("_build", "__all__ = []\n__all__.append('_build')\n", True),
+        ("_build", "", False),
+        ("build", "", True),
+        ("_build", "__all__ = ['other']\n", False),
+        ("build", "__all__ = ['other']\n", False),
+        ("_build", "__all__ = names\n", False),
+        ("build", "__all__ = names\n", False),
+        ("_build", "__all__ = ['_build']\ndel __all__\n", False),
+    ],
+)
+def test_star_export_membership_qualifies_identity_calls_and_test_callers(
+    tmp_path: Path, name: str, declaration: str, exported: bool
+) -> None:
+    _write(tmp_path, "pkg/__init__.py", "from .impl import *\n")
+    _write(tmp_path, "pkg/impl.py", declaration + f"def {name}(): return 1\n")
+    _write(
+        tmp_path,
+        "tests/test_build.py",
+        f"from pkg import {name} as selected\ndef test_build(): return selected()\n",
+    )
+    owner = f"pkg/impl.py::{name}"
+    with _map(tmp_path) as codemap:
+        codemap.index.sync()
+        identity = qualified_import_identity(
+            codemap._imports, source_path="tests/test_build.py", target=f"pkg.{name}"
+        )
+        forward = codemap.structure.locality("tests/test_build.py::test_build")
+        reverse = codemap.structure.locality(owner, max_depth=0)
+    calls = [
+        row
+        for row in assert_records(forward["edges"])
+        if row["target_text"] == "selected"
+    ]
+    target = next(
+        row for row in assert_records(reverse["nodes"]) if row["symbol_id"] == owner
+    )
+    assert len(calls) == 1
+    if exported:
+        assert identity["status"] == "resolved"
+        assert identity["qualified_identity"] is not None
+        assert identity["owner_paths"] == ["pkg/__init__.py", "pkg/impl.py"]
+        assert calls[0]["resolved_symbol_id"] == owner
+        assert {
+            (row["path"], row["source"])
+            for row in assert_records(target["exact_callers"])
+        } == {("tests/test_build.py", "test_build")}
+    else:
+        assert identity["qualified_identity"] is None
+        assert calls[0]["resolved_symbol_id"] is None
+        assert target["exact_callers"] == []
+    assert (
+        identity["producer_implementation_identity"]
+        == forward["provider_implementation_identity"]
+    )
+    assert (
+        forward["provider_implementation_identity"]
+        == reverse["provider_implementation_identity"]
+    )
+    assert identity["source_path"] == "tests/test_build.py"
+    assert identity["requested_target"] == f"pkg.{name}"
+    assert forward["repository_identity"] == reverse["repository_identity"]
+
+
 def _shared_repo(root: Path) -> None:
     (root / "backend").mkdir()
     (root / "frontend").mkdir()

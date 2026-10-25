@@ -363,7 +363,7 @@ class RepositoryImports:
         authoritative, while absent ``__all__`` exports non-underscore names.
         Dynamic or ambiguous ``__all__`` remains unknown/fail-closed.
         """
-        if not exported_name or exported_name.startswith("_"):
+        if not exported_name:
             return False
         module_target = (
             target.rsplit(".", 1)[0]
@@ -384,8 +384,10 @@ class RepositoryImports:
             return None
         if isinstance(exports, list):
             return exported_name in exports
-        symbols = self.reads.symbols_for_path(owner)
-        return any(str(symbol.get("name") or "") == exported_name for symbol in symbols)
+        return not exported_name.startswith("_") and any(
+            str(symbol.get("name") or "") == exported_name
+            for symbol in self.reads.symbols_for_path(owner)
+        )
 
     def _resolve_import_owner_evidence(
         self, source_path: str, target: str

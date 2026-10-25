@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+from contract_assertions import assert_records
 
 from hashmarks.codemap import CodeMap
 
@@ -223,17 +224,41 @@ def test_star_reexport_dynamic_extend_all_fails_closed(tmp_path: Path) -> None:
     assert ambiguous is True
 
 
-def test_private_name_never_acquires_star_export_authority(tmp_path: Path) -> None:
+def test_explicit_private_star_export_qualifies_the_selected_class_member(
+    tmp_path: Path,
+) -> None:
     _write(tmp_path, "pkg/__init__.py", "from .impl import *\n")
-    _write(tmp_path, "pkg/impl.py", "__all__ = ['_Private']\ndef _Private(): pass\n")
-    _write(tmp_path, "tests/test_public.py", "from pkg import _Private\n")
+    _write(
+        tmp_path,
+        "pkg/impl.py",
+        "__all__ = ['_Private']\nclass _Private:\n"
+        "    @classmethod\n    def build(cls): return 1\n",
+    )
+    _write(
+        tmp_path,
+        "pkg/other.py",
+        "class _Private:\n    @classmethod\n    def build(cls): return 2\n",
+    )
+    _write(
+        tmp_path,
+        "tests/test_public.py",
+        "from pkg import _Private as Public\ndef test_build(): return Public.build()\n",
+    )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
         owners, ambiguous = codemap._imports._resolve_import_owner_evidence(
             "tests/test_public.py", "pkg._Private"
         )
-    assert owners == ["pkg/__init__.py"]
-    assert ambiguous is True
+        packet = codemap.structure.locality("tests/test_public.py::test_build")
+    assert owners == ["pkg/__init__.py", "pkg/impl.py"]
+    assert ambiguous is False
+    calls = [
+        row
+        for row in assert_records(packet["edges"])
+        if row["target_text"] == "Public.build"
+    ]
+    assert len(calls) == 1
+    assert calls[0]["resolved_symbol_id"] == "pkg/impl.py::_Private.build"
 
 
 def test_chained_star_facade_keeps_leaf_owner_when_each_export_is_proven(
