@@ -23,6 +23,7 @@ from .ownership.filesystem_lifecycle import locality_lifecycle
 from .python_exports import (
     python_class_member_binding,
     python_class_node,
+    python_expression_call_binds,
     python_function_body_binds,
     python_function_scope_binds,
 )
@@ -263,6 +264,26 @@ class RepositoryStructure(ReadScopeOwner):
             return True
         return python_function_scope_binds(
             snapshot.function_definitions_by_qualname, source, name
+        )
+
+    def _python_expression_call_locally_binds(
+        self, edge: Mapping[str, object], name: str
+    ) -> bool:
+        try:
+            snapshot = read_python_ast(
+                self.workspace / str(edge["path"]), errors="replace"
+            )
+        except (OSError, SyntaxError, UnicodeError, ValueError):
+            return True
+        source = str(edge.get("source") or "")
+        body = snapshot.tree.body
+        if source:
+            functions = snapshot.function_definitions_by_qualname.get(source, ())
+            if len(functions) != 1:
+                return True
+            body = functions[0].body
+        return python_expression_call_binds(
+            body, name, locality_coordinate(edge.get("line") or 0)
         )
 
     def _python_plain_call_binding(
@@ -627,7 +648,13 @@ class RepositoryStructure(ReadScopeOwner):
         source_qualname = str(edge.get("source") or "")
         source_row = self.store.file_row(source_path)
         language = "" if source_row is None else str(source_row["language"] or "")
-        if language == "python" and target != short:
+        expression_bound = (
+            language == "python"
+            and self._python_expression_call_locally_binds(
+                edge, target.split(".", 1)[0]
+            )
+        )
+        if language == "python" and not expression_bound and target != short:
             binding = self._python_qualified_call_binding(
                 source_path=source_path,
                 source_qualname=source_qualname,
@@ -637,7 +664,7 @@ class RepositoryStructure(ReadScopeOwner):
             if binding[0] is not None or evidence.complete:
                 return binding
             return None, binding[1], True, False
-        if language == "python":
+        if language == "python" and not expression_bound:
             resolved, ids, unresolved = self._python_plain_call_binding(
                 source_path=source_path,
                 source_qualname=source_qualname,

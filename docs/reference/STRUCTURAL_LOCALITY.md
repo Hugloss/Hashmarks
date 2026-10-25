@@ -448,3 +448,9 @@ statements preserve an existing declaration; locals inside unrelated nested scop
 do not overwrite module exports. Class/member qualification uses the same ordered
 binding analysis. Indexing and qualification share relative-import target spelling;
 the Python parser cache version changes so prior derived import artifacts rebuild.
+
+Lambda parameters, lambda-local assignments and comprehension targets qualify
+calls in their own expression scope. Lambda defaults and the first comprehension iterable retain the outer
+scope; later iterables, filters and results use the comprehension's local bindings.
+The compact call index has line coordinates, so a same-line collision between
+outer and shadowed calls remains unresolved.
