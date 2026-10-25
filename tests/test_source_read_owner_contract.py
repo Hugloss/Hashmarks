@@ -6,6 +6,7 @@ import pytest
 from contract_assertions import assert_records, assert_text
 
 from hashmarks.codemap import CodeMap
+from hashmarks.codemap.providers import TreeSitterRangeProvider
 
 
 def _move_after_check(
@@ -102,3 +103,98 @@ def test_source_body_uses_physical_lines_and_preserves_unicode_contents(
     assert body["lines"] == [2, 3]
     assert body["content"] == "def owner():\n    return 'body\u0085tail'"
     assert (tmp_path / "owner.py").read_bytes() == source.encode("utf-8")
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
+        (
+            "owner.py",
+            "",
+            "label = 'before__SEP__after'",
+            "def needle_owner(): return label",
+            2,
+        ),
+        (
+            "broken.py",
+            "",
+            "label = 'before__SEP__after'",
+            "needle_owner = (",
+            2,
+        ),
+        (
+            "owner.js",
+            "",
+            "const label = 'before__SEP__after';",
+            "export function needle_owner() { return label; }",
+            2,
+        ),
+        (
+            "owner.ts",
+            "",
+            "const label = 'before__SEP__after';",
+            "export function needle_owner() { return label; }",
+            2,
+        ),
+        (
+            "owner.go",
+            "package sample\n",
+            'var label = "before__SEP__after"',
+            "func needle_owner() string { return label }",
+            3,
+        ),
+        (
+            "owner.rs",
+            "",
+            'const LABEL: &str = "before__SEP__after";',
+            "fn needle_owner() -> &'static str { LABEL }",
+            2,
+        ),
+        ("notes.md", "", "'before__SEP__after'", "needle_owner reference", 2),
+    ],
+)
+@pytest.mark.parametrize("separator", ["\u0085", "\u2028", "\u2029"])
+@pytest.mark.parametrize("newline", ["\n", "\r\n"])
+def test_grep_uses_canonical_physical_lines_across_lexical_artifact_families(
+    tmp_path: Path,
+    case: tuple[str, str, str, str, int],
+    separator: str,
+    newline: str,
+) -> None:
+    filename, prefix, header, declaration, line = case
+    header = header.replace("__SEP__", separator)
+    raw = (prefix + header + "\n" + declaration).replace("\n", newline).encode("utf-8")
+    (tmp_path / filename).write_bytes(raw)
+    state = tmp_path / ".state"
+    provider = TreeSitterRangeProvider()
+    with CodeMap(
+        tmp_path,
+        state_dir=state,
+        artifact_db=state / "artifacts.sqlite3",
+        range_provider=provider,
+    ) as codemap:
+        codemap.index.sync()
+        if filename == "broken.py":
+            assert codemap.source.outline(filename)["parse_error"] is not None
+        canonical = codemap.source.observe(filename, literal="needle_owner")
+        first = codemap.source.grep("needle_owner", context_lines=1)
+    with CodeMap(
+        tmp_path,
+        state_dir=state,
+        artifact_db=state / "artifacts.sqlite3",
+        range_provider=provider,
+    ) as reopened:
+        warm = reopened.index.sync()
+        second = reopened.source.grep("needle_owner", context_lines=1)
+    assert warm.parsed_artifacts == 0
+    assert warm.reused_artifacts == 1
+    assert provider.status().available is False
+    assert canonical["freshness"] == "unknown"
+    assert [row["line"] for row in assert_records(canonical["occurrences"])] == [line]
+    for packet in (first, second):
+        matches = assert_records(packet["matches"])
+        assert len(matches) == 1
+        assert matches[0]["line"] == line
+        assert matches[0]["range"] == [line - 1, line]
+        assert matches[0]["content"] == header + "\n" + declaration
+    assert (tmp_path / filename).read_bytes() == raw

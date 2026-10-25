@@ -12,10 +12,10 @@ from .python_ast import PYTHON_PARSER, estimate_tokens, lexical_records, parse_p
 if TYPE_CHECKING:
     from .providers import SourceRangeProvider
 
-NODE_PARSER = "hashmarks.ecmascript-outline.v5"
-GO_PARSER = "hashmarks.go-outline.v2"
-RUST_PARSER = "hashmarks.rust-outline.v2"
-PATH_ONLY_PARSER = "hashmarks.path-only.v3"
+NODE_PARSER = "hashmarks.ecmascript-outline.v6"
+GO_PARSER = "hashmarks.go-outline.v3"
+RUST_PARSER = "hashmarks.rust-outline.v3"
+PATH_ONLY_PARSER = "hashmarks.path-only.v4"
 
 
 def parser_id(language: str) -> str:

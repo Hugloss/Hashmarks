@@ -931,7 +931,10 @@ class RepositorySource(
         _observation, raw = self.member(path, include_bytes=True)
         if raw is None:
             return None
-        lines = raw.decode("utf-8", errors="replace").splitlines()
+        lines = [
+            line.decode("utf-8", errors="replace").removesuffix("\n").removesuffix("\r")
+            for line in self._physical_lines(raw)
+        ]
         line_value = candidate["line"]
         assert isinstance(line_value, int)
         line_no = line_value
