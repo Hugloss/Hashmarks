@@ -387,6 +387,44 @@ def test_native_destructuring_defaults_and_parameter_scope_stay_distinct(
     assert assert_object(destructured["rest"]["property"])["name"] is None
 
 
+@pytest.mark.parametrize(
+    "signature",
+    [
+        "const decoder: ({chunk}: Payload) => void = consume;",
+        "const Decoder: new ({chunk}: Payload) => object = Producer;",
+        "const protocol: { decode({chunk}: Payload): void } = provided;",
+        "const protocol: { ({chunk}: Payload): void } = provided;",
+        "const protocol: { new ({chunk}: Payload): object } = provided;",
+    ],
+)
+def test_native_type_parameter_patterns_do_not_inherit_a_variable_declaration(
+    tmp_path: Path, native_syntax: TreeSitterRangeProvider, signature: str
+) -> None:
+    raw = (signature + "\nconst {chunk: payloadChunk} = frame;\n").encode("utf-8")
+    (tmp_path / "codec.ts").write_bytes(raw)
+    with CodeMap(tmp_path, range_provider=native_syntax) as codemap:
+        codemap.index.sync()
+        packet = codemap.source.ecmascript("codec.ts")
+    assert packet["availability"] == "observed"
+    destructured = {
+        _text(row["binding"]): row for row in _facts(packet, "destructured-binding")
+    }
+    parameter = destructured["chunk"]
+    assert parameter["syntax_context"] == "type-syntax"
+    assert parameter["declaration_range"] is None
+    variable = destructured["payloadChunk"]
+    assert variable["syntax_context"] == "value-syntax"
+    assert variable["declaration_range"] is not None
+    bounds = assert_object(variable["declaration_range"])
+    assert (
+        raw[assert_integer(bounds["start_byte"]) : assert_integer(bounds["end_byte"])]
+        == b"{chunk: payloadChunk} = frame"
+    )
+    assert packet["semantic_resolution"] == "not-performed"
+    assert packet["negative_evidence"] == "not-admissible"
+    assert packet["freshness"] == "unknown"
+
+
 def test_expression_previews_and_escaped_keys_do_not_invent_static_names(
     tmp_path: Path, native_syntax: TreeSitterRangeProvider
 ) -> None:
