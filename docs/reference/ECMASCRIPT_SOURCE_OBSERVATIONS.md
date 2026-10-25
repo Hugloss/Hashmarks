@@ -118,8 +118,9 @@ preserve native `type_only` qualifiers.
 Object-pattern components preserve nesting through their ranges rather than
 flattening an alias chain. Defaults are separately exposed. A rest binding has no
 known property name. Function-parameter patterns never acquire an enclosing
-variable declaration's range. Array patterns remain whole binding expressions;
-this version does not expand their elements. Side-effect-only imports,
+variable declaration's range, including parameters in TypeScript function types,
+constructor types, and callable object signatures. Array patterns remain whole
+binding expressions; this version does not expand their elements. Side-effect-only imports,
 TypeScript import-equals declarations, namespace re-exports, and other syntax
 outside the listed node forms do not acquire binding facts.
 

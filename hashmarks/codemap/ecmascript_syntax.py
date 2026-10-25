@@ -111,6 +111,7 @@ class _Visit:
                 if self.node.type == "variable_declarator"
                 else None
                 if self.node.type in _CALLABLE_SCOPES
+                or self.node.type == "formal_parameters"
                 else self.declaration
             ),
         )
