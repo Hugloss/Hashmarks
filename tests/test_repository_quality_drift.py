@@ -239,13 +239,15 @@ def test_typescript_generic_function_is_an_exact_owner(tmp_path: Path) -> None:
     assert action["admitted_edit"]["name"] == "withRefreshOutcome"
 
 
+@pytest.mark.parametrize("prefix", ["", "const label = 'before\u2028after';\n"])
 def test_typescript_overload_signatures_share_the_implementation_owner(
     tmp_path: Path,
+    prefix: str,
 ) -> None:
     repo = tmp_path / "repo"
     (repo / "src").mkdir(parents=True)
     (repo / "src" / "encoding.ts").write_text(
-        "export function encodePayload(value: object): object;\n"
+        prefix + "export function encodePayload(value: object): object;\n"
         "export function encodePayload(value: unknown): unknown;\n"
         "export function encodePayload(value: unknown): unknown {\n"
         "  return value;\n"

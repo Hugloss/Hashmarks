@@ -52,6 +52,12 @@ owns qualified member/range reads and returns detached public outline symbols.
 Its instruction-scope primitive consumes explicit paths. Query-based instruction
 seed selection remains Context composition, above Source and retrieval.
 
+Indexed JavaScript/TypeScript declaration and import positions use physical LF
+source lines, matching canonical Source observations. Unicode separators inside
+source strings do not shift those positions, including advisory outlines when
+native ranges are unavailable. Symbol body reads use the same physical lines,
+retaining Unicode contents and the existing CRLF display normalization.
+
 `CodeMap.source.range_receipt()` is a supported direct Python operation with
 schema `hashmarks.source-range-receipt.v1`. It preserves original bytes in an
 explicit zero-based half-open range and binds them to the canonical full-member

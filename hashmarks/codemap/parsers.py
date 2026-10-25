@@ -12,7 +12,7 @@ from .python_ast import PYTHON_PARSER, estimate_tokens, lexical_records, parse_p
 if TYPE_CHECKING:
     from .providers import SourceRangeProvider
 
-NODE_PARSER = "hashmarks.ecmascript-outline.v4"
+NODE_PARSER = "hashmarks.ecmascript-outline.v5"
 GO_PARSER = "hashmarks.go-outline.v2"
 RUST_PARSER = "hashmarks.rust-outline.v2"
 PATH_ONLY_PARSER = "hashmarks.path-only.v3"
@@ -150,7 +150,7 @@ def _node_declaration(stripped: str, line_no: int) -> SymbolRecord | None:
 def _node_outline(source: str, *, file_digest: str, language: str) -> ParsedArtifact:
     symbols: list[SymbolRecord] = []
     edges: list[EdgeRecord] = []
-    for line_no, raw in enumerate(source.splitlines(), 1):
+    for line_no, raw in enumerate(source.split("\n"), 1):
         stripped = raw.strip()
         if not stripped:
             continue
@@ -187,7 +187,7 @@ def _typescript_implementation_symbols(
     symbols: tuple[SymbolRecord, ...], source: str
 ) -> tuple[SymbolRecord, ...]:
     """Join only adjacent same-scope overload signatures to their implementation."""
-    lines = source.splitlines()
+    lines = source.split("\n")
 
     def is_signature(symbol: SymbolRecord) -> bool:
         if symbol.kind != "function" or not 1 <= symbol.start_line <= len(lines):
