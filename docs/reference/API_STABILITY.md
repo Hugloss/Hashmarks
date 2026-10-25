@@ -57,6 +57,9 @@ source lines, matching canonical Source observations. Unicode separators inside
 source strings do not shift those positions, including advisory outlines when
 native ranges are unavailable. Symbol body reads use the same physical lines,
 retaining Unicode contents and the existing CRLF display normalization.
+Lexical match positions and grep context use this physical-line contract across
+all indexed languages. Parser derivation identities invalidate retained lexical
+artifacts when their line partition changes.
 
 `CodeMap.source.range_receipt()` is a supported direct Python operation with
 schema `hashmarks.source-range-receipt.v1`. It preserves original bytes in an

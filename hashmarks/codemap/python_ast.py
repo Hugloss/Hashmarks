@@ -281,7 +281,7 @@ def lexical_records(source: str) -> tuple[LexicalRecord, ...]:
     import re
 
     records: list[LexicalRecord] = []
-    for line_no, line in enumerate(source.splitlines(), 1):
+    for line_no, line in enumerate(source.split("\n"), 1):
         # Deduplicate within one line. The index is for narrowing candidate
         # lines, not term frequency/scoring.
         tokens: set[str] = set()
