@@ -84,8 +84,9 @@ jobs:
             exit 0
           fi
           python3 scripts/release_contract.py validate-release-candidate --base-ref "$BASE_SHA"
-      - run: uv sync --frozen --group test --python 3.11
+      - run: uv sync --frozen --group typing --python 3.11
       - run: make compile
+      - run: make typecheck
   authority-diagnostics:
     name: Workspace authority diagnostics
     runs-on: ubuntu-latest

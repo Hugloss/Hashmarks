@@ -264,6 +264,7 @@ def test_repair_handoff_separates_membership_from_source_and_capture(
                 {"path": changed_path, "state": "unchanged"}
             ]
             if changed_path == "owner.py":
+                assert "previous_index_binding" in delta
                 assert delta["previous_index_binding"] == "mismatch"
                 assert "candidate-source-revision" in delta["invalidated"]
         else:

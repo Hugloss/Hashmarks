@@ -6,6 +6,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from contract_assertions import is_available_plan
+
 from hashmarks import RepositoryIdentity
 from hashmarks import test_shards as legacy_shards
 from hashmarks._development import test_shards as developer_shards
@@ -106,6 +108,11 @@ def test_verification_target_is_evidence_not_command_authority(tmp_path: Path) -
         codemap.index.sync()
         nomination = codemap.verification.plan("tests/test_demo.py", symbol="test_demo")
     assert nomination["available"] is True
+    assert is_available_plan(nomination)
+    assert "verification_target" in nomination
+    assert "command_intent_authority" in nomination
+    assert "execution_authority" in nomination
+    assert "argv" in nomination
     assert nomination["verification_target"] == {
         "path": "tests/test_demo.py",
         "test_symbol": "test_demo",

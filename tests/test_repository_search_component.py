@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 import pytest
-from contract_assertions import assert_records
+from contract_assertions import assert_array, assert_records
 from test_repository_index_component import index as index
 from test_repository_native_component import _native
 
@@ -111,7 +111,8 @@ def test_bounded_unicode_symbol_lookup_preserves_incompleteness(
     packet = _search(index).packet("Διατάξεις", limit=limit)
 
     assert 0 < len(assert_records(packet["results"])) < count
-    assert "find-exact-symbol-limit" in packet["omissions"]
+    omissions = assert_array(packet["omissions"])
+    assert "find-exact-symbol-limit" in omissions
     assert packet["completeness"] == "incomplete"
     assert packet["uniqueness_evidence"] in {"not-admissible", "not-applicable"}
 

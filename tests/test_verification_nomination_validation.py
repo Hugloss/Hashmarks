@@ -6,6 +6,7 @@ from copy import deepcopy
 from typing import TYPE_CHECKING
 
 import pytest
+from contract_assertions import assert_object, assert_records, assert_text
 
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.repository_observation import evidence_identity
@@ -67,7 +68,7 @@ def test_validator_rejects_mutated_nomination_fields(
     elif mutation == "forged-execution-authority":
         changed["execution_authority"] = "hashmarks"
     elif mutation == "noncanonical-target-path":
-        changed["verification_target"]["path"] = "tests/./test_sample.py"
+        assert_object(changed["verification_target"])["path"] = "tests/./test_sample.py"
     elif mutation == "invalid-availability":
         changed["available"] = 1
     result = validate_verification_nomination(changed)
@@ -91,7 +92,8 @@ def test_validator_rejects_mutated_nomination_ledger(
     tmp_path: Path, mutation: str
 ) -> None:
     changed = deepcopy(_nomination(tmp_path))
-    members = changed["supporting_source_members"]
+    members = assert_records(changed["supporting_source_members"])
+    changed["supporting_source_members"] = members
     if mutation == "absent-test-member":
         members[0] = {"path": members[0]["path"], "state": "known-absent"}
     elif mutation == "duplicate-member":
@@ -112,12 +114,14 @@ def test_validator_rejects_mutated_nomination_ledger(
 
 def test_resigned_malformed_packet_is_still_rejected(tmp_path: Path) -> None:
     changed = _nomination(tmp_path)
-    changed["supporting_source_members"][0]["member_revision"] = "not-a-digest"
+    assert_records(changed["supporting_source_members"])[0]["member_revision"] = (
+        "not-a-digest"
+    )
     without_identity = {
         key: value for key, value in changed.items() if key != "nomination_identity"
     }
     changed["nomination_identity"] = evidence_identity(
-        changed["schema"], without_identity
+        assert_text(changed["schema"]), without_identity
     )
     result = validate_verification_nomination(changed)
     assert result["valid"] is False
@@ -164,7 +168,9 @@ def test_validator_does_not_redecide_runner_or_scope_semantics(tmp_path: Path) -
     payload = {
         key: value for key, value in packet.items() if key != "nomination_identity"
     }
-    packet["nomination_identity"] = evidence_identity(packet["schema"], payload)
+    packet["nomination_identity"] = evidence_identity(
+        assert_text(packet["schema"]), payload
+    )
     state = validate_verification_nomination(packet)
     assert state["valid"] is True
     assert state["producer_authenticity"] == "not-checked"
