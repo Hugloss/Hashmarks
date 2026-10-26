@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.32.0 — Qualified verification evidence and CodeMap correctness
+
+- Add source-bound verification nominations, member witness receipts, and public validation while keeping repository freshness, source correspondence, and external execution results separate.
+- Preserve exact Python and polyglot test selectors and flat verification membership without silently widening their scope. Qualify authored pytest and Vitest declarations through their existing syntax owners.
+- Improve initial MCP discovery, qualified ownership, and next-read evidence. Bound and escape readable source-controlled text while preserving native packets, ambiguity, and evidence qualifications.
+- Correct exact Unicode symbol retrieval and Python import/call identity for expression-local bindings, explicit private star exports, class globals, and definition headers. Unsupported or ambiguous identity remains unresolved.
+- Align JavaScript/TypeScript outlines, symbol bodies, lexical matches, and grep context with physical LF source lines, invalidating retained derived artifacts where needed. Keep TypeScript parameter patterns separate from enclosing variable declarations.
+- Share qualified Go module declarations across import ownership and verification nominations without inferring runtime or dependency ownership.
+
 ## 0.31.2 — Local operation without Unix-domain sockets
 
 - Report missing or unsupported native Unix-domain sockets through the existing daemon-unavailable boundary. Default local identity and CodeMap reads continue to work on Windows without inventing daemon observation or freshness evidence; explicitly required daemon mode still fails.
