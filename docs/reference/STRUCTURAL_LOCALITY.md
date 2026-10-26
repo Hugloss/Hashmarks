@@ -44,6 +44,9 @@ Each Python call keeps its indexed lexical source. Calls inside a nested functio
 or method belong to that declaration, and do not become direct calls of its
 enclosing function. Decorator, default and class-base expressions belong to the
 surrounding definition scope; they are not calls made by the declared body.
+When a header calls the name its declaration will publish, the final file
+binding cannot prove that earlier call's target. Such calls remain unresolved;
+ordinary body recursion and parameter names do not change that boundary.
 The per-symbol call limit applies after selecting that source's own calls.
 Passing a callback to a task group does not establish an invocation edge, and
 two observed direct edges do not establish a transitive shortcut or runtime path.

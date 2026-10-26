@@ -200,6 +200,14 @@ def _call_uses_name(node: ast.Call, name: str) -> bool:
 def _expression_bound_call(
     node: ast.AST, name: str, line: int, bound: bool = False
 ) -> bool:
+    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+        # Headers execute before their declaration publishes its binding. The
+        # final file binding therefore cannot qualify a self-named header call.
+        # Decorators may precede the declaration's own lineno.
+        return any(
+            _expression_bound_call(child, name, line, bound or node.name == name)
+            for child in _binding_children(node)
+        )
     start = getattr(node, "lineno", None)
     if start is not None and not start <= line <= (
         getattr(node, "end_lineno", None) or start
