@@ -68,7 +68,9 @@ def python_export_bindings(
         tuple(tree.body),
         MappingProxyType(
             {
-                statement: frozenset(_binding_writes(statement))
+                statement: frozenset(
+                    _binding_writes(statement, annotation_targets_bind=False)
+                )
                 for statement in tree.body
             }
         ),
@@ -82,8 +84,6 @@ def _export_binding(
 ) -> PythonExportBinding:
     bindings: list[PythonExportBinding] = []
     for node in body:
-        if isinstance(node, ast.AnnAssign) and node.value is None and bindings:
-            continue
         binding = _statement_export_binding(
             node, name, None if writes is None else writes.get(node)
         )
@@ -138,7 +138,7 @@ def _class_global_names(node: ast.ClassDef) -> frozenset[str]:
 def _class_global_writes(node: ast.ClassDef) -> Iterator[str]:
     names = _class_global_names(node)
     for statement in node.body:
-        yield from _binding_writes(statement, names)
+        yield from _binding_writes(statement, names, annotation_targets_bind=False)
 
 
 def _node_binding_writes(node: ast.AST) -> Iterator[str]:
@@ -162,6 +162,7 @@ def _binding_writes(
     names: frozenset[str] | None = None,
     *,
     include_class_globals: bool = True,
+    annotation_targets_bind: bool = True,
 ) -> Iterator[str]:
     # Nested bodies are local; definition headers and walrus expressions can
     # still bind the containing scope. Comprehension iteration targets are local.
@@ -172,14 +173,40 @@ def _binding_writes(
     yield from (
         name for name in _node_binding_writes(node) if names is None or name in names
     )
-    for child in _binding_children(node):
+    for child in _binding_write_children(node, annotation_targets_bind):
         yield from _binding_writes(
-            child, names, include_class_globals=include_class_globals
+            child,
+            names,
+            include_class_globals=include_class_globals,
+            annotation_targets_bind=annotation_targets_bind,
         )
 
 
-def _writes_name(node: ast.AST, name: str) -> bool:
-    return any(bound == name for bound in _binding_writes(node))
+def _binding_write_children(
+    node: ast.AST, annotation_targets_bind: bool
+) -> list[ast.AST]:
+    # Module/class annotation-only targets do not assign a name. Preserve
+    # possible expression effects without assuming runtime annotation timing.
+    children = _binding_children(node)
+    if (
+        isinstance(node, ast.AnnAssign)
+        and node.value is None
+        and isinstance(node.target, ast.Name)
+        and not annotation_targets_bind
+    ):
+        children.remove(node.target)
+    return children
+
+
+def _writes_name(
+    node: ast.AST, name: str, *, annotation_targets_bind: bool = True
+) -> bool:
+    return any(
+        bound == name
+        for bound in _binding_writes(
+            node, annotation_targets_bind=annotation_targets_bind
+        )
+    )
 
 
 def _arguments_bind(arguments: ast.arguments, name: str) -> bool:
@@ -307,18 +334,46 @@ def _statement_export_binding(
             if (alias.asname or alias.name.split(".")[0]) == name
         )
         return PythonExportBinding("module", targets) if targets else None
-    if not (_writes_name(node, name) if writes is None else name in writes):
+    if not (
+        _writes_name(node, name, annotation_targets_bind=False)
+        if writes is None
+        else name in writes
+    ):
         return None
-    if isinstance(node, (ast.Assign, ast.AnnAssign, ast.AugAssign)):
+    if _assignment_binds(node, name):
         return PythonExportBinding("local")
     return PythonExportBinding("ambiguous")
+
+
+def _assignment_target_binds(target: ast.AST, name: str) -> bool:
+    if isinstance(target, ast.Name):
+        return target.id == name
+    if isinstance(target, ast.Starred):
+        return _assignment_target_binds(target.value, name)
+    if isinstance(target, (ast.Tuple, ast.List)):
+        return any(_assignment_target_binds(child, name) for child in target.elts)
+    return False
+
+
+def _assignment_binds(node: ast.stmt, name: str) -> bool:
+    if isinstance(node, ast.Assign):
+        return any(_assignment_target_binds(target, name) for target in node.targets)
+    if isinstance(node, ast.AugAssign) or (
+        isinstance(node, ast.AnnAssign) and node.value is not None
+    ):
+        return _assignment_target_binds(node.target, name)
+    return False
 
 
 def _class_export_binding(node: ast.ClassDef, name: str) -> PythonExportBinding:
     if name in _class_global_names(node):
         return PythonExportBinding("ambiguous")
     writes = {
-        statement: frozenset(_binding_writes(statement, include_class_globals=False))
+        statement: frozenset(
+            _binding_writes(
+                statement, include_class_globals=False, annotation_targets_bind=False
+            )
+        )
         for statement in node.body
     }
     return _export_binding(node.body, name, writes)

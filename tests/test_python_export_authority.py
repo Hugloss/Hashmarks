@@ -39,9 +39,14 @@ def test_static_string_names_rejects_runtime_or_mixed_values() -> None:
         ("def other():\n    Public = 1", "unknown", [], False),
         ("def other(value=(Public := 1)): pass", "ambiguous", [], False),
         ("other = lambda: (Public := 1)", "unknown", [], False),
-        ("other = lambda value=(Public := 1): value", "local", [], False),
+        ("other = lambda value=(Public := 1): value", "ambiguous", [], False),
         ("other = [Public for Public in items]", "unknown", [], False),
-        ("other = [item for item in items if (Public := item)]", "local", [], False),
+        (
+            "other = [item for item in items if (Public := item)]",
+            "ambiguous",
+            [],
+            False,
+        ),
         ("class Other(metaclass=(Public := factory)): pass", "ambiguous", [], False),
         (
             "from .first import Public\nfrom .second import Public",

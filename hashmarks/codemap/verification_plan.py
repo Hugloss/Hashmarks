@@ -13,6 +13,7 @@ from hashmarks.paths import normalize_relative_path
 
 from .decision_session import decision_scoped, reconcile_decision
 from .go_module_declaration import declared_go_module
+from .providers import SourceSyntaxProvider
 from .repository_domains import RepositoryDomain, classify_repository_path
 from .repository_observation import evidence_identity
 
@@ -265,10 +266,37 @@ class VerificationPlanMixin:
         raw = self._nomination_source_member("package.json", members)
         return raw is not None and self._vitest_package_declaration(raw)
 
-    @staticmethod
-    def _source_test_import(source: str) -> bool:
-        """Recognize explicit node:test source evidence, not a runtime install."""
-        return "node:test" in source or "node:test/" in source
+    def _source_test_import(self, source: bytes) -> bool:
+        """Qualify a native import declaration in the captured member bytes."""
+        if TYPE_CHECKING:
+            self = cast("RepositoryVerification", self)
+        provider = self.source.index.range_provider
+        try:
+            source.decode("utf-8")
+            if not isinstance(provider, SourceSyntaxProvider):
+                raise _UnqualifiedNominationMember("native-syntax-unavailable")
+            tree = provider.syntax_tree(source, "javascript")
+        except (
+            ImportError,
+            LookupError,
+            OSError,
+            RuntimeError,
+            TypeError,
+            ValueError,
+        ) as exc:
+            raise _UnqualifiedNominationMember("node-test-source-syntax") from exc
+        if tree is None:
+            raise _UnqualifiedNominationMember("native-syntax-unavailable")
+        for node in tree.root_node.named_children:
+            if node.type != "import_statement":
+                continue
+            module = node.child_by_field_name("source")
+            if module is not None and source[module.start_byte : module.end_byte] in {
+                b"'node:test'",
+                b'"node:test"',
+            }:
+                return True
+        return False
 
     @staticmethod
     def _pytest_manifest_declaration(raw: bytes) -> bool:
@@ -374,11 +402,7 @@ class VerificationPlanMixin:
                 None,
             )
         if suffix in {".js", ".mjs", ".cjs"}:
-            try:
-                source_text = source.decode("utf-8")
-            except UnicodeError as exc:
-                raise _UnqualifiedNominationMember(rel) from exc
-            if self._source_test_import(source_text):
+            if self._source_test_import(source):
                 return (
                     "node-test",
                     "test-file",

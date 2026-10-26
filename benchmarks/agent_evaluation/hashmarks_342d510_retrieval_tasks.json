@@ -1,0 +1,99 @@
+{
+  "schema": "hashmarks.agent-task-corpus.v1",
+  "source_pin": {
+    "repository": "https://github.com/Hugloss/Hashmarks",
+    "commit": "342d5105f6b99ad04d61e2d9b39cf7c1ac0b07e2",
+    "tree": "e6b76f49d1104e085def94b79c47b4094fa0462a",
+    "admitted_paths": [
+      "hashmarks/",
+      "docs/",
+      "README.md",
+      "pyproject.toml",
+      "Makefile",
+      "uv.lock"
+    ]
+  },
+  "oracle_scope": "source-inspected owner localization; labels frozen before retrieval; not coding-outcome truth",
+  "tasks": [
+    {
+      "id": "shadowed-python-export",
+      "query": "Python export binding when an imported name is overwritten by a class global declaration",
+      "expected_files": [
+        "hashmarks/codemap/python_exports.py"
+      ],
+      "expected_symbols": [
+        "python_export_binding"
+      ]
+    },
+    {
+      "id": "source-member-drift",
+      "query": "repository source member revision mismatch known-present unknown captured bytes",
+      "expected_files": [
+        "hashmarks/codemap/repository_source.py"
+      ],
+      "expected_symbols": [
+        "RepositorySource.member"
+      ]
+    },
+    {
+      "id": "exact-test-nomination",
+      "query": "verification nomination explicit symbol qualname test node supporting source members",
+      "expected_files": [
+        "hashmarks/codemap/verification_plan.py"
+      ],
+      "expected_symbols": [
+        "VerificationPlanMixin.nomination"
+      ]
+    },
+    {
+      "id": "nomination-current-source",
+      "query": "observe nomination source binding recheck changed correspondence unknown",
+      "expected_files": [
+        "hashmarks/codemap/verification_membership.py"
+      ],
+      "expected_symbols": [
+        "VerificationMembershipMixin.observe_nomination_source_binding"
+      ]
+    },
+    {
+      "id": "projection-integrity",
+      "query": "evidence presentation conformance rejects upgraded projection native source packet",
+      "expected_files": [
+        "hashmarks/evidence_presentation_conformance.py"
+      ],
+      "expected_symbols": [
+        "validate_evidence_presentation"
+      ]
+    },
+    {
+      "id": "visibility-policy",
+      "query": "context policy decide repository path source outline deny secret",
+      "expected_files": [
+        "hashmarks/codemap/policy.py"
+      ],
+      "expected_symbols": [
+        "ContextPolicy.decide"
+      ]
+    },
+    {
+      "id": "cached-parser-identity",
+      "query": "artifact key parser signature language file digest range provider",
+      "expected_files": [
+        "hashmarks/codemap/parsers.py"
+      ],
+      "expected_symbols": [
+        "artifact_key_for"
+      ]
+    },
+    {
+      "id": "ecmascript-syntax-facts",
+      "query": "native ECMAScript syntax facts bounded source tree original byte ranges",
+      "expected_files": [
+        "hashmarks/codemap/ecmascript_syntax.py"
+      ],
+      "expected_symbols": [
+        "ecmascript_facts"
+      ]
+    }
+  ]
+}

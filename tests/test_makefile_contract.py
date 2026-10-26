@@ -1,7 +1,14 @@
 from __future__ import annotations
 
+import json
 import re
+import shlex
+import shutil
+import subprocess
+import sys
 from pathlib import Path
+
+import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -38,6 +45,44 @@ def _make_recipe(text: str, target: str) -> tuple[str, ...]:
     )
     assert match is not None
     return tuple(line.removeprefix("\t") for line in match.group("recipe").splitlines())
+
+
+def _recorded_make(
+    root: Path, target: str, **variables: str
+) -> tuple[subprocess.CompletedProcess[str], list[list[str]]]:
+    native_make = shutil.which("make")
+    if native_make is None:
+        pytest.skip("native Make is unavailable")
+    (root / "Makefile").write_bytes((ROOT / "Makefile").read_bytes())
+    (root / "uv.lock").write_text("test-owned locked supply\n", encoding="utf-8")
+    journal = root / "uv-calls.jsonl"
+    journal.unlink(missing_ok=True)
+    stub = root / "record_uv.py"
+    stub.write_text(
+        "import json, sys\n"
+        f"with open({str(journal)!r}, 'a', encoding='utf-8') as output:\n"
+        "    output.write(json.dumps(sys.argv[1:]) + '\\n')\n",
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [
+            native_make,
+            "--no-print-directory",
+            target,
+            f"UV={shlex.quote(sys.executable)} {shlex.quote(str(stub))}",
+            *(f"{key}={value}" for key, value in variables.items()),
+        ],
+        cwd=root,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    calls = (
+        [json.loads(line) for line in journal.read_text(encoding="utf-8").splitlines()]
+        if journal.exists()
+        else []
+    )
+    return result, calls
 
 
 def test_benchmark_make_aliases_delegate_all_launch_authority() -> None:
@@ -212,19 +257,26 @@ def test_metrics_agent_make_alias_delegates_normal_defaults() -> None:
         assert stale not in "\n".join(_make_recipe(text, "metrics-agent"))
 
 
-def test_metrics_agent_corpus_make_alias_delegates_normal_defaults() -> None:
-    text = (ROOT / "Makefile").read_text(encoding="utf-8")
-    assert _make_recipe(text, "metrics-agent-corpus") == (
-        "@$(UV_RUN) --offline python -m scripts.agent_evaluation.metrics_agent_corpus",
-    )
+def test_metrics_agent_corpus_make_alias_delegates_normal_defaults(
+    tmp_path: Path,
+) -> None:
+    rejected, calls = _recorded_make(tmp_path, "metrics-agent-corpus")
+    assert rejected.returncode != 0
+    assert "HASHMARKS_TARGET is required" in rejected.stderr
+    assert calls == []
 
-    joined = "\n".join(_make_recipe(text, "metrics-agent-corpus"))
-    for stale in (
-        "--workspace .",
-        "--corpus benchmarks/agent_tasks.json",
-        "--budget 1200",
-    ):
-        assert stale not in joined
+    workspace = str(tmp_path / "external frozen source")
+    accepted, calls = _recorded_make(
+        tmp_path, "metrics-agent-corpus", HASHMARKS_TARGET=workspace
+    )
+    assert accepted.returncode == 0, accepted.stderr
+    assert calls[0][0] == "sync"
+    assert "doctor" in calls[-2]
+    command = calls[-1]
+    assert "scripts.agent_evaluation.metrics_agent_corpus" in command
+    assert command[command.index("--workspace") + 1] == workspace
+    for delegated in ("--corpus", "--budget", "--limit"):
+        assert delegated not in command
 
 
 def test_fresh_multi_repo_make_alias_owns_only_repo_local_paths() -> None:
@@ -293,29 +345,51 @@ def test_worker_behavior_make_alias_owns_only_repo_local_paths() -> None:
     assert "--limit 20" not in joined
 
 
-def test_agent_suite_make_alias_keeps_only_repo_and_qualification_policy() -> None:
-    text = (ROOT / "Makefile").read_text(encoding="utf-8")
-    recipe = _make_recipe(text, "metrics-agent-suite")
-    joined = "\n".join(recipe)
-
-    assert (
-        "$(UV_RUN) --offline python -m scripts.agent_evaluation.metrics_agent_suite"
-        in joined
+def test_agent_suite_make_alias_keeps_only_repo_and_qualification_policy(
+    tmp_path: Path,
+) -> None:
+    rejected, calls = _recorded_make(tmp_path, "metrics-agent-suite")
+    assert rejected.returncode != 0
+    assert "HASHMARKS_TARGET is required" in rejected.stderr
+    assert calls == []
+    hashmarks_target = str(tmp_path / "external Hashmarks source")
+    rejected, calls = _recorded_make(
+        tmp_path, "metrics-agent-suite", HASHMARKS_TARGET=hashmarks_target
     )
-    assert '--repo "hashmarks=.::benchmarks/agent_tasks.json"' in joined
-    assert (
-        '--repo "oh-goon=$(OH_GOON)::'
-        'benchmarks/external/oh_goon_1267_0_49_agent_tasks.json"' in joined
-    )
-    assert "--min-file-recall 1" in joined
-    assert "--min-symbol-recall 1" in joined
-    assert "--max-fallback-rate 0" in joined
-    assert "--max-average-find-ms 60" in joined
-    assert "--max-average-context-ms 80" in joined
-    assert "--output .hashmarks/metrics/agent-suite-latest.json" in joined
+    assert rejected.returncode != 0
+    assert "OH_GOON is required" in rejected.stderr
+    assert calls == []
 
-    for stale in ("--budget 1200", "--limit 20"):
-        assert stale not in joined
+    oh_goon_target = str(tmp_path / "external Oh-Goon source")
+    accepted, calls = _recorded_make(
+        tmp_path,
+        "metrics-agent-suite",
+        HASHMARKS_TARGET=hashmarks_target,
+        OH_GOON=oh_goon_target,
+    )
+    assert accepted.returncode == 0, accepted.stderr
+    assert calls[0][0] == "sync"
+    assert "doctor" in calls[-2]
+    command = calls[-1]
+    assert "scripts.agent_evaluation.metrics_agent_suite" in command
+    repositories = [
+        command[index + 1] for index, arg in enumerate(command) if arg == "--repo"
+    ]
+    assert repositories == [
+        f"hashmarks={hashmarks_target}::benchmarks/agent_evaluation/hashmarks_342d510_retrieval_tasks.json",
+        f"oh-goon={oh_goon_target}::benchmarks/external/oh_goon_dafbe930_retrieval_tasks.json",
+    ]
+    for flag, value in (
+        ("--min-file-recall", "1"),
+        ("--min-symbol-recall", "1"),
+        ("--max-fallback-rate", "0"),
+        ("--max-average-find-ms", "60"),
+        ("--max-average-context-ms", "80"),
+        ("--output", ".hashmarks/metrics/agent-suite-latest.json"),
+    ):
+        assert command[command.index(flag) + 1] == value
+    assert "--budget" not in command
+    assert "--limit" not in command
 
 
 def test_codex_agent_economics_make_alias_delegates_root_default() -> None:

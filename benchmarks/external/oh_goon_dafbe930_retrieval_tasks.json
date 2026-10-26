@@ -1,0 +1,104 @@
+{
+  "schema": "hashmarks.agent-task-corpus.v1",
+  "source_pin": {
+    "repository": "https://github.com/oh-goon/oh-goon",
+    "commit": "dafbe9309f62d9a59b1b2db82bd3a6a965e8e274",
+    "tree": "a041de5dff6fc9a990522d798bfd8b20ad335228",
+    "admitted_paths": [
+      "backend/src/",
+      "frontend/src/",
+      "templates/",
+      "docs/",
+      "backend/pyproject.toml",
+      "backend/uv.lock",
+      "frontend/package.json",
+      "frontend/package-lock.json",
+      "Makefile",
+      "README.md",
+      "AGENTS.md"
+    ]
+  },
+  "oracle_scope": "source-inspected owner localization; labels frozen before retrieval; not coding-outcome truth",
+  "tasks": [
+    {
+      "id": "native-home-separation",
+      "query": "native Codex home separation agent readable roots original normalized grants",
+      "expected_files": [
+        "backend/src/oh_goon/integrations/agent_codex_service.py"
+      ],
+      "expected_symbols": [
+        "CodexServiceClient.require_native_home_separation"
+      ]
+    },
+    {
+      "id": "qualified-evidence-admission",
+      "query": "bind Hashmarks repository evidence producer implementation identity source generation provenance",
+      "expected_files": [
+        "backend/src/oh_goon/integrations/hashmarks/repository_intelligence.py"
+      ],
+      "expected_symbols": [
+        "bind_hashmarks_repository_evidence"
+      ]
+    },
+    {
+      "id": "source-snapshot-publication",
+      "query": "materialize read snapshot durable workspace state compare and swap publication",
+      "expected_files": [
+        "backend/src/oh_goon/runtime/workspaces.py"
+      ],
+      "expected_symbols": [
+        "RepositoryWorkspaceAuthority.materialize_read_snapshot"
+      ]
+    },
+    {
+      "id": "native-run-ingress",
+      "query": "run native agent ordinary Plan compiled captured Fleet execution",
+      "expected_files": [
+        "backend/src/oh_goon/services/fleet_plans.py"
+      ],
+      "expected_symbols": [
+        "FleetPlanService.run_native_agent"
+      ]
+    },
+    {
+      "id": "skill-registry",
+      "query": "read selected Skill root registry bounded YAML prepared native Git source aliases",
+      "expected_files": [
+        "backend/src/oh_goon/services/agent_skill_registry.py"
+      ],
+      "expected_symbols": [
+        "read_goonskills"
+      ]
+    },
+    {
+      "id": "scheduler-tick-accounting",
+      "query": "schedule scheduler tick stale generation background failure active ticks",
+      "expected_files": [
+        "backend/src/oh_goon/runtime/schedule_scheduler.py"
+      ],
+      "expected_symbols": [
+        "ScheduleScheduler.tick"
+      ]
+    },
+    {
+      "id": "run-review-canonical-state",
+      "query": "normalize Run review state for loaded canonical Run step baseline collapsed lanes",
+      "expected_files": [
+        "frontend/src/app/pages/runReviewState.ts"
+      ],
+      "expected_symbols": [
+        "normalizeRunReviewStateForLoadedRun"
+      ]
+    },
+    {
+      "id": "frontend-read-invalidation",
+      "query": "read scopes invalidated by mutation canonical data resources",
+      "expected_files": [
+        "frontend/src/domain/reads/readResources.ts"
+      ],
+      "expected_symbols": [
+        "readScopesInvalidatedByMutation"
+      ]
+    }
+  ]
+}

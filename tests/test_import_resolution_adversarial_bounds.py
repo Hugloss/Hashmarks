@@ -167,7 +167,7 @@ def test_reexport_hop_boundary(tmp_path: Path, hops: int) -> None:
         ("async def Public(): pass", ("local", [])),
         ("Public = 1", ("local", [])),
         ("other = Public = 1", ("local", [])),
-        ("Public: int", ("local", [])),
+        ("Public: int", ("unknown", [])),
         ("Public, other = pair", ("local", [])),
         ("obj.Public = 1", ("unknown", [])),
         ("from .impl import Internal as Public", ("reexport", [".impl.Internal"])),

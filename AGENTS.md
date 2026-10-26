@@ -289,7 +289,7 @@ The committed lock is repository development/qualification authority, not instal
 
 ### External benchmark entrypoints transport authority; they do not recreate it
 
-agentsCookbook owns benchmark configuration, suite/task selection, native-agent selection, campaign/run state, resume/new behavior, interpreter launch, scoring, and reporting. Hashmarks may expose thin Make aliases into agentsCookbook, but those aliases must not mirror or reinterpret those choices, create their own run directories or latest pointers, invoke `python -m benchmarks` directly, or maintain compatibility launch paths beside the agentsCookbook front door. Configure the agentsCookbook benchmark environment once, including the exact `HASHMARKS_BENCH_SOURCE`, and transport that authority unchanged.
+EvalShot owns native-agent benchmark configuration, suite/task selection, native-agent selection, campaign/run state, resume/new behavior, interpreter launch, scoring, and reporting. Hashmarks may expose thin Make aliases into EvalShot, but those aliases must not mirror or reinterpret those choices, create their own run directories or latest pointers, invoke `python -m benchmarks` directly, or maintain compatibility launch paths beside the EvalShot front door. Configure the EvalShot benchmark environment once, including the exact `HASHMARKS_BENCH_SOURCE`, and transport that authority unchanged. Reusable Skills and review guidance remain agentsCookbook-owned; model-free repository-evidence measurements remain in their existing Hashmarks evaluation owners.
 
 ### Standalone packaging has one semantic build owner
 

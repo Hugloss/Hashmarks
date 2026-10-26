@@ -516,6 +516,22 @@ source-member revision ledger and nomination identity remain authoritative
 for the exact observed inputs. The legacy advisory `plan(...)` surface is
 not changed.
 
+### Node test import qualification
+
+Without an authored Vitest declaration, JavaScript `node-test` nomination
+requires a native top-level ES import declaration whose complete literal
+source is exactly `node:test`. Default, named, namespace and side-effect
+imports qualify; comments, example strings, template text, similar module
+names and arbitrary subpaths do not. The existing optional native syntax
+provider interprets the already source-qualified member bytes. Missing native
+syntax capability or malformed source remains `source-evidence-unqualified`,
+without a text fallback or a native-tool installation requirement.
+
+This bounded syntax observation does not resolve CommonJS `require` bindings,
+dynamic module expressions, installed Node capability, collected tests or
+test outcomes. It preserves the existing source-member revision ledger and
+external execution authority. The legacy advisory `plan(...)` is unchanged.
+
 ### Python test-node source qualification
 
 A requested `test-node` projection for Python is admitted as repository

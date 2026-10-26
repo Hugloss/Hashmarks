@@ -98,6 +98,204 @@ def test_executed_class_global_write_invalidates_reexport_identity(
 
 
 @pytest.mark.parametrize(
+    ("facade_tail", "caller", "owner", "exact_call"),
+    [
+        pytest.param(
+            "", "def invoke(): return selected()\n", "impl.py", True, id="alias"
+        ),
+        pytest.param(
+            "exposed: object\n",
+            "def invoke(): return selected()\n",
+            "impl.py",
+            True,
+            id="module-annotation-target",
+        ),
+        pytest.param(
+            "if True:\n    exposed: object\n",
+            "def invoke(): return selected()\n",
+            "impl.py",
+            True,
+            id="nested-annotation-target",
+        ),
+        pytest.param(
+            "annotation: (exposed := replacement)\n",
+            "def invoke(): return selected()\n",
+            None,
+            False,
+            id="possible-annotation-effect",
+        ),
+        pytest.param(
+            "ignored = False and (exposed := replacement)\n",
+            "def invoke(): return selected()\n",
+            None,
+            False,
+            id="conditional-expression-effect",
+        ),
+        pytest.param(
+            "ignored = [(exposed := replacement) for item in ()]\n",
+            "def invoke(): return selected()\n",
+            None,
+            False,
+            id="comprehension-expression-effect",
+        ),
+        pytest.param(
+            "deferred = lambda: (exposed := replacement)\n",
+            "def invoke(): return selected()\n",
+            "impl.py",
+            True,
+            id="deferred-lambda-effect",
+        ),
+        pytest.param(
+            "deferred = lambda value=(exposed := replacement): value\n",
+            "def invoke(): return selected()\n",
+            None,
+            False,
+            id="lambda-default-expression-effect",
+        ),
+        pytest.param(
+            "exposed = replacement\n",
+            "def invoke(): return selected()\n",
+            "facade.py",
+            False,
+            id="direct-assignment",
+        ),
+        pytest.param(
+            "try:\n    raise ValueError()\nexcept ValueError as exposed:\n    pass\n",
+            "def invoke(): return selected()\n",
+            None,
+            False,
+            id="module-exception-target",
+        ),
+        pytest.param(
+            "",
+            "def invoke(selected): return selected()\n",
+            "impl.py",
+            False,
+            id="parameter-shadows-call-only",
+        ),
+        pytest.param(
+            "",
+            "def invoke():\n    selected: object\n    return selected()\n",
+            "impl.py",
+            False,
+            id="function-annotation-target-is-local",
+        ),
+        pytest.param(
+            "",
+            "def invoke():\n    try:\n        raise ValueError()\n"
+            "    except ValueError as selected:\n        pass\n    return selected()\n",
+            "impl.py",
+            False,
+            id="function-exception-target-is-local",
+        ),
+        pytest.param(
+            "",
+            "def invoke():\n    try:\n        raise ValueError()\n"
+            "    except ValueError as other:\n        pass\n    return selected()\n",
+            "impl.py",
+            True,
+            id="unrelated-exception-target",
+        ),
+    ],
+)
+def test_binding_authority_conforms_across_imports_calls_and_callers(
+    tmp_path: Path, facade_tail: str, caller: str, owner: str | None, exact_call: bool
+) -> None:
+    _write(tmp_path, "impl.py", "def build(): return 'impl'\n")
+    _write(tmp_path, "decoy.py", "def build(): return 'decoy'\n")
+    _write(
+        tmp_path,
+        "facade.py",
+        "from impl import build as exposed\nreplacement = lambda: 'replacement'\n"
+        + facade_tail,
+    )
+    _write(tmp_path, "consumer.py", "from facade import exposed as selected\n" + caller)
+    with _map(tmp_path) as codemap:
+        codemap.index.sync()
+        identity = qualified_import_identity(
+            codemap._imports, source_path="consumer.py", target="facade.exposed"
+        )
+        forward = codemap.structure.locality("consumer.py::invoke")
+        reverse = codemap.structure.locality("impl.py::build", max_depth=0)
+    assert identity["status"] == ("ambiguous" if owner is None else "resolved")
+    assert (identity["qualified_identity"] is not None) is (owner is not None)
+    assert identity["owner_paths"] == (
+        ["facade.py", "impl.py"] if owner == "impl.py" else ["facade.py"]
+    )
+    call = next(
+        row
+        for row in assert_records(forward["edges"])
+        if row["target_text"] == "selected"
+    )
+    assert call["resolved_symbol_id"] == ("impl.py::build" if exact_call else None)
+    node = assert_records(reverse["nodes"])[0]
+    assert {
+        (row["path"], row["source"]) for row in assert_records(node["exact_callers"])
+    } == ({("consumer.py", "invoke")} if exact_call else set())
+    assert (
+        identity["producer_implementation_identity"]
+        == forward["provider_implementation_identity"]
+        == reverse["provider_implementation_identity"]
+    )
+
+
+@pytest.mark.parametrize(
+    ("class_tail", "exact_call"),
+    [
+        ("    if True:\n        build: object\n", True),
+        ("    annotation: (build := replacement)\n", False),
+    ],
+)
+def test_class_annotation_targets_and_possible_effects_keep_distinct_authority(
+    tmp_path: Path, class_tail: str, exact_call: bool
+) -> None:
+    _write(
+        tmp_path,
+        "factory.py",
+        "replacement = lambda: 'replacement'\nclass Factory:\n"
+        "    def build(): return 'original'\n" + class_tail,
+    )
+    _write(
+        tmp_path,
+        "consumer.py",
+        "from factory import Factory\ndef invoke(): return Factory.build()\n",
+    )
+    with _map(tmp_path) as codemap:
+        codemap.index.sync()
+        identity = qualified_import_identity(
+            codemap._imports, source_path="consumer.py", target="factory.Factory"
+        )
+        forward = codemap.structure.locality("consumer.py::invoke")
+        reverse = codemap.structure.locality("factory.py::Factory.build", max_depth=0)
+    assert identity["status"] == "resolved"
+    assert identity["owner_paths"] == ["factory.py"]
+    call = next(
+        row
+        for row in assert_records(forward["edges"])
+        if row["target_text"] == "Factory.build"
+    )
+    assert call["resolved_symbol_id"] == (
+        "factory.py::Factory.build" if exact_call else None
+    )
+    node = assert_records(reverse["nodes"])[0]
+    assert {
+        (row["path"], row["source"]) for row in assert_records(node["exact_callers"])
+    } == ({("consumer.py", "invoke")} if exact_call else set())
+
+
+def test_annotation_only_module_target_has_no_qualified_binding(tmp_path: Path) -> None:
+    _write(tmp_path, "facade.py", "exposed: object\n")
+    _write(tmp_path, "consumer.py", "from facade import exposed\n")
+    with _map(tmp_path) as codemap:
+        codemap.index.sync()
+        identity = qualified_import_identity(
+            codemap._imports, source_path="consumer.py", target="facade.exposed"
+        )
+    assert identity["status"] in {"ambiguous", "unresolved"}
+    assert identity["qualified_identity"] is None
+
+
+@pytest.mark.parametrize(
     ("name", "declaration", "exported"),
     [
         ("_build", "__all__ = ['_build']\n", True),

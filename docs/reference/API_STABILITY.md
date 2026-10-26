@@ -52,11 +52,12 @@ owns qualified member/range reads and returns detached public outline symbols.
 Its instruction-scope primitive consumes explicit paths. Query-based instruction
 seed selection remains Context composition, above Source and retrieval.
 
-Indexed JavaScript/TypeScript declaration and import positions use physical LF
-source lines, matching canonical Source observations. Unicode separators inside
-source strings do not shift those positions, including advisory outlines when
-native ranges are unavailable. Symbol body reads use the same physical lines,
-retaining Unicode contents and the existing CRLF display normalization.
+Indexed JavaScript/TypeScript/Go/Rust declaration and import positions use physical
+LF source lines, matching canonical Source observations. Unicode separators
+inside source strings or comments do not shift those positions, including
+advisory outlines when native ranges are unavailable. Symbol body reads use the
+same physical lines, retaining Unicode contents and the existing CRLF display
+normalization.
 Lexical match positions and grep context use this physical-line contract across
 all indexed languages. Parser derivation identities invalidate retained lexical
 artifacts when their line partition changes.

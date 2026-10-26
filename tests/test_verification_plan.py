@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from hashmarks.codemap import CodeMap
+from hashmarks.codemap.providers import TreeSitterRangeProvider
 from hashmarks.codemap.repository_observation import evidence_identity
 
 if TYPE_CHECKING:
@@ -339,6 +340,82 @@ def test_nomination_does_not_treat_installed_tool_as_repository_evidence(
         nomination = codemap.verification.nomination("tests/example.test.js")
     assert nomination["available"] is False
     assert nomination["reason"] == "unsupported-repository-verification-source"
+
+
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        ("import test from 'node:test';\n", True),
+        ('import { test as check } from "node:test";\n', True),
+        ("import * as checks from 'node:test';\n", True),
+        ("import 'node:test';\n", True),
+        ("// import test from 'node:test';\n", False),
+        ("/* import test from 'node:test'; */\n", False),
+        ("const example = \"import test from 'node:test';\";\n", False),
+        ("const moduleName = 'node:test';\n", False),
+        ("const example = `import test from 'node:test';`;\n", False),
+        ("import test from 'node:test-extra';\n", False),
+        ("import test from 'node:test/not-a-runner';\n", False),
+        ("import test from 'node:test';\nfunction broken( {\n", False),
+    ],
+)
+def test_nomination_requires_native_node_test_import_syntax(
+    tmp_path: Path, source: str, expected: bool
+) -> None:
+    pytest.importorskip("tree_sitter_language_pack")
+    (tmp_path / "tests").mkdir()
+    selected = tmp_path / "tests/example.test.js"
+    selected.write_text(source, encoding="utf-8")
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        result = codemap.verification.nomination("tests/example.test.js")
+    assert result["available"] is expected
+    if expected:
+        assert result["runner_evidence"] == "node-test"
+        assert result["source_evidence"] == "node-test-import-plus-test-file"
+        assert result["verification_target"] == {
+            "path": "tests/example.test.js",
+            "test_symbol": None,
+        }
+    else:
+        assert result["reason"] in {
+            "unsupported-repository-verification-source",
+            "source-evidence-unqualified",
+        }
+    assert result["execution_authority"] == "external"
+
+
+def test_node_test_nomination_cannot_promote_missing_native_syntax(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests/example.test.js").write_text(
+        "import test from 'node:test';\n", encoding="utf-8"
+    )
+    with CodeMap(tmp_path, range_provider=TreeSitterRangeProvider()) as codemap:
+        codemap.index.sync()
+        result = codemap.verification.nomination("tests/example.test.js")
+    assert result["available"] is False
+    assert result["reason"] == "source-evidence-unqualified"
+    assert result["execution_authority"] == "external"
+
+
+def test_node_test_nomination_tracks_import_to_comment_source_change(
+    tmp_path: Path,
+) -> None:
+    pytest.importorskip("tree_sitter_language_pack")
+    (tmp_path / "tests").mkdir()
+    selected = tmp_path / "tests/example.test.js"
+    selected.write_text("import test from 'node:test';\n", encoding="utf-8")
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        before = codemap.verification.nomination("tests/example.test.js")
+        assert before["available"] is True
+        selected.write_text("// import test from 'node:test';\n", encoding="utf-8")
+        codemap.index.sync()
+        after = codemap.verification.nomination("tests/example.test.js")
+    assert after["available"] is False
+    assert after["nomination_identity"] != before["nomination_identity"]
 
 
 @pytest.mark.parametrize(
