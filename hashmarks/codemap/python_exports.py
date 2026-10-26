@@ -119,26 +119,63 @@ def _binding_children(node: ast.AST) -> list[ast.AST]:
     return list(ast.iter_child_nodes(node))
 
 
-def _binding_writes(node: ast.AST) -> Iterator[str]:
-    # Nested bodies are local; definition headers and walrus expressions can
-    # still bind the containing scope. Comprehension iteration targets are local.
+def _binding_nodes(node: ast.AST) -> Iterator[ast.AST]:
+    yield node
+    for child in _binding_children(node):
+        yield from _binding_nodes(child)
+
+
+def _class_global_names(node: ast.ClassDef) -> frozenset[str]:
+    return frozenset(
+        name
+        for statement in node.body
+        for child in _binding_nodes(statement)
+        if isinstance(child, ast.Global)
+        for name in child.names
+    )
+
+
+def _class_global_writes(node: ast.ClassDef) -> Iterator[str]:
+    names = _class_global_names(node)
+    for statement in node.body:
+        yield from _binding_writes(statement, names)
+
+
+def _node_binding_writes(node: ast.AST) -> Iterator[str]:
     if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
         yield node.name
     if isinstance(node, ast.Name):
         if isinstance(node.ctx, (ast.Store, ast.Del)):
             yield node.id
-        return
     if isinstance(node, (ast.Import, ast.ImportFrom)):
-        yield from (a.asname or a.name.split(".")[0] for a in node.names)
-        return
+        yield from (alias.asname or alias.name.split(".")[0] for alias in node.names)
     if isinstance(
         node, (ast.ExceptHandler, ast.MatchAs, ast.MatchStar, ast.MatchMapping)
     ):
         bound_name = getattr(node, "name", getattr(node, "rest", None))
         if isinstance(bound_name, str):
             yield bound_name
+
+
+def _binding_writes(
+    node: ast.AST,
+    names: frozenset[str] | None = None,
+    *,
+    include_class_globals: bool = True,
+) -> Iterator[str]:
+    # Nested bodies are local; definition headers and walrus expressions can
+    # still bind the containing scope. Comprehension iteration targets are local.
+    if isinstance(node, ast.ClassDef) and include_class_globals:
+        # Class construction executes its body now. Explicit global writes
+        # escape that namespace, including writes by immediately nested classes.
+        yield from _class_global_writes(node)
+    yield from (
+        name for name in _node_binding_writes(node) if names is None or name in names
+    )
     for child in _binding_children(node):
-        yield from _binding_writes(child)
+        yield from _binding_writes(
+            child, names, include_class_globals=include_class_globals
+        )
 
 
 def _writes_name(node: ast.AST, name: str) -> bool:
@@ -269,16 +306,28 @@ def _statement_export_binding(
     return PythonExportBinding("ambiguous")
 
 
+def _class_export_binding(node: ast.ClassDef, name: str) -> PythonExportBinding:
+    if name in _class_global_names(node):
+        return PythonExportBinding("ambiguous")
+    writes = {
+        statement: frozenset(_binding_writes(statement, include_class_globals=False))
+        for statement in node.body
+    }
+    return _export_binding(node.body, name, writes)
+
+
 def python_class_node(tree: ast.Module, qualname: str) -> ast.ClassDef | None:
     """Qualify every class component with the same ordered binding analysis."""
-    body = tree.body
     selected: ast.ClassDef | None = None
     for part in qualname.split("."):
-        binding = _export_binding(body, part)
+        binding = (
+            _export_binding(tree.body, part)
+            if selected is None
+            else _class_export_binding(selected, part)
+        )
         if not isinstance(binding.declaration, ast.ClassDef):
             return None
         selected = binding.declaration
-        body = selected.body
     return selected
 
 
@@ -286,7 +335,7 @@ def python_class_member_binding(
     node: ast.ClassDef, name: str
 ) -> tuple[str, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef | None]:
     """Expose the same ordered binding rule inside one declared class scope."""
-    binding = _export_binding(node.body, name)
+    binding = _class_export_binding(node, name)
     return binding.kind, binding.declaration
 
 

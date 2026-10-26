@@ -466,6 +466,11 @@ class RepositoryStructure(ReadScopeOwner):
         if len(methods) != 1:
             return None
         source_node = methods[0]
+        if (
+            python_class_member_binding(class_node, target.source_method)[1]
+            is not source_node
+        ):
+            return None
         positional = [*source_node.args.posonlyargs, *source_node.args.args]
         if not positional or positional[0].arg != target.receiver:
             return None
