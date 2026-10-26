@@ -11,7 +11,7 @@ from hashmarks.native_vitest import local_vitest
 from hashmarks.operation_contract import operation_response, operation_schema
 from hashmarks.paths import normalize_relative_path
 
-from .decision_session import decision_scoped, reconcile_decision
+from .decision_session import ReadScopeOwner, decision_scoped, reconcile_decision
 from .go_module_declaration import declared_go_module
 from .providers import SourceSyntaxProvider
 from .repository_domains import RepositoryDomain, classify_repository_path
@@ -19,7 +19,10 @@ from .repository_observation import evidence_identity
 
 if TYPE_CHECKING:
     from .evidence_verification import RepositoryVerification
-    from .task_evidence_types import TaskVerificationPlan
+    from .task_evidence_types import (
+        AvailableVerificationPlan,
+        TaskVerificationPlan,
+    )
 
 
 class _UnqualifiedNominationMember(RuntimeError):
@@ -65,7 +68,7 @@ class VerificationPlanMixin:
         qualname: str | None,
         *,
         pytest_declared: bool | None = None,
-    ) -> TaskVerificationPlan:
+    ) -> AvailableVerificationPlan:
         if pytest_declared is None:
             pytest_declared = self._pytest_declared()
         test_symbol = self._verification_test_symbol(symbol, qualname)
@@ -87,7 +90,7 @@ class VerificationPlanMixin:
 
     def _go_verification_plan(
         self, rel: str, target: Path
-    ) -> TaskVerificationPlan | None:
+    ) -> AvailableVerificationPlan | None:
         if TYPE_CHECKING:
             self = cast("RepositoryVerification", self)
         if (
@@ -120,7 +123,7 @@ class VerificationPlanMixin:
 
     def _javascript_verification_plan(
         self, rel: str, target: Path
-    ) -> TaskVerificationPlan | None:
+    ) -> AvailableVerificationPlan | None:
         if TYPE_CHECKING:
             self = cast("RepositoryVerification", self)
         runner = self._vitest_runner(self.workspace)
@@ -160,7 +163,7 @@ class VerificationPlanMixin:
 
     def _typescript_verification_plan(
         self, rel: str, target: Path
-    ) -> TaskVerificationPlan | None:
+    ) -> AvailableVerificationPlan | None:
         if TYPE_CHECKING:
             self = cast("RepositoryVerification", self)
         if target.suffix.lower() not in {".ts", ".tsx", ".mts", ".cts"}:
@@ -181,7 +184,7 @@ class VerificationPlanMixin:
 
     def _polyglot_verification_plan(
         self, rel: str, target: Path
-    ) -> TaskVerificationPlan:
+    ) -> AvailableVerificationPlan | None:
         plan = self._go_verification_plan(rel, target)
         if plan is not None:
             return plan
@@ -193,12 +196,7 @@ class VerificationPlanMixin:
             plan = self._typescript_verification_plan(rel, target)
             if plan is not None:
                 return plan
-        return {
-            "schema": "hashmarks.verification-plan.v1",
-            "path": rel,
-            "available": False,
-            "reason": "unsupported-test-runner",
-        }
+        return None
 
     def _nomination_source_member(
         self, rel: str, members: list[dict[str, object]]
@@ -490,7 +488,11 @@ class VerificationPlanMixin:
     @reconcile_decision
     @decision_scoped
     def nomination(
-        self, path: str, *, symbol: str | None = None, qualname: str | None = None
+        self: ReadScopeOwner,
+        path: str,
+        *,
+        symbol: str | None = None,
+        qualname: str | None = None,
     ) -> dict[str, object]:
         """Observe one generation-bound verifier nomination with input revisions."""
         if TYPE_CHECKING:
@@ -528,7 +530,11 @@ class VerificationPlanMixin:
         )
 
     def plan(
-        self, path: str, *, symbol: str | None = None, qualname: str | None = None
+        self: ReadScopeOwner,
+        path: str,
+        *,
+        symbol: str | None = None,
+        qualname: str | None = None,
     ) -> TaskVerificationPlan:
         """Derive a bounded argv for a known verification surface."""
         if TYPE_CHECKING:
@@ -554,17 +560,24 @@ class VerificationPlanMixin:
             nominated = self._python_verification_plan(rel, symbol, qualname)
         else:
             nominated = self._polyglot_verification_plan(rel, target)
-        if not nominated["available"]:
-            return nominated
+            if nominated is None:
+                return {
+                    "schema": "hashmarks.verification-plan.v1",
+                    "path": rel,
+                    "available": False,
+                    "reason": "unsupported-test-runner",
+                }
+        available_nomination: AvailableVerificationPlan = nominated
         # The repository-derived test target is the observer's result. The
         # historical argv/runner fields are advisory compatibility projections:
         # consumers must resolve their own executable and execution policy.
-        return {
-            **nominated,
+        available: AvailableVerificationPlan = {
+            **available_nomination,
             "verification_target": {
                 "path": rel,
-                "test_symbol": nominated.get("test_symbol"),
+                "test_symbol": available_nomination.get("test_symbol"),
             },
             "command_intent_authority": "advisory-only",
             "execution_authority": "external",
         }
+        return available

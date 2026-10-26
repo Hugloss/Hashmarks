@@ -8,7 +8,7 @@ import zlib
 from collections.abc import Mapping
 from copy import deepcopy
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 import pytest
 from contract_assertions import assert_array, assert_object, assert_text
@@ -607,7 +607,7 @@ def test_initial_owner_display_qualification_converges_across_formats(
     )
     groups = assert_array(assert_object(structured["presentation"])["groups"])
     owner_group = next(
-        group
+        assert_object(group)
         for group in groups
         if assert_object(group)["family"] == "ownership_evidence"
     )
@@ -718,12 +718,12 @@ def test_next_read_never_inherits_owner_display_qualification(
     owner = next(
         assert_object(row)
         for row in findings
-        if "/ownership/owner" in assert_object(row)["source_refs"]
+        if "/ownership/owner" in assert_array(assert_object(row)["source_refs"])
     )
     read = next(
         assert_object(row)
         for row in findings
-        if "/ownership/next_read" in assert_object(row)["source_refs"]
+        if "/ownership/next_read" in assert_array(assert_object(row)["source_refs"])
     )
     owner_context = assert_object(owner["source_context"])
     assert owner_context["display_qualification"] in {
@@ -819,7 +819,7 @@ def test_initial_next_read_text_is_bounded_without_dropping_native_fields(
 )
 def test_initial_ambiguity_text_escapes_and_bounds_source_claims(
     initial_text_source: tuple[dict[str, Any], dict[str, object]],
-    field: str,
+    field: Literal["reason", "discrimination_question"],
     payload: str,
     expected: str,
 ) -> None:
@@ -847,7 +847,11 @@ def test_initial_ambiguity_text_escapes_and_bounds_source_claims(
         for row in rendered.splitlines()
     )
     assert f"@ /ownership/ambiguity/{field}" in matching[0]
-    assert initial["ownership"]["ambiguity"][field] == payload
+    ambiguity = initial["ownership"]["ambiguity"]
+    if field == "reason":
+        assert ambiguity["reason"] == payload
+    else:
+        assert ambiguity["discrimination_question"] == payload
     assert response["result"] == before_wire
     assert native == original
 

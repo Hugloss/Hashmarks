@@ -5,6 +5,9 @@ from pathlib import Path
 import pytest
 
 from hashmarks.codemap import CodeMap
+from hashmarks.codemap.context_defaults import REPOSITORY_CONTEXT_DEFAULTS
+from hashmarks.codemap.find_engine import FIND_DEFAULT_OPTIONS
+from hashmarks.codemap.model import ContextDisclosure, ContextPack, SearchHit
 from scripts.agent_evaluation import metrics_agent_corpus
 from scripts.agent_evaluation.metrics_agent_suite import collect_suite
 
@@ -173,17 +176,31 @@ def test_suite_protocol_names_the_retrieval_methods_actually_measured(
         build = codemap.context.build
         in_context = False
 
-        def observed_find(*args: object, **kwargs: object) -> object:
+        def observed_find(
+            query: str, *, limit: int = FIND_DEFAULT_OPTIONS.limit
+        ) -> tuple[SearchHit, ...]:
             if not in_context:
                 calls.append("CodeMap.search.find")
-            return find(*args, **kwargs)
+            return find(query, limit=limit)
 
-        def observed_build(*args: object, **kwargs: object) -> object:
+        def observed_build(
+            query: str,
+            *,
+            token_budget: int = REPOSITORY_CONTEXT_DEFAULTS.token_budget,
+            limit: int = REPOSITORY_CONTEXT_DEFAULTS.limit,
+            disclosure: ContextDisclosure
+            | str = REPOSITORY_CONTEXT_DEFAULTS.disclosure,
+        ) -> ContextPack:
             nonlocal in_context
             calls.append("CodeMap.context.build")
             in_context = True
             try:
-                return build(*args, **kwargs)
+                return build(
+                    query,
+                    token_budget=token_budget,
+                    limit=limit,
+                    disclosure=disclosure,
+                )
             finally:
                 in_context = False
 

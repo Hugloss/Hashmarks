@@ -58,7 +58,10 @@ def test_go_nomination_requires_authored_module_declaration(
     if expected:
         assert nomination["confidence"] == "high"
         assert nomination["runner_evidence"] == "go-test"
-        assert nomination["supporting_source_members"][1]["path"] == "go.mod"
+        assert isinstance(nomination["supporting_source_members"], list)
+        member = nomination["supporting_source_members"][1]
+        assert isinstance(member, dict)
+        assert member["path"] == "go.mod"
     else:
         assert nomination["reason"] == "source-evidence-unqualified"
     assert {"argv", "executable", "working_directory"}.isdisjoint(nomination)

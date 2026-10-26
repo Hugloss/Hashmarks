@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
+from contract_assertions import assert_object, assert_records, assert_text
 
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.providers import TreeSitterRangeProvider
@@ -129,8 +130,11 @@ def test_verification_nomination_excludes_native_command_for_python(
             "tests/test_widget.py", symbol="test_widget"
         )
     assert nomination.pop("nomination_identity") == evidence_identity(
-        nomination["schema"], nomination
+        assert_text(nomination["schema"]), nomination
     )
+    assert "verification_target" in nomination
+    assert "supporting_source_members" in nomination
+    assert "verification_target" in legacy
     assert nomination == {
         "schema": "hashmarks.verification-nomination.v1",
         "available": True,
@@ -167,7 +171,7 @@ def test_verification_nomination_preserves_unavailable_scope(tmp_path: Path) -> 
         codemap.index.sync()
         nomination = codemap.verification.nomination("src/widget.py")
     assert nomination.pop("nomination_identity") == evidence_identity(
-        nomination["schema"], nomination
+        assert_text(nomination["schema"]), nomination
     )
     assert nomination == {
         "schema": "hashmarks.verification-nomination.v1",
@@ -202,6 +206,9 @@ def test_verification_nomination_never_promotes_polyglot_argv(tmp_path: Path) ->
             planned = codemap.verification.plan(rel)
             nominated = codemap.verification.nomination(rel)
             assert planned["available"] is True
+            assert "verification_target" in planned
+            assert "runner" in planned
+            assert "verification_target" in nominated
             assert nominated["verification_target"] == planned["verification_target"]
             assert nominated["runner_evidence"] == planned["runner"]
             assert nominated["execution_authority"] == "external"
@@ -373,7 +380,7 @@ def test_nomination_requires_native_node_test_import_syntax(
     if expected:
         assert result["runner_evidence"] == "node-test"
         assert result["source_evidence"] == "node-test-import-plus-test-file"
-        assert result["verification_target"] == {
+        assert assert_object(result["verification_target"]) == {
             "path": "tests/example.test.js",
             "test_symbol": None,
         }
@@ -471,10 +478,12 @@ def test_nomination_binds_exact_supporting_manifest_revision(
         updated = codemap.verification.nomination(test_file)
     assert updated["available"] is True
     first_members = {
-        member["path"]: member for member in original["supporting_source_members"]
+        member["path"]: member
+        for member in assert_records(original["supporting_source_members"])
     }
     later_members = {
-        member["path"]: member for member in updated["supporting_source_members"]
+        member["path"]: member
+        for member in assert_records(updated["supporting_source_members"])
     }
     assert set(first_members) == set(later_members)
     assert (
@@ -531,7 +540,7 @@ def test_nomination_qualifies_missing_metadata_as_observed_absence(
         codemap.index.sync()
         nomination = codemap.verification.nomination("tests/test_demo.py")
     assert nomination["available"] is True
-    assert nomination["supporting_source_members"][1] == {
+    assert assert_records(nomination["supporting_source_members"])[1] == {
         "path": "pyproject.toml",
         "state": "known-absent",
     }
@@ -587,9 +596,9 @@ def test_nomination_identity_detects_foreign_field_changes(tmp_path: Path) -> No
     contents = {
         key: value for key, value in original.items() if key != "nomination_identity"
     }
-    assert evidence_identity(original["schema"], contents) == identity
+    assert evidence_identity(assert_text(original["schema"]), contents) == identity
     contents["execution_authority"] = "hashmarks"
-    assert evidence_identity(original["schema"], contents) != identity
+    assert evidence_identity(assert_text(original["schema"]), contents) != identity
 
 
 @pytest.mark.parametrize(
@@ -639,7 +648,10 @@ def test_nomination_qualifies_pytest_declaration_from_parsed_toml(
     assert nomination["available"] is True
     assert nomination["confidence"] == expected_confidence
     assert nomination["source_evidence"] == expected_evidence
-    assert nomination["supporting_source_members"][1]["path"] == "pyproject.toml"
+    assert (
+        assert_records(nomination["supporting_source_members"])[1]["path"]
+        == "pyproject.toml"
+    )
     assert {"argv", "executable", "working_directory"}.isdisjoint(nomination)
 
 
@@ -734,7 +746,10 @@ def test_nomination_qualifies_declared_vitest_spec_not_package_mentions(
     assert nominated["available"] is True
     assert nominated["runner_evidence"] == expected_runner
     assert nominated["source_evidence"] == expected_source
-    assert nominated["supporting_source_members"][1]["path"] == "package.json"
+    assert (
+        assert_records(nominated["supporting_source_members"])[1]["path"]
+        == "package.json"
+    )
     assert nominated["execution_authority"] == "external"
     assert {"argv", "working_directory", "executable"}.isdisjoint(nominated)
 
@@ -789,8 +804,13 @@ def test_nomination_vitest_manifest_repair_changes_only_support_revision(
     assert before["available"] is False
     assert after["available"] is True
     assert after["runner_evidence"] == "vitest"
-    assert after["supporting_source_members"][0]["path"] == "tests/widget.test.js"
-    assert after["supporting_source_members"][1]["path"] == "package.json"
+    assert (
+        assert_records(after["supporting_source_members"])[0]["path"]
+        == "tests/widget.test.js"
+    )
+    assert (
+        assert_records(after["supporting_source_members"])[1]["path"] == "package.json"
+    )
     assert after["nomination_identity"] != before["nomination_identity"]
 
 
@@ -824,7 +844,9 @@ def test_nomination_requires_unique_top_level_python_test_node(
     assert result["execution_authority"] == "external"
     if expected:
         assert result["scope"] == "test-node"
-        assert result["verification_target"]["test_symbol"] == "test_widget"
+        assert (
+            assert_object(result["verification_target"])["test_symbol"] == "test_widget"
+        )
     else:
         assert result["reason"] == "source-evidence-unqualified"
     assert {"argv", "working_directory", "executable"}.isdisjoint(result)
@@ -842,7 +864,7 @@ def test_python_file_level_nomination_remains_available_without_node_claim(
         packet = codemap.verification.nomination("tests/test_widget.py")
     assert packet["available"] is True
     assert packet["scope"] == "test-file"
-    assert packet["verification_target"]["test_symbol"] is None
+    assert assert_object(packet["verification_target"])["test_symbol"] is None
     assert packet["source_member_revision"]
 
 
@@ -918,7 +940,7 @@ def test_nomination_preserves_explicit_python_source_selection_precision(
     else:
         assert nomination["available"] is True
         assert nomination["scope"] == expected_scope
-        assert nomination["verification_target"]["test_symbol"] == (
+        assert assert_object(nomination["verification_target"])["test_symbol"] == (
             "test_widget" if expected_scope == "test-node" else None
         )
 
@@ -939,7 +961,8 @@ def test_legacy_plan_retains_flat_projection_while_nomination_refuses_nested(
             "tests/test_widget.py", qualname="test_widget.inner"
         )
     assert legacy["available"] is True
-    assert legacy["verification_target"]["test_symbol"] == "test_widget"
+    assert "verification_target" in legacy
+    assert assert_object(legacy["verification_target"])["test_symbol"] == "test_widget"
     assert exact["available"] is False
     assert exact["reason"] == "source-evidence-unqualified"
 
@@ -965,6 +988,7 @@ def test_explicit_non_test_selector_cannot_widen_to_file_nomination(
     assert narrowed["nomination_identity"] != original["nomination_identity"]
     assert narrowed["execution_authority"] == "external"
     assert legacy["available"] is True
+    assert "scope" in legacy
     assert legacy["scope"] == "test-file"
 
 
@@ -1045,7 +1069,7 @@ def test_polyglot_explicit_node_selector_cannot_widen_to_file_or_package(
             filename, symbol=symbol, qualname=qualname
         )
     assert file_scope["available"] is True
-    assert file_scope["verification_target"]["test_symbol"] is None
+    assert assert_object(file_scope["verification_target"])["test_symbol"] is None
     assert file_scope["scope"] in {"go-package", "test-file", "typescript-project"}
     assert requested_node["available"] is False
     assert requested_node["reason"] == "source-evidence-unqualified"

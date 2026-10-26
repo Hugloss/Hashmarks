@@ -210,6 +210,7 @@ def test_mcp_native_specialist_projection_preserves_advertised_intent(
         assert [tool.name for tool in tools] == [selected_tool]
         assert tools[0].description == tool_description(selected_tool)
         assert server.instructions == mcp_projection_instructions((selected_tool,))
+        assert server.instructions is not None
         first = tool_description(selected_tool).split(". ", 1)[0].rstrip(".")
         assert f"{selected_tool}: {first}." in server.instructions
         assert "task_evidence:" not in server.instructions

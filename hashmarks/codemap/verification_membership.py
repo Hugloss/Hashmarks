@@ -16,7 +16,7 @@ from hashmarks.verification_nomination_validation import (
     validate_verification_nomination,
 )
 
-from .decision_session import decision_scoped, reconcile_decision
+from .decision_session import ReadScopeOwner, decision_scoped, reconcile_decision
 
 if TYPE_CHECKING:
     from .evidence_verification import RepositoryVerification
@@ -122,7 +122,7 @@ class VerificationMembershipMixin:
     @reconcile_decision
     @decision_scoped
     def observe_nomination_source_binding(
-        self, nomination: object
+        self: ReadScopeOwner, nomination: object
     ) -> dict[str, object]:
         """Correlate an existing nomination with current observed input revisions.
 
