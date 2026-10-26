@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import logging
 import math
@@ -11,6 +12,7 @@ from typing import NotRequired, TypedDict, TypeVar
 
 from hashmarks._command_output import log_command_output
 from hashmarks.codemap import CodeMap
+from hashmarks.paths import normalize_relative_path
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +53,7 @@ class CorpusMetricsReport(TypedDict):
     schema: str
     workspace: str
     corpus: str
+    corpus_sha256: str
     parameters: dict[str, int]
     repository: dict[str, int]
     sync: dict[str, object]
@@ -60,20 +63,47 @@ class CorpusMetricsReport(TypedDict):
     name: NotRequired[str]
 
 
-def _load(path: Path) -> list[dict[str, object]]:
-    value = json.loads(path.read_text(encoding="utf-8"))
-    if value.get("schema") != "hashmarks.agent-task-corpus.v1":
+def _load(path: Path) -> tuple[list[dict[str, object]], str]:
+    raw = path.read_bytes()
+    value = json.loads(raw.decode("utf-8"))
+    if (
+        not isinstance(value, dict)
+        or value.get("schema") != "hashmarks.agent-task-corpus.v1"
+    ):
         raise ValueError("unsupported agent task corpus schema")
     tasks = value.get("tasks")
     if not isinstance(tasks, list) or not tasks:
         raise ValueError("agent task corpus must contain tasks")
-    return [row for row in tasks if isinstance(row, dict)]
+    if any(not isinstance(row, dict) for row in tasks):
+        raise ValueError("agent task corpus rows must be objects")
+    return tasks, "sha256:" + hashlib.sha256(raw).hexdigest()
 
 
 def _timed(fn: Callable[[], _T]) -> tuple[_T, float]:
     started = time.perf_counter()
     value = fn()
     return value, time.perf_counter() - started
+
+
+def _validate_expected_files(workspace: Path, tasks: list[dict[str, object]]) -> None:
+    """Reject retired source labels before any index or score is produced."""
+    for task in tasks:
+        paths = task.get("expected_files", [])
+        if not isinstance(paths, (list, tuple)):
+            raise ValueError("expected task files must be an array")
+        for path in paths:
+            if not isinstance(path, str):
+                raise ValueError("expected task file must be a relative path")
+            relative = normalize_relative_path(path, allow_root=False)
+            candidate = workspace / relative
+            if (
+                path != relative
+                or not candidate.resolve().is_relative_to(workspace)
+                or not candidate.is_file()
+            ):
+                raise ValueError(
+                    f"expected file is absent or outside target workspace: {task.get('id')}: {path}"
+                )
 
 
 def _percentile(values: list[float], fraction: float) -> float:
@@ -178,7 +208,10 @@ def collect(
     workspace: Path, corpus: Path, *, budget: int = 1200, limit: int = 20
 ) -> CorpusMetricsReport:
     workspace = workspace.resolve(strict=False)
-    tasks = _load(corpus)
+    if corpus.resolve().is_relative_to(workspace):
+        raise ValueError("oracle corpus must be outside the target workspace")
+    tasks, corpus_sha256 = _load(corpus)
+    _validate_expected_files(workspace, tasks)
     started = time.perf_counter()
     rows: list[TaskMetrics] = []
     with CodeMap(workspace) as codemap:
@@ -210,6 +243,7 @@ def collect(
         "schema": SCHEMA,
         "workspace": str(workspace),
         "corpus": str(corpus),
+        "corpus_sha256": corpus_sha256,
         "parameters": {"budget": budget, "limit": limit, "tasks": task_count},
         "repository": {
             "files": repository_file_count,
@@ -260,9 +294,13 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Replay agent localization tasks against Hashmarks CodeMap"
     )
-    parser.add_argument("--workspace", type=Path, default=Path("."))
+    parser.add_argument("--workspace", type=Path, required=True)
     parser.add_argument(
-        "--corpus", type=Path, default=Path("benchmarks/agent_tasks.json")
+        "--corpus",
+        type=Path,
+        default=Path(
+            "benchmarks/agent_evaluation/hashmarks_342d510_retrieval_tasks.json"
+        ),
     )
     parser.add_argument("--budget", type=int, default=1200)
     parser.add_argument("--limit", type=int, default=20)

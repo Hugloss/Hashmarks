@@ -13,8 +13,8 @@ if TYPE_CHECKING:
     from .providers import SourceRangeProvider
 
 NODE_PARSER = "hashmarks.ecmascript-outline.v6"
-GO_PARSER = "hashmarks.go-outline.v3"
-RUST_PARSER = "hashmarks.rust-outline.v3"
+GO_PARSER = "hashmarks.go-outline.v4"
+RUST_PARSER = "hashmarks.rust-outline.v4"
 PATH_ONLY_PARSER = "hashmarks.path-only.v4"
 
 
@@ -234,7 +234,7 @@ def _go_outline(source: str, *, file_digest: str) -> ParsedArtifact:
     symbols: list[SymbolRecord] = []
     edges: list[EdgeRecord] = []
     in_import = False
-    for line_no, raw in enumerate(source.splitlines(), 1):
+    for line_no, raw in enumerate(source.split("\n"), 1):
         stripped = raw.strip()
         if stripped.startswith("import ("):
             in_import = True
@@ -293,7 +293,7 @@ def _go_outline(source: str, *, file_digest: str) -> ParsedArtifact:
 def _rust_outline(source: str, *, file_digest: str) -> ParsedArtifact:
     symbols: list[SymbolRecord] = []
     edges: list[EdgeRecord] = []
-    for line_no, raw in enumerate(source.splitlines(), 1):
+    for line_no, raw in enumerate(source.split("\n"), 1):
         stripped = raw.strip()
         match = re.match(r"^(?:pub(?:\([^)]*\))?\s+)?use\s+([^;]+);", stripped)
         if match:

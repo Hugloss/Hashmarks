@@ -49,14 +49,6 @@ class SuiteMetricsReport(TypedDict):
     repositories: list[CorpusMetricsReport]
 
 
-def _sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return "sha256:" + digest.hexdigest()
-
-
 def _protocol_identity(protocol: Mapping[str, object]) -> str:
     payload = json.dumps(protocol, sort_keys=True, separators=(",", ":")).encode(
         "utf-8"
@@ -76,6 +68,9 @@ def _parse_repo(value: str) -> tuple[str, Path, Path]:
 
 def _validate_repository_roots(repos: list[tuple[str, Path, Path]]) -> None:
     resolved = [(name, workspace.resolve()) for name, workspace, _ in repos]
+    for _name, root in resolved:
+        if any(corpus.resolve().is_relative_to(root) for _, _, corpus in repos):
+            raise ValueError("oracle corpus must be outside every target workspace")
     for index, (name, root) in enumerate(resolved):
         for other_name, other_root in resolved[index + 1 :]:
             if (
@@ -113,18 +108,18 @@ def collect_suite(
         reports.append({"name": name, **report})
     total_tasks = sum(int(row["parameters"]["tasks"]) for row in reports)
     protocol_repositories: list[ProtocolRepository] = []
-    for (name, _workspace, corpus), report in zip(repos, reports, strict=False):
+    for (name, _workspace, _corpus), report in zip(repos, reports, strict=False):
         protocol_repositories.append(
             {
                 "name": name,
                 "workspace_fingerprint": str(report["sync"]["workspace_fingerprint"]),
-                "corpus_sha256": _sha256_file(corpus),
+                "corpus_sha256": report["corpus_sha256"],
                 "tasks": int(report["parameters"]["tasks"]),
             }
         )
     protocol: SuiteProtocol = {
         "schema": PROTOCOL_SCHEMA,
-        "retrieval": "CodeMap.search.find_task + CodeMap.context.build",
+        "retrieval": "CodeMap.search.find + CodeMap.context.build",
         "budget": int(budget),
         "limit": int(limit),
         "repositories": protocol_repositories,

@@ -103,7 +103,7 @@ evaluation-help:
 	  '' \
 	  'These targets measure external consumers; they are not installed product APIs or agent workflow authority.' \
 	  '  make metrics-agent' \
-	  '  make metrics-agent-corpus' \
+	  '  make metrics-agent-corpus HASHMARKS_TARGET=/external/hashmarks-source' \
 	  '  make metrics-fresh-multi-repo' \
 	  '  make metrics-blind-worker-ab' \
 	  '  make metrics-worker-behavior-ab' \
@@ -114,7 +114,7 @@ evaluation-help:
 	  '  make metrics-context-economics-csv  Project Codex economics evidence to CSV' \
 	  '  make splunk-csv-dogfood  Stream masked Splunk CSV into bounded evidence' \
 	  '  make metrics-bm25-economics' \
-	  '  make metrics-agent-suite' \
+	  '  make metrics-agent-suite HASHMARKS_TARGET=/external/hashmarks-source OH_GOON=/external/oh-goon-source' \
 	  '  make metrics-agent-trace' \
 	  '  make metrics-agent-experiment' \
 	  '  make metrics-agent-experiment-set' \
@@ -489,8 +489,10 @@ metrics-derived-authority: bootstrap
 metrics-agent: bootstrap
 	@$(UV_RUN) --offline python -m scripts.agent_evaluation.metrics_agent
 
-metrics-agent-corpus: bootstrap
-	@$(UV_RUN) --offline python -m scripts.agent_evaluation.metrics_agent_corpus
+metrics-agent-corpus:
+	@test -n "$(HASHMARKS_TARGET)" || (echo "HASHMARKS_TARGET is required: select an external frozen source snapshot" >&2; exit 2)
+	@$(MAKE) bootstrap
+	@$(UV_RUN) --offline python -m scripts.agent_evaluation.metrics_agent_corpus --workspace "$(HASHMARKS_TARGET)"
 
 metrics-fresh-multi-repo: bootstrap
 	@$(UV_RUN) --offline python -m scripts.agent_evaluation.metrics_fresh_multi_repo \
@@ -532,11 +534,13 @@ metrics-bm25-economics: bootstrap
 metrics-bm25-constrained: bootstrap
 	$(UV_RUN) --offline python -m scripts.agent_evaluation.metrics_bm25_constrained --root .hashmarks/benchmarks/bm25-constrained --output .hashmarks/metrics/bm25-constrained-latest.json
 
-metrics-agent-suite: bootstrap
+metrics-agent-suite:
+	@test -n "$(HASHMARKS_TARGET)" || (echo "HASHMARKS_TARGET is required: select an external frozen source snapshot" >&2; exit 2)
 	@test -n "$(OH_GOON)" || (echo "OH_GOON is required, e.g. make metrics-agent-suite OH_GOON=/path/to/oh-goon" >&2; exit 2)
+	@$(MAKE) bootstrap
 	@$(UV_RUN) --offline python -m scripts.agent_evaluation.metrics_agent_suite \
-	  --repo "hashmarks=.::benchmarks/agent_tasks.json" \
-	  --repo "oh-goon=$(OH_GOON)::benchmarks/external/oh_goon_1267_0_49_agent_tasks.json" \
+	  --repo "hashmarks=$(HASHMARKS_TARGET)::benchmarks/agent_evaluation/hashmarks_342d510_retrieval_tasks.json" \
+	  --repo "oh-goon=$(OH_GOON)::benchmarks/external/oh_goon_dafbe930_retrieval_tasks.json" \
 	  --min-file-recall 1 --min-symbol-recall 1 --max-fallback-rate 0 \
 	  --max-average-find-ms 60 --max-average-context-ms 80 \
 	  --output .hashmarks/metrics/agent-suite-latest.json

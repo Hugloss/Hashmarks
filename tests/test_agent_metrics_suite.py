@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import importlib
 import json
 import subprocess
@@ -96,6 +97,7 @@ def test_suite_protocol_identity_binds_corpus_workspace_and_parameters(
     workspace.mkdir()
     report = {
         "schema": "hashmarks.agent-corpus-metrics.v1",
+        "corpus_sha256": "sha256:" + hashlib.sha256(corpus.read_bytes()).hexdigest(),
         "parameters": {"tasks": 1},
         "summary": {
             "file_recall": 1.0,

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.32.1 — Repository-evidence conformance
+
+- Preserve Python import identity across annotation-only targets while keeping possible annotation and conditional expression effects ambiguous. Check import identity, forward calls, and reverse callers together without weakening lexical shadowing.
+- Align Go and Rust advisory outlines with physical LF source coordinates and invalidate their retained parser artifacts. Keep indexed ranges, Source reads, UTF-8 byte receipts, edits, and cache reopen consistent.
+- Qualify Node test nominations from exact top-level static `node:test` imports through the existing native syntax provider. Comments, strings, similar module names, malformed source, and unavailable syntax cannot become import authority.
+- Expand source and evidence conformance proof while preserving unknown freshness, bounded evidence, source correspondence, and external execution authority. Keep model-free retrieval measurements separate from coding-outcome claims.
+
 ## 0.32.0 — Qualified verification evidence and CodeMap correctness
 
 - Add source-bound verification nominations, member witness receipts, and public validation while keeping repository freshness, source correspondence, and external execution results separate.

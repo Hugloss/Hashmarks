@@ -8,6 +8,72 @@ Canonical synthetic fixture inputs are owned by the evaluation code that materia
 
 New product behavior must still pass the product-admission contract in `docs/reference/PRODUCT_BOUNDARY.md`; benchmark wins do not authorize moving consumer workflow into Hashmarks.
 
+## Frozen model-free retrieval corpus
+
+The current bounded corpus contains eight source-inspected owner-localization
+tasks per repository. Labels were frozen before retrieval and independently
+checked against these source pins:
+
+| Corpus | Repository source commit | Full source tree |
+| --- | --- | --- |
+| [`hashmarks_342d510_retrieval_tasks.json`](hashmarks_342d510_retrieval_tasks.json) | `342d5105f6b99ad04d61e2d9b39cf7c1ac0b07e2` | `e6b76f49d1104e085def94b79c47b4094fa0462a` |
+| [`oh_goon_dafbe930_retrieval_tasks.json`](../external/oh_goon_dafbe930_retrieval_tasks.json) | `dafbe9309f62d9a59b1b2db82bd3a6a965e8e274` | `a041de5dff6fc9a990522d798bfd8b20ad335228` |
+
+Admit only the corpus's explicit `source_pin.admitted_paths` into external,
+disjoint source snapshots. For Hashmarks these are `hashmarks/`, `docs/`,
+`README.md`, `pyproject.toml`, `Makefile`, and `uv.lock`. For Oh-Goon they are
+`backend/src/`, `frontend/src/`, `templates/`, `docs/`, `backend/pyproject.toml`,
+`backend/uv.lock`, `frontend/package.json`, `frontend/package-lock.json`,
+`Makefile`, `README.md`, and `AGENTS.md`. This is a bounded admitted component
+comparison, not a measurement over both complete repositories. Keep the corpus
+labels outside those targets. Do not include development environments, native
+authentication/configuration stores, generated metric output or oracle files.
+
+Use the existing retrieval collector with a native locked interpreter that can
+parse the selected source; this Oh-Goon pin requires Python 3.14 syntax support:
+
+```sh
+uv run --frozen --offline --no-sync --group test python -m scripts.agent_evaluation.metrics_agent_suite \
+  --repo "hashmarks=/external/hashmarks-target::benchmarks/agent_evaluation/hashmarks_342d510_retrieval_tasks.json" \
+  --repo "oh-goon=/external/oh-goon-target::benchmarks/external/oh_goon_dafbe930_retrieval_tasks.json" \
+  --budget 1200 --limit 20 --output /external/retrieval-metrics.json
+```
+
+The standalone corpus CLI requires an explicit `--workspace`; the Make corpus
+and suite aliases require `HASHMARKS_TARGET` to select an external source
+snapshot. The suite also requires `OH_GOON`. The collector rejects an oracle
+corpus located inside any selected target before indexing, including an
+external symlink resolving into the target. It does not silently measure the
+source checkout that contains its own query/answer labels.
+
+This collector invokes `CodeMap.search.find` and `CodeMap.context.build`; it
+does not run a coding agent, provider adapter, authentication preflight or
+EvalShot campaign. It rejects nonexistent/outside target expected files before
+indexing and rejects malformed task rows rather than silently dropping them.
+The `source_pin` records how labels were authored; the collector does not
+authenticate Git commits or enforce those pins. Independently materialize the
+selected source and retain its Git/archive identity. The report binds the
+actual indexed `workspace_fingerprint`, exact corpus digest, retrieval method,
+budget and limit through `benchmark_protocol_identity`.
+Tasks and their digest come from one initial corpus byte capture. The suite
+transports that captured digest rather than reopening the corpus after scoring.
+
+File recall is coverage in the union of search hits and context items. Symbol
+recall similarly compares observed symbol names/qualified names. The reported
+fallback rate means that expected files were not all returned, not an observed
+agent action. Context tokens and avoided full-file tokens are estimator-based
+approximations, not model usage or measured cost savings. Latency describes
+this collector's calls and cache/environment conditions; record cold/warm
+conditions separately. None of these metrics establishes coding correctness,
+agent productivity, sufficient verification, or an improvement over another
+version without a source-equivalent paired comparison. Coding outcomes and
+model-visible delivery remain unmeasured here and EvalShot-owned.
+
+The ordinary corpus and Make suite defaults name these current files.
+`benchmarks/agent_tasks.json` and
+`benchmarks/external/oh_goon_1267_0_49_agent_tasks.json` retain their historical
+bytes and retired-owner labels; use them only with their historical source.
+Their old results must not be reinterpreted as scores for the current corpus.
 
 ## Frozen backend navigation source-evidence ablation (B35–B39)
 

@@ -457,7 +457,12 @@ coverage. There is no whole-tree fallback or persistent alias graph.
 The syntax owner distinguishes declarations from later assignments (including
 unpacking and augmented assignment), ordinary imports, deletion and conditional
 writes. Unsupported or conditional rebinding preserves uncertainty. Annotation-only
-statements preserve an existing declaration; locals inside unrelated nested scopes
+targets preserve existing module/class declarations, including inside compound
+statements; function-local annotation targets still establish lexical locals.
+Possible annotation-expression effects retain uncertainty without assuming a
+runtime's annotation evaluation timing. Incidental expression writes do not gain
+the unconditional authority of actual assignment targets.
+Locals inside unrelated nested scopes
 do not overwrite module exports. Class/member qualification uses the same ordered
 binding analysis. Indexing and qualification share relative-import target spelling;
 the Python parser cache version changes so prior derived import artifacts rebuild.

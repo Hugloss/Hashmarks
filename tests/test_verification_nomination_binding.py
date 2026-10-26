@@ -8,7 +8,11 @@ from pathlib import Path
 import pytest
 
 from hashmarks.codemap import CodeMap
+from hashmarks.codemap.repository_observation import evidence_identity
 from hashmarks.operation_contract import operation_schema
+from hashmarks.verification_nomination_validation import (
+    validate_verification_nomination,
+)
 
 
 def _repo(root: Path, *, with_manifest: bool = True) -> None:
@@ -62,6 +66,38 @@ def test_live_binding_matches_qualified_source_members(tmp_path: Path) -> None:
             assert observed["member_revision"] == claimed["member_revision"]
         assert "reobserved_member" not in checked
     _assert_external(result)
+
+
+def test_resigned_nomination_source_match_cannot_authenticate_semantic_claims(
+    tmp_path: Path,
+) -> None:
+    """Current byte correspondence and packet integrity are independent of trust."""
+    _repo(tmp_path)
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        original = codemap.verification.nomination("tests/test_demo.py")
+        forged = deepcopy(original)
+        forged["runner_evidence"] = "caller-invented-runner"
+        forged["scope"] = "caller-invented-scope"
+        forged["nomination_identity"] = evidence_identity(
+            forged["schema"],
+            {
+                key: value
+                for key, value in forged.items()
+                if key != "nomination_identity"
+            },
+        )
+        transported = validate_verification_nomination(forged)
+        correlated = codemap.verification.observe_nomination_source_binding(forged)
+    assert forged["nomination_identity"] != original["nomination_identity"]
+    assert transported["valid"] is True
+    assert transported["authority"] == "content-integrity-only"
+    assert transported["repository_binding"] == "not-checked"
+    assert transported["producer_authenticity"] == "not-checked"
+    assert correlated["packet_valid"] is True
+    assert correlated["source_binding_state"] == "matched"
+    assert correlated["nomination_identity"] == forged["nomination_identity"]
+    _assert_external(correlated)
 
 
 @pytest.mark.parametrize("path", ["tests/test_demo.py", "pyproject.toml"])
