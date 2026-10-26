@@ -1,6 +1,7 @@
 """Import identity uses the exact callable scope and preserves real shadowing."""
 
 from pathlib import Path
+from textwrap import indent
 
 import pytest
 from contract_assertions import assert_records
@@ -92,6 +93,159 @@ def test_actual_lexical_shadowing_cannot_gain_import_authority(
     ]
     assert len(calls) == 1
     assert calls[0]["resolved_symbol_id"] is None
+
+
+@pytest.mark.parametrize("inside_function", [False, True])
+@pytest.mark.parametrize(
+    "class_body",
+    [
+        "global Envelope\nEnvelope = replacement\n",
+        "global Envelope\n(Envelope := replacement)\n",
+        "class Inner:\n    global Envelope\n    Envelope = replacement\n",
+    ],
+)
+def test_executed_class_global_writes_cannot_gain_imported_call_authority(
+    tmp_path: Path, class_body: str, inside_function: bool
+) -> None:
+    _write_factory(tmp_path)
+    declaration = "class Rebind:\n" + indent(class_body, "    ")
+    caller = "def publish():\n"
+    source = "from factory import Envelope\nfrom other import Envelope as replacement\n"
+    source += (
+        caller + indent(declaration, "    ")
+        if inside_function
+        else declaration + caller
+    )
+    source += "    return Envelope.from_cmd()\n"
+    (tmp_path / "consumer.py").write_text(source)
+    with CodeMap(tmp_path) as codemap:
+        forward = codemap.structure.locality("consumer.py::publish")
+        reverse = codemap.structure.locality(
+            "factory.py::Envelope.from_cmd", max_depth=0
+        )
+    call = next(
+        row
+        for row in assert_records(forward["edges"])
+        if row["target_text"] == "Envelope.from_cmd"
+    )
+    assert call["resolved_symbol_id"] is None
+    assert any(
+        row["target_text"] == "Envelope.from_cmd"
+        for row in assert_records(forward["unresolved_calls"])
+        + assert_records(forward["external_or_unindexed_calls"])
+    )
+    owner = next(
+        row
+        for row in assert_records(reverse["nodes"])
+        if row["symbol_id"] == "factory.py::Envelope.from_cmd"
+    )
+    assert assert_records(owner["exact_callers"]) == []
+    if not inside_function:
+        assert any(
+            row["path"] == "consumer.py" and row["source"] == "publish"
+            for row in assert_records(owner["unresolved_caller_candidates"])
+        )
+
+
+@pytest.mark.parametrize(
+    "class_body",
+    [
+        "Envelope = replacement\n",
+        "global Envelope\nvalue = replacement\n",
+        "def later(self):\n    global Envelope\n    Envelope = replacement\n",
+        "def later(self):\n    class Inner:\n        global Envelope\n        Envelope = replacement\n",
+        "class Inner:\n    Envelope = replacement\n",
+    ],
+)
+def test_class_namespace_and_deferred_writes_preserve_imported_call_authority(
+    tmp_path: Path, class_body: str
+) -> None:
+    _write_factory(tmp_path)
+    (tmp_path / "consumer.py").write_text(
+        "from factory import Envelope\nfrom other import Envelope as replacement\n"
+        "class Other:\n"
+        + indent(class_body, "    ")
+        + "def publish():\n    return Envelope.from_cmd()\n"
+    )
+    with CodeMap(tmp_path) as codemap:
+        packet = codemap.structure.locality("consumer.py::publish")
+    call = next(
+        row
+        for row in assert_records(packet["edges"])
+        if row["target_text"] == "Envelope.from_cmd"
+    )
+    assert call["resolved_symbol_id"] == "factory.py::Envelope.from_cmd"
+
+
+@pytest.mark.parametrize(
+    ("class_body", "member"),
+    [
+        ("global build\ndef build(): return 1\n", "build"),
+        ("global Inner\nclass Inner:\n    def build(): return 1\n", "Inner.build"),
+    ],
+)
+def test_class_global_declarations_cannot_become_exact_class_members(
+    tmp_path: Path, class_body: str, member: str
+) -> None:
+    (tmp_path / "factory.py").write_text(
+        "class Factory:\n" + indent(class_body, "    ")
+    )
+    (tmp_path / "consumer.py").write_text(
+        f"from factory import Factory\ndef publish():\n    return Factory.{member}()\n"
+    )
+    with CodeMap(tmp_path) as codemap:
+        packet = codemap.structure.locality("consumer.py::publish")
+        reverse = codemap.structure.locality(
+            f"factory.py::Factory.{member}", max_depth=0
+        )
+    call = next(
+        row
+        for row in assert_records(packet["edges"])
+        if row["target_text"] == f"Factory.{member}"
+    )
+    assert call["resolved_symbol_id"] is None
+    assert assert_records(reverse["nodes"])[0]["exact_callers"] == []
+
+
+def test_nested_class_global_write_does_not_rebind_an_outer_class_member(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "factory.py").write_text(
+        "class Factory:\n    def build(): return 1\n"
+        "    class Rebind:\n        global build\n        def build(): return 2\n"
+    )
+    (tmp_path / "consumer.py").write_text(
+        "from factory import Factory\ndef publish():\n    return Factory.build()\n"
+    )
+    with CodeMap(tmp_path) as codemap:
+        packet = codemap.structure.locality("consumer.py::publish")
+    call = next(
+        row
+        for row in assert_records(packet["edges"])
+        if row["target_text"] == "Factory.build"
+    )
+    assert call["resolved_symbol_id"] == "factory.py::Factory.build"
+
+
+@pytest.mark.parametrize("receiver", ["self", "cls"])
+def test_global_function_in_class_syntax_cannot_prove_a_method_receiver(
+    tmp_path: Path, receiver: str
+) -> None:
+    decorator = "    @classmethod\n" if receiver == "cls" else ""
+    (tmp_path / "factory.py").write_text(
+        "class Factory:\n    global publish\n"
+        + decorator
+        + f"    def publish({receiver}):\n        return {receiver}.build()\n"
+        + "    def build(self): return 1\n"
+    )
+    with CodeMap(tmp_path) as codemap:
+        packet = codemap.structure.locality("factory.py::Factory.publish")
+    call = next(
+        row
+        for row in assert_records(packet["edges"])
+        if row["target_text"] == f"{receiver}.build"
+    )
+    assert call["resolved_symbol_id"] is None
 
 
 def test_duplicate_declarations_in_the_same_scope_stay_unresolved(

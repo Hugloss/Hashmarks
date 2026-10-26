@@ -53,6 +53,12 @@ function bindings. Another class's same-named method or an unrelated nested body
 cannot shadow that import. Actual argument, assignment, function, class and
 closure bindings preserve unresolved identity; duplicate declarations in the
 same qualified scope also remain unresolved.
+An immediately executed class body can explicitly write a module name through
+`global`; those writes also prevent exact import qualification. Ordinary class
+attributes and writes inside deferred function or method bodies do not escape
+their own scope merely because a class is constructed.
+Names declared `global` in a class cannot establish exact class-member or nested
+class identity. Escaped module writes do not overwrite another class's namespace.
 
 Structured, compact and text presentation preserve the complete, already bounded
 `nodes`, `edges`, `unresolved_calls` and `external_or_unindexed_calls` collections.

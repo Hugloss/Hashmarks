@@ -74,6 +74,29 @@ def test_ambiguous_reexport_has_no_qualified_identity(tmp_path: Path) -> None:
     assert result["qualified_identity"] is None
 
 
+def test_executed_class_global_write_invalidates_reexport_identity(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "pkg/impl.py", "def parse_pointer(value): return value\n")
+    _write(tmp_path, "pkg/replacement.py", "def parse_pointer(value): return value\n")
+    _write(
+        tmp_path,
+        "pkg/__init__.py",
+        "from .impl import parse_pointer\n"
+        "from .replacement import parse_pointer as replacement\nclass Rebind:\n"
+        "    global parse_pointer\n    parse_pointer = replacement\n",
+    )
+    _write(tmp_path, "consumer.py", "from pkg import parse_pointer\n")
+    with _map(tmp_path) as codemap:
+        codemap.index.sync()
+        result = qualified_import_identity(
+            codemap._imports, source_path="consumer.py", target="pkg.parse_pointer"
+        )
+    assert result["status"] == "ambiguous"
+    assert result["qualified_identity"] is None
+    assert result["owner_paths"] == ["pkg/__init__.py"]
+
+
 @pytest.mark.parametrize(
     ("name", "declaration", "exported"),
     [
