@@ -96,7 +96,14 @@ COMPONENTS: dict[str, tuple[str, frozenset[str]]] = {
     ),
     "RepositoryDependencies": (
         "repository_dependencies",
-        frozenset({"RepositorySource", "RepositoryImports", "RepositoryCorrelation"}),
+        frozenset(
+            {
+                "RepositorySource",
+                "RepositoryImports",
+                "RepositoryCorrelation",
+                "RepositoryRelationships",
+            }
+        ),
     ),
     "RepositoryChanges": (
         "repository_changes",
