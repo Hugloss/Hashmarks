@@ -7,7 +7,7 @@ verification sufficiency or execution authority.
 from __future__ import annotations
 
 from copy import deepcopy
-from typing import TYPE_CHECKING, TypedDict, cast
+from typing import TYPE_CHECKING, NotRequired, TypedDict, cast
 
 from hashmarks.operation_contract import operation_response, operation_schema
 
@@ -25,6 +25,7 @@ class _VerificationOwner(TypedDict):
     plan: TaskVerificationPlan
     covers_edit_candidates: list[str]
     coverage_evidence: str | None
+    file_read_evidence: NotRequired[object]
 
 
 class VerificationOwnershipMixin:
@@ -149,7 +150,7 @@ class VerificationOwnershipMixin:
         if not isinstance(path, str):
             return None
         coverage, evidence = self._coverage_for_candidate(item, edit_paths)
-        return {
+        result: _VerificationOwner = {
             "path": path,
             "score": item.get("score"),
             "reason": item.get("reason"),
@@ -161,6 +162,9 @@ class VerificationOwnershipMixin:
             "covers_edit_candidates": coverage,
             "coverage_evidence": evidence,
         }
+        if "file_read_evidence" in item:
+            result["file_read_evidence"] = deepcopy(item["file_read_evidence"])
+        return result
 
     def _verification_owner_rows(
         self, relevance: Mapping[str, object], edit_paths: list[str]
