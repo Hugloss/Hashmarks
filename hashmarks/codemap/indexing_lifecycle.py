@@ -344,9 +344,17 @@ class RepositoryIndex(IndexWatchMixin):
         self.range_provider = range_provider
         self._observation_source = observation_source
         self._max_index_bytes = int(max_index_bytes)
-        root_manifest = files.visible_file("pyproject.toml")
+        # The durable file inventory supplies candidates, never admission. Reuse
+        # its nested manifests on reopen, then apply the current canonical file
+        # policy; cold/full sync remains the owner of repository discovery.
+        manifests = sorted({"pyproject.toml", *store.paths_named("pyproject.toml")})
         self._python_import_roots = _python_source_roots_from_pyprojects(
-            self.workspace, () if root_manifest is None else (root_manifest.path,)
+            self.workspace,
+            tuple(
+                item.path
+                for rel in manifests
+                if (item := files.visible_file(rel)) is not None
+            ),
         )
 
     @property

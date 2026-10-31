@@ -73,7 +73,7 @@ def _mixed_factories(left: CodeMap, right: CodeMap) -> dict[str, Callable[[], ob
             declarations=right.declarations,
         ),
         "dependencies": lambda: RepositoryDependencies(
-            left.source, left._imports, right.correlation
+            left.source, left._imports, right.correlation, left.relationships
         ),
         "changes": lambda: RepositoryChanges(left.tasks, right.relationships),
         "views-cross": lambda: RepositoryViews(

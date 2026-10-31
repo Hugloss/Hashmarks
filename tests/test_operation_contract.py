@@ -57,6 +57,7 @@ _EXPECTED = {
         "explain": "hashmarks.dependency-resolution-explain.v1",
         "compare": "hashmarks.dependency-resolution-delta.v3",
     },
+    "dependency_consumers": {"default": "hashmarks.dependency-consumers.v1"},
     "repository_declarations": {
         "observation": "hashmarks.repository-declarations.v1",
         "explain": "hashmarks.repository-declaration-explain.v1",
@@ -387,6 +388,10 @@ def test_operation_modes_fail_closed() -> None:
 
 
 _FIXED_MODE_CORE_BOUNDARIES = {
+    "dependency_consumers": (
+        "hashmarks/codemap/dependency_consumers.py",
+        "consumers",
+    ),
     "source_range_receipt": (
         "hashmarks/codemap/repository_source.py",
         "range_receipt",

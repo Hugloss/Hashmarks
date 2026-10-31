@@ -9,6 +9,7 @@ from hashmarks.file_store import UnstableFileError
 from hashmarks.freshness import freshness_state
 
 from .decision_session import ReadScopeOwner
+from .dependency_consumers import DependencyConsumersMixin
 from .dependency_resolution_delta import DependencyResolutionDeltaMixin
 from .dependency_resolution_derivation import DependencyResolutionDerivationMixin
 from .dependency_resolution_evidence import DependencyResolutionEvidenceMixin
@@ -17,11 +18,13 @@ from .dependency_resolution_query import dependency_inventory_assessment
 if TYPE_CHECKING:
     from .decision_session import DecisionScope
     from .evidence_correlation import RepositoryCorrelation
+    from .evidence_graph import RepositoryRelationships
     from .import_resolution import RepositoryImports
     from .repository_source import RepositorySource
 
 
 class RepositoryDependencies(
+    DependencyConsumersMixin,
     DependencyResolutionEvidenceMixin,
     DependencyResolutionDeltaMixin,
     DependencyResolutionDerivationMixin,
@@ -40,12 +43,18 @@ class RepositoryDependencies(
         source: RepositorySource,
         imports: RepositoryImports,
         correlation: RepositoryCorrelation,
+        relationships: RepositoryRelationships,
     ) -> None:
-        if imports.reads is not source.reads or correlation.reads is not source.reads:
+        if (
+            imports.reads is not source.reads
+            or correlation.reads is not source.reads
+            or relationships.reads is not source.reads
+        ):
             raise ValueError("Dependency inputs must share one repository read scope")
         self.source = source
         self.imports = imports
         self._repository_correlation = correlation
+        self.relationships = relationships
         self.store = source.store
 
     @property

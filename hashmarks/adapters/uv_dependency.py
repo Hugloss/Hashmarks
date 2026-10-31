@@ -6,6 +6,8 @@ import tomllib
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
+from .python_distribution_metadata import add_python_distribution_metadata
+
 _SCHEMA = "hashmarks.dependency-resolution.v3"
 _ADAPTER_SEMANTICS = "hashmarks.uv-dependency-adapter.v1"
 _CONTEXT = "lock"
@@ -87,6 +89,7 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
     *,
     lock: bytes,
     repository_inputs: Sequence[Mapping[str, object]] = (),
+    distribution_metadata: Sequence[Mapping[str, object]] = (),
 ) -> dict[str, object]:
     """Translate already-produced uv.lock bytes into dependency-resolution v3.
 
@@ -260,7 +263,7 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
         }
     ]
 
-    return {
+    snapshot: dict[str, object] = {
         "schema": _SCHEMA,
         "producer": {
             "kind": "uv-lock",
@@ -335,3 +338,5 @@ def uv_lock_dependency_observation(  # noqa: C901, PLR0912, PLR0914, PLR0915
         "repository_inputs": [dict(row) for row in repository_inputs],
         "module_ownership": [],
     }
+    add_python_distribution_metadata(snapshot, distribution_metadata)
+    return snapshot
