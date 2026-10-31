@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.33.0 — Native Python repository and dependency evidence
+
+- Preserve nested Python packaging roots and qualified verifier relationships when reopening an index. Reuse indexed manifest candidates and current repository admission without adding full discovery on reopen.
+- Translate explicitly supplied Python distribution METADATA and RECORD bytes into the existing dependency module-ownership contract. Keep distribution/import names distinct, preserve ambiguous owners, and leave unsupported runtime providers unqualified.
+- Observe bounded Python source consumers and existing downstream relationships with exact source revisions. Retain caller-claimed dependency provenance, incomplete consumer scope and external execution authority; these observations do not certify verification sufficiency.
+- Recognize structural literal repository-file readers as verifier relationships, preserving exact target/reader revisions, readsite provenance and bounded unknown scope.
+- Align Python type contracts with native behavior and qualify both configured type checkers through the existing CI fast gate.
+
 ## 0.32.1 — Repository-evidence conformance
 
 - Preserve Python import identity across annotation-only targets while keeping possible annotation and conditional expression effects ambiguous. Check import identity, forward calls, and reverse callers together without weakening lexical shadowing.
