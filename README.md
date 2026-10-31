@@ -138,6 +138,16 @@ These are case-sensitive literal searches, never regex or repository-wide absenc
 Use direct source reads when an exact file is already known or the actual code
 body matters. Source declarations such as Makefile targets can still require
 native inspection; Hashmarks never executes `make`, tests, or another command.
+
+**OBSERVER:** verification ownership can also describe a test's literal read of
+an admitted repository file. A current Python AST must establish an unshadowed
+`pathlib.Path` import, an exact repository ancestor rooted at `__file__`, and an
+unconditional `read_text`/`read_bytes` call in the test. The relationship preserves
+both source revisions and the readsite; lexical matches only locate bounded
+candidates. Dynamic roots, unsupported control flow and ambiguous bindings remain
+unqualified. Reader/path bounds are reported and cannot establish absence. This
+does not prove that a test ran, that the read's result was asserted, or that the
+test supplies sufficient coverage; those remain consumer responsibilities.
 The agent retains responsibility for all next-tool, edit and verification
 decisions. See [MCP repository-discovery examples](docs/integration/MCP.md).
 

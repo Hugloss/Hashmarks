@@ -17,6 +17,7 @@ from .repository_observation import evidence_identity
 from .task_evidence_contract import read_task_candidate
 from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
 from .verification_explanation import VerificationExplanationMixin
+from .verification_file_reads import VerificationFileReadsMixin
 from .verification_membership import VerificationMembershipMixin
 from .verification_ownership import VerificationOwnershipMixin
 from .verification_plan import VerificationPlanMixin
@@ -63,6 +64,9 @@ class _VerificationRelevanceState:
     indirect_via_paths: dict[str, set[str]]
     source_ref_paths: set[str]
     unresolved_import_identity_paths: set[str]
+    file_read_references: dict[str, list[dict[str, object]]] = field(
+        default_factory=dict
+    )
     search_bound_reasons: set[str] = field(default_factory=set)
     reference_indexes: dict[str, _VerificationReferenceIndex | None] = field(
         default_factory=dict
@@ -96,6 +100,7 @@ class RepositoryVerification(
     VerificationPlanMixin,
     VerificationOwnershipMixin,
     VerificationExplanationMixin,
+    VerificationFileReadsMixin,
     ReadScopeOwner,
 ):
     """Own source-qualified test relevance for supplied owner/candidate facts."""
@@ -978,7 +983,17 @@ class RepositoryVerification(
                 "syntactic_reference": True,
                 "reference_strength": "unresolved-reference-identity",
             }
-        direct_reference = reference.get("reference_strength") == "reachable-symbol-use"
+        file_reads = state.file_read_references.get(path)
+        if file_reads:
+            reference = {
+                "syntactic_reference": True,
+                "reference_strength": "literal-file-read",
+                "file_read_evidence": file_reads,
+            }
+        direct_reference = reference.get("reference_strength") in {
+            "reachable-symbol-use",
+            "literal-file-read",
+        }
         return {
             "path": path,
             **reference,
@@ -1407,6 +1422,14 @@ class RepositoryVerification(
                 "indirect_reverse_refs_per_symbol": 256,
                 "indirect_test_paths": 4096,
                 "indirect_test_reverse_refs_per_symbol": 1024,
+                **(
+                    {
+                        "literal_reader_paths": VERIFICATION_RELEVANCE_DEFAULTS.literal_file_reader_paths,
+                        "literal_read_sites_per_reader": VERIFICATION_RELEVANCE_DEFAULTS.literal_file_read_sites,
+                    }
+                    if "literal-file-reader-syntax-scope" in state.search_bound_reasons
+                    else {}
+                ),
             },
             "authority": "bounded-index-evidence-not-verification-execution",
             "secret_knowledge_used": False,
@@ -1440,6 +1463,7 @@ class RepositoryVerification(
                 "task_matches": task_matches,
             }
 
+        self._verification_collect_file_reads(state)
         symbol_names, symbol_scope_complete = self._verification_edit_symbols(
             edit_path, edit
         )

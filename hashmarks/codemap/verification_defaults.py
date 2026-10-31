@@ -9,6 +9,8 @@ class VerificationRelevanceOptions:
 
     limit: int = 20
     candidate_limit: int = 8
+    literal_file_reader_paths: int = 64
+    literal_file_read_sites: int = 64
 
 
 VERIFICATION_RELEVANCE_DEFAULTS = VerificationRelevanceOptions()
