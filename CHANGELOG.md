@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.32.2 — Literal repository-file reader evidence
+
+- Observe structurally qualified test reads of exact repository-owned files through an unshadowed pathlib import and a repository-root anchor. Reuse the existing verification owner rather than treating matching path text as a read relationship.
+- Preserve target and reader revisions, readsite provenance and whole-file test nominations. Keep candidate and syntax bounds explicit; ambiguous, shadowed, unsafe, unreadable and unsupported forms remain unqualified.
+- Revoke warm reader relationships after source changes or removal, and retain incomplete negative-evidence scope. Test execution, sufficiency and result authority remain with the external consumer.
+
 ## 0.32.1 — Repository-evidence conformance
 
 - Preserve Python import identity across annotation-only targets while keeping possible annotation and conditional expression effects ambiguous. Check import identity, forward calls, and reverse callers together without weakening lexical shadowing.
