@@ -119,7 +119,13 @@ This allocation changes only GitHub Actions worker assignment. Native pytest
 still defines all membership, every selected process proves its exact
 collection, and the four shards must all pass. Do not use empirical time
 weights to skip tests, change completeness, or turn a green subset into release
-certification. Reprofile before changing pinned weights; compare actual
+certification. The existing pytest plugin also emits a small, diagnostic per-file phase-time
+receipt from the **actual ordinary pytest execution** (no new collection or
+test invocation). GitHub Actions retains these samples with the run, and the
+slowest measured modules are printed for review. This diagnostic output
+does not enter plan identity, test selection, exit status, or certification.
+
+Reprofile before changing pinned weights; compare actual
 slowest-shard runtime and end-to-end issue-to-merge time with the prior gate.
 
 ## Follow-up optimization

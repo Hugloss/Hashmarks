@@ -45,6 +45,11 @@ _HOT_FILE_EXTRA_MS = {
     "tests/test_backend_declaration_transport.py": 4_000,
 }
 
+# Per-file pytest-phase timings are diagnostic-only. Nothing in test membership,
+# plan identity, execution, exit status, or certification reads these samples.
+_DURATION_PROFILE_SCHEMA = "hashmarks.development-ci-file-duration.v1"
+_DURATION_BY_FILE: dict[str, float] = {}
+
 
 class _NativeCollector:
     def __init__(self) -> None:
@@ -281,6 +286,44 @@ def pytest_collection_finish(session: pytest.Session) -> None:
         _expected_execution_membership(),
         [item.nodeid for item in session.items],
     )
+
+
+def pytest_runtest_logreport(report: pytest.TestReport) -> None:
+    """Capture real setup, call and teardown durations without touching results."""
+    if not os.environ.get("HASHMARKS_CI_DURATION_REPORT"):
+        return
+    path = report.nodeid.split("::", 1)[0]
+    _DURATION_BY_FILE[path] = _DURATION_BY_FILE.get(path, 0.0) + report.duration
+
+
+def _duration_profile() -> dict[str, object]:
+    return {
+        "schema": _DURATION_PROFILE_SCHEMA,
+        "candidate_sha": _git_head(Path.cwd()),
+        "measurement": "pytest-phase-runtime-diagnostics-only",
+        "file_seconds": {
+            path: round(seconds, 3)
+            for path, seconds in sorted(_DURATION_BY_FILE.items())
+        },
+    }
+
+
+def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
+    """Emit a passive receipt even when the existing native test run failed."""
+    raw = os.environ.get("HASHMARKS_CI_DURATION_REPORT")
+    if not raw:
+        return
+    destination = Path(raw)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(
+        json.dumps(_duration_profile(), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    ranked = sorted(
+        _DURATION_BY_FILE.items(), key=lambda row: (-row[1], row[0])
+    )
+    for path, seconds in ranked[:16]:
+        sys.stdout.write(f"CI per-file pytest phase: {seconds:.2f}s {path}\n")
 
 
 def main() -> int:

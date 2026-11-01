@@ -208,6 +208,31 @@ def test_class_parametrization_keeps_full_isolated_function_name() -> None:
     assert handoff._test_function(nodeid) == "tests/test_a.py::TestCases::test_run"
 
 
+def test_duration_profile_records_actual_phase_seconds_without_weight_feedback(
+    native_repository: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Measurement only: the same static plan stays valid when timing changes."""
+    from types import SimpleNamespace
+    from typing import cast
+
+    monkeypatch.setenv("HASHMARKS_CI_DURATION_REPORT", str(native_repository / "profile.json"))
+    handoff._DURATION_BY_FILE.clear()
+    nodes = ["tests/test_a.py::test_standard"]
+    initial = handoff._build_plan(native_repository, nodes, isolated=(), shard_count=1)
+    report = SimpleNamespace(nodeid=nodes[0], duration=0.25)
+    handoff.pytest_runtest_logreport(cast(pytest.TestReport, report))
+    report.duration = 0.5
+    handoff.pytest_runtest_logreport(cast(pytest.TestReport, report))
+    profile = handoff._duration_profile()
+    assert profile["file_seconds"] == {"tests/test_a.py": 0.75}
+    assert profile["measurement"] == "pytest-phase-runtime-diagnostics-only"
+    assert handoff._build_plan(
+        native_repository, nodes, isolated=(), shard_count=1
+    ) == initial
+    handoff._DURATION_BY_FILE.clear()
+
+
 def test_hotspot_costs_follow_observed_runtime_not_source_size() -> None:
     slow = "tests/test_backend_evaluation_workflows.py"
     ordinary = "tests/test_small_fast_suite.py"
