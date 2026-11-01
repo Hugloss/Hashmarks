@@ -12,13 +12,15 @@ from hashmarks.operation_contract import operation_response, operation_schema
 from hashmarks.paths import normalize_relative_path
 
 from .decision_session import ReadScopeOwner, decision_scoped, reconcile_decision
+from .ecmascript_syntax import module_declarations
 from .go_module_declaration import declared_go_module
-from .providers import SourceSyntaxProvider
+from .providers import SourceSyntaxError, SourceSyntaxProvider, source_grammar
 from .repository_domains import RepositoryDomain, classify_repository_path
 from .repository_observation import evidence_identity
 
 if TYPE_CHECKING:
     from .evidence_verification import RepositoryVerification
+    from .providers import StructuralTree
     from .task_evidence_types import (
         AvailableVerificationPlan,
         TaskVerificationPlan,
@@ -266,16 +268,45 @@ class VerificationPlanMixin:
         _, raw = self._verification_manifest(rel, "package.json", members)
         return raw is not None and self._vitest_package_declaration(raw)
 
-    def _source_test_import(self, source: bytes) -> bool:
-        """Qualify a native import declaration in the captured member bytes."""
+    @staticmethod
+    def _tree_test_import(tree: StructuralTree, source: bytes) -> bool:
+        """Consume the canonical module projection without parsing a second time."""
+        imports = [
+            row
+            for row in module_declarations(tree, source)
+            if row["parent_syntax_type"] == "program"
+            and row["declaration_kind"] == "import"
+            and not row["type_only"]
+        ]
+        if any(row["module_specifier"] == "node:test" for row in imports):
+            return True
+        if any(row["module_specifier"] is None for row in imports):
+            raise _UnqualifiedNominationMember("node-test-import-unqualified")
+        return False
+
+    def _verification_syntax(self, rel: str, source: bytes) -> StructuralTree | None:
+        """Bind verifier projections to the configured parser before and after."""
         if TYPE_CHECKING:
             self = cast("RepositoryVerification", self)
         provider = self.source.index.range_provider
+        grammar = source_grammar(rel)
+        if not isinstance(provider, SourceSyntaxProvider) or grammar is None:
+            return None
+        signature = provider.signature(grammar)
+        if signature is None:
+            return None
+        tree = provider.syntax_tree(source, grammar)
+        if provider.signature(grammar) != signature:
+            raise SourceSyntaxError("native-syntax-provider-changed")
+        return tree
+
+    def _source_test_import(self, rel: str, source: bytes) -> bool:
+        """Qualify a native import declaration in the captured member bytes."""
         try:
-            source.decode("utf-8")
-            if not isinstance(provider, SourceSyntaxProvider):
+            tree = self._verification_syntax(rel, source)
+            if tree is None:
                 raise _UnqualifiedNominationMember("native-syntax-unavailable")
-            tree = provider.syntax_tree(source, "javascript")
+            return self._tree_test_import(tree, source)
         except (
             ImportError,
             LookupError,
@@ -285,18 +316,6 @@ class VerificationPlanMixin:
             ValueError,
         ) as exc:
             raise _UnqualifiedNominationMember("node-test-source-syntax") from exc
-        if tree is None:
-            raise _UnqualifiedNominationMember("native-syntax-unavailable")
-        for node in tree.root_node.named_children:
-            if node.type != "import_statement":
-                continue
-            module = node.child_by_field_name("source")
-            if module is not None and source[module.start_byte : module.end_byte] in {
-                b"'node:test'",
-                b'"node:test"',
-            }:
-                return True
-        return False
 
     @staticmethod
     def _pytest_manifest_declaration(raw: bytes) -> bool:
@@ -407,7 +426,7 @@ class VerificationPlanMixin:
                 None,
             )
         if suffix in {".js", ".mjs", ".cjs"}:
-            if self._source_test_import(source):
+            if self._source_test_import(rel, source):
                 return (
                     "node-test",
                     "test-file",
@@ -463,6 +482,8 @@ class VerificationPlanMixin:
     def _qualified_nomination(
         self, rel: str, *, symbol: str | None, qualname: str | None
     ) -> dict[str, object] | None:
+        if TYPE_CHECKING:
+            self = cast("RepositoryVerification", self)
         members: list[dict[str, object]] = []
         source = self._nomination_source_member(rel, members)
         if source is None:
@@ -473,6 +494,13 @@ class VerificationPlanMixin:
         if nominated is None:
             return None
         runner, scope, evidence, confidence, test_symbol = nominated
+        if runner == "node-test":
+            current, _ = self.source.member(rel, include_bytes=True)
+            if (
+                current.get("state") != "known-present"
+                or current.get("member_revision") != members[0]["member_revision"]
+            ):
+                raise _UnqualifiedNominationMember("node-test-source-changed")
         return self._bound_nomination(
             {
                 "schema": operation_schema("verification_nomination"),

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable, Iterable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -12,6 +12,7 @@ from hashmarks import native_vitest
 from hashmarks.native_vitest import VitestViteGraph
 
 from .evidence_freshness import EvidenceFreshnessMixin
+from .parsers import artifact_key_for
 from .project_graph import ProjectGraphProvider, default_project_graph_providers
 from .pyright_type_server import PyrightTypeServerProvider
 from .scip_adapter import load_scip_json
@@ -21,7 +22,7 @@ from .scip_import import (
     scip_reference_rows,
 )
 from .scip_relationship_adapter import scip_import_provenance
-from .typescript_resolver import TypeScriptResolverProvider
+from .typescript_resolver import TypeScriptResolution, TypeScriptResolverProvider
 
 if TYPE_CHECKING:
     from .project_graph import ProjectEdge, ProjectNode
@@ -232,7 +233,7 @@ class RepositoryNativeEvidence(EvidenceFreshnessMixin):
     ) -> None:
         if selected is None or self.producers.typescript.name in selected:
             if self.producers.typescript.detect(self.workspace):
-                ts = self.producers.typescript.collect(self.workspace)
+                ts = self._collect_typescript_resolution()
                 generation = ensure_publication_generation()
                 self.store.replace_native_file_edges(
                     self.producers.typescript.name, ts.edges
@@ -246,6 +247,88 @@ class RepositoryNativeEvidence(EvidenceFreshnessMixin):
                 )
                 results.append({"producer": ts.producer, "file_edges": len(ts.edges)})
                 warnings.extend(ts.warnings)
+
+    def _typescript_syntax_rows(self) -> dict[str, dict]:
+        paths = [
+            str(row["path"])
+            for row in self.store.all_file_rows()
+            if row.get("language") in {"javascript", "typescript"}
+        ]
+        return self.store.file_rows(paths)
+
+    def _typescript_source_qualified(
+        self, path: str, row: Mapping[str, object]
+    ) -> bool:
+        language = str(row["language"])
+        provider = self.source.index.range_provider
+        expected = artifact_key_for(
+            str(row["file_digest"]), language, range_provider=provider, path=path
+        )
+        return row.get("parse_error") is None and row.get("artifact_key") == expected
+
+    def _typescript_inputs(
+        self, warnings: list[str]
+    ) -> tuple[
+        dict[str, list[str]],
+        dict[str, dict[str, object]],
+        dict[str, dict],
+    ]:
+        """Project qualified index occurrences; never reparse in the native adapter."""
+        members: dict[str, dict[str, object]] = {}
+        rows = self._typescript_syntax_rows()
+        for path, row in rows.items():
+            if not self._typescript_source_qualified(path, row):
+                warnings.append(f"{path}: canonical source syntax unavailable")
+                continue
+            member, raw = self.source.member(path, include_bytes=True)
+            if raw is None or member.get("state") != "known-present":
+                warnings.append(f"{path}: canonical source revision unavailable")
+                continue
+            members[path] = member
+        imports: dict[str, list[str]] = {path: [] for path in members}
+        for edge in self.store.all_edges("import"):
+            path = str(edge["path"])
+            if path in imports and edge.get("confidence") == "native":
+                imports[path].append(str(edge["target"]))
+        return imports, members, {path: rows[path] for path in members}
+
+    def _collect_typescript_resolution(self) -> TypeScriptResolution:
+        warnings: list[str] = []
+        imports, members, syntax_rows = self._typescript_inputs(warnings)
+        config, raw = self.source.member("tsconfig.json", include_bytes=True)
+        if raw is None or config.get("state") != "known-present":
+            return TypeScriptResolution(
+                self.producers.typescript.name,
+                (),
+                (*warnings, "tsconfig.json: canonical source revision unavailable"),
+            )
+        members["tsconfig.json"] = config
+        result = self.producers.typescript.collect(self.workspace, imports)
+        changed = [
+            path
+            for path, before in members.items()
+            if self.source.member(path, include_bytes=True)[0] != before
+        ]
+        if changed:
+            warnings.append(
+                "TypeScript source inputs changed during resolution: "
+                + ", ".join(sorted(changed))
+            )
+        syntax_changed = [
+            path
+            for path, row in syntax_rows.items()
+            if not self._typescript_source_qualified(path, row)
+        ]
+        if syntax_changed:
+            warnings.append(
+                "TypeScript syntax provider changed during resolution: "
+                + ", ".join(sorted(syntax_changed))
+            )
+        return replace(
+            result,
+            edges=() if changed or syntax_changed else result.edges,
+            warnings=(*warnings, *result.warnings),
+        )
 
     def _enrich_pyright_graph(
         self,

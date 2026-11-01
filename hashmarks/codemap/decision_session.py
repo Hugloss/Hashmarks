@@ -11,6 +11,7 @@ from functools import wraps
 from pathlib import Path
 from typing import TYPE_CHECKING, Concatenate, ParamSpec, Protocol, TypeVar
 
+from .providers import syntax_session
 from .repository_index_store import git_base_identity
 from .store_queries import MAX_REFERENCE_QUERY_ROWS
 
@@ -97,12 +98,13 @@ def reconcile_decision(
         if owner._depth > 0:
             return method(self, *args, **kwargs)
 
-        refreshed: set[str] = set()
-        while True:
-            try:
-                return method(self, *args, **kwargs)
-            except DecisionRefreshRequired as exc:
-                owner._reconcile_member(exc.path, refreshed)
+        with syntax_session(owner.index.range_provider):
+            refreshed: set[str] = set()
+            while True:
+                try:
+                    return method(self, *args, **kwargs)
+                except DecisionRefreshRequired as exc:
+                    owner._reconcile_member(exc.path, refreshed)
 
     return wrapped
 
@@ -395,22 +397,25 @@ class DecisionScope:
         The session is read-only and generation-bound. It never caches final
         decisions and raises if the CodeMap generation changes while active.
         """
-        generation = self._decision_session_entry_generation(
-            diagnostics=diagnostics,
-            allow_incomplete=_allow_incomplete,
-            expected_generation=expected_generation,
-        )
-        self._depth += 1
-        try:
-            scope = self.scope
-            assert scope is not None
-            yield scope
-            if self._store.generation() != self._generation:
-                raise RuntimeError("CodeMap generation changed during decision session")
-        finally:
-            self._depth -= 1
-            if self._depth == 0:
-                self._finish_decision_session()
+        with syntax_session(self._index.range_provider):
+            generation = self._decision_session_entry_generation(
+                diagnostics=diagnostics,
+                allow_incomplete=_allow_incomplete,
+                expected_generation=expected_generation,
+            )
+            self._depth += 1
+            try:
+                scope = self.scope
+                assert scope is not None
+                yield scope
+                if self._store.generation() != self._generation:
+                    raise RuntimeError(
+                        "CodeMap generation changed during decision session"
+                    )
+            finally:
+                self._depth -= 1
+                if self._depth == 0:
+                    self._finish_decision_session()
 
     def _reconcile_member(
         self,
@@ -437,21 +442,22 @@ class DecisionScope:
         publication may become the next expected generation; another writer
         invalidates the observation rather than being silently adopted.
         """
-        refreshed: set[str] = set()
-        while True:
-            try:
-                with self.session(
-                    expected_generation=expected_generation,
-                    _allow_incomplete=_allow_incomplete,
-                ) as scope:
-                    expected_generation = scope.generation
-                    return operation(scope)
-            except DecisionRefreshRequired as exc:
-                if self.depth:
-                    raise
-                expected_generation = self._reconcile_member(
-                    exc.path, refreshed, expected_generation=expected_generation
-                )
+        with syntax_session(self._index.range_provider):
+            refreshed: set[str] = set()
+            while True:
+                try:
+                    with self.session(
+                        expected_generation=expected_generation,
+                        _allow_incomplete=_allow_incomplete,
+                    ) as scope:
+                        expected_generation = scope.generation
+                        return operation(scope)
+                except DecisionRefreshRequired as exc:
+                    if self.depth:
+                        raise
+                    expected_generation = self._reconcile_member(
+                        exc.path, refreshed, expected_generation=expected_generation
+                    )
 
     @staticmethod
     def _diagnostic_normalize(value: object) -> object:

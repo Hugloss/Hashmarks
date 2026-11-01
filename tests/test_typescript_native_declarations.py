@@ -114,7 +114,7 @@ class Request {
     ]
 
 
-def test_unavailable_native_ranges_keep_the_advisory_capability_explicit() -> None:
+def test_unavailable_native_syntax_does_not_restore_advisory_declarations() -> None:
     provider = TreeSitterRangeProvider()
     assert provider.status().as_dict()["available"] is False
     artifact = parse_source(
@@ -123,11 +123,8 @@ def test_unavailable_native_ranges_keep_the_advisory_capability_explicit() -> No
         language="typescript",
         range_provider=provider,
     )
-    assert [
-        (row.qualname, row.start_line, row.end_line) for row in artifact.symbols
-    ] == [
-        ("Callback", 1, 1),
-    ]
+    assert artifact.symbols == artifact.edges == ()
+    assert artifact.parse_error == "native-syntax-unavailable"
     assert "tree-sitter" not in artifact.parser
 
 

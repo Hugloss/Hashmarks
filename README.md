@@ -536,9 +536,12 @@ The `test` dependency group includes the MCP SDK and native syntax parser, so
 normal CI and local qualification exercise both integrations without dependency
 skips. Installed-package users can enable the same declaration ranges with
 `pip install 'hashmarks[syntax]'`.
-This uses bundled grammars and keeps repository parsing local. Without this extra,
-JavaScript/TypeScript outlines retain their advisory header ranges; native scope
-and full declaration ranges are unavailable.
+This uses bundled grammars and keeps repository parsing local. One configured
+syntax provider supplies JavaScript/JSX, TypeScript and TSX declarations, module
+references and Source observations. Without this extra, or when native parsing
+fails, those structural facts are explicitly unavailable. Lexical search and
+source disclosure remain available; they do not restore structural facts through
+a fallback tokenizer.
 
 External benchmark execution, scoring, and campaign reports are owned by
 [EvalShot](https://github.com/Hugloss/EvalShot). Configure the sibling EvalShot

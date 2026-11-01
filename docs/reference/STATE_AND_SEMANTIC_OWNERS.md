@@ -71,6 +71,7 @@ introduce a dispatcher, interface registry or additional repository authority.
 | Read-only worktree fusion | `worktree_overlay.py::WorktreeOverlay` | Borrows base Index, Search and DecisionScope plus an optional immutable artifact database path. It owns only its local CodeMap and retains no borrowed base root. Sync and fused reads bind both the base publication generation and fingerprint; only caller-requested resync adopts another binding. No worktree creation, Git mutation or execution control belongs here. |
 | Generation-bound read scope | `decision_session.py::DecisionScope.session` and `.observe`, exposed by `CodeMap.reads` | Owns primitive query reuse and diagnostics for one existing store generation and atomic identity observation. Nested scopes share an immutable `ReadScope` value. `.observe` recomputes only the read stage after member drift, preserving the caller's original before snapshot and sync facts. Index reconciliation atomically checks the expected generation and returns the exact publication adopted by the next read. Nested observations propagate refresh requests to their outer owner; another writer or repeated drift fails closed. Task-evidence preparation uses `reconcile_decision` around its staged read. Ended scopes cannot supply another scope's final task/snapshot/impact/ownership memo; those paired memo values remain domain-owned. The static `ReadScopeOwner` port has no state, registry or runtime policy. |
 | Parsed artifact | `parsers.py::parse_source`, `artifact_key_for` | Interprets supplied source under the supplied content revision and parser signature. File-backed ingestion must bind the supplied digest to the bytes actually parsed. Mechanisms do not own repository admission or generation. |
+| Native source syntax | `providers.py::TreeSitterRangeProvider.syntax_tree`, `source_grammar`; projections in `ecmascript_syntax.py` | The configured provider owns parsing and rejection of malformed/recovered syntax. Grammar selection distinguishes JavaScript/JSX, TypeScript and TSX. Indexing, public Source, verification and TypeScript resolver inputs share admitted syntax and its module declarations. Source bytes/revision and provider/grammar identity remain binding; operation-local tree reuse adds no repository observer or persistent cache. |
 | Index publication | `indexing_lifecycle.py::RepositoryIndex.sync` and `repository_index_store.py::publication_transaction` | The independently constructed Index owns ingestion/reconciliation and import-root projection. The store owns atomic derived writes. Consumers call `CodeMap.index`; the old root sync/preflight/clean/watch entry points are removed. Index has no source/read-scope/relationship-cache dependency. |
 | Qualified import identity | `import_resolution.py::RepositoryImports` | Produces bounded repository import/re-export identity. Retrieval, relationship, and verification consumers preserve unresolved/ambiguous results rather than resolve again by short name. |
 | Native evidence | `native_evidence.py::RepositoryNativeEvidence`, exposed by `CodeMap.native` | Owns producer import/enrichment, repository admission before publication, and source/provenance freshness qualification through its internal `EvidenceFreshnessMixin`. It consumes Files, Source, DecisionScope and the existing store publication transaction directly; it has no CodeMap or relationship-owner back-reference. Producer translation stays in native adapters. |
@@ -99,6 +100,58 @@ index reconciliation. Indexing must not call back through that reconciliation
 path merely to obtain bytes; it uses the stable-byte mechanism after admission.
 Keep coordination with the existing composition owner, and preserve fail-closed
 validation at every untrusted boundary.
+
+### Source syntax and tokenizer ownership
+
+One canonical source parser owns each language family's syntax. ECMAScript
+consumers use the configured `TreeSitterRangeProvider` through its existing
+syntax capability; they must not construct native parsers or introduce a local
+tokenizer. CodeMap's existing composition owner constructs the configured
+provider once; a consumer must not call `TreeSitterRangeProvider.auto()` to
+silently acquire a different parser. `source_grammar(path)` owns native grammar
+selection, including the distinction between `.ts` and `.tsx`; the broader
+source-language catalog does not override that grammar. The provider rejects
+recovered error trees before any dependent structural fact is published.
+
+`ecmascript_syntax.py` projects fields from the admitted native tree. Index
+symbols/imports, public Source facts and verifier import classification must
+agree on that syntax. A comment, inert string, malformed program or unavailable
+parser cannot create a structural import or declaration through a regex
+fallback. Exact source-byte offsets and type-only syntax remain explicit;
+syntax does not by itself prove a runtime target or complete semantic coverage.
+
+Within a coherent operation, a consumer passes the already admitted tree to
+downstream projections instead of reparsing unchanged bytes. Reuse is bound to
+the same bytes, native grammar and provider signature. Another source revision,
+grammar or provider cannot inherit that result. Separate indexing and read
+operations may parse again through the same owner; there is no global AST
+cache, path/mtime identity, additional provider registry or new generation.
+`TreeSitterRangeProvider.syntax_session()` supplies bounded, context-local reuse
+to the existing read/observation lifecycle. The scope starts before readiness
+and source reconciliation, so cold indexing and subsequent Source/verification
+projections can share one capture within that observation. Nested operations
+share the scope; normal exit and exceptions clear it. Its tree-count and byte
+bounds may evict entries and require another parse, changing cost but never
+evidence. Failed syntax stays a qualified failure, and a provider change during
+capture cannot be stamped onto old facts. Source performs a second canonical
+member observation and provider-signature check before returning syntax facts;
+intervening drift suppresses the facts and remains unavailable/stale.
+Existing Source member qualification/rechecks and indexed artifact signatures
+continue to own revision and freshness behavior.
+
+TypeScript's native compiler still owns configuration and module-resolution
+semantics. Its resolver consumes canonical source import declarations rather
+than rediscovering occurrences with a second source preprocessor. Compiler
+resolution provenance remains separate from source syntax and cannot repair an
+unknown syntax observation. Python's native AST/token facilities remain
+language-specific. Lexical retrieval terms and approximate model-token budgets
+are separate projections and never establish structural source facts.
+
+The ownership guard in `tests/test_semantic_ownership_architecture.py` resolves
+absolute/relative imports and aliases, rejects consumer access to native parser
+construction, and exercises renamed bypass controls. Behavioral source and
+verification regressions separately prove that parser unavailability and
+comment/string decoys cannot revive the retired structural fallbacks.
 
 ### Status observations during publication
 

@@ -396,7 +396,7 @@ def test_generation_change_during_native_parse_is_stale(
     assert packet["freshness"] == "stale"
 
 
-def test_syntax_uses_one_canonical_byte_read_without_following_imports(
+def test_syntax_rechecks_canonical_bytes_without_following_imports(
     tmp_path: Path,
     native_syntax: TreeSitterRangeProvider,
     monkeypatch: pytest.MonkeyPatch,
@@ -416,7 +416,7 @@ def test_syntax_uses_one_canonical_byte_read_without_following_imports(
         monkeypatch.setattr(codemap.source.file_store, "read_bytes_stable", captured)
         packet = codemap.source.ecmascript("consumer.ts")
     assert packet["availability"] == "observed"
-    assert reads == [tmp_path / "consumer.ts"]
+    assert reads == [tmp_path / "consumer.ts", tmp_path / "consumer.ts"]
 
 
 def test_native_destructuring_defaults_and_parameter_scope_stay_distinct(

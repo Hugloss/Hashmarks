@@ -14,7 +14,6 @@ from typing import TYPE_CHECKING, cast
 
 from hashmarks.paths import normalize_relative_path
 
-from .providers import SourceSyntaxProvider
 from .repository_domains import RepositoryDomain, classify_repository_path
 from .repository_observation import evidence_identity
 from .verification_plan import _UnqualifiedNominationMember
@@ -80,14 +79,6 @@ def _ini_config_details(name: str, raw: bytes) -> _PathDetails:
     return "source", "repository-source", []
 
 
-def _native_language(suffix: str) -> str:
-    if suffix == ".go":
-        return "go"
-    if suffix == ".tsx":
-        return "tsx"
-    return "typescript" if suffix in {".ts", ".mts", ".cts"} else "javascript"
-
-
 def _test_filename(path: PurePosixPath) -> bool:
     return (
         ".test." in path.name
@@ -103,18 +94,14 @@ class VerificationSupportMixin:
     def _native_path_details(self, path: PurePosixPath, raw: bytes) -> _PathDetails:
         if TYPE_CHECKING:
             self = cast("RepositoryVerification", self)
-        provider = self.source.index.range_provider
-        if not isinstance(provider, SourceSyntaxProvider):
-            return "unknown", "native-source-syntax-unavailable", []
         try:
-            raw.decode("utf-8")
-            tree = provider.syntax_tree(raw, _native_language(path.suffix))
+            tree = self._verification_syntax(path.as_posix(), raw)
             if tree is None:
                 return "unknown", "native-source-syntax-unavailable", []
             if _test_filename(path):
                 return "verifier", "native-test-file-syntax", []
             if path.suffix in {".js", ".mjs", ".cjs"}:
-                if self._source_test_import(raw):
+                if self._tree_test_import(tree, raw):
                     return "verifier", "node-test-import", []
         except (ImportError, LookupError, OSError, RuntimeError, TypeError, ValueError):
             return "unknown", "native-source-syntax-unqualified", []
@@ -157,6 +144,12 @@ class VerificationSupportMixin:
         member, raw = self.source.member(rel, include_bytes=True)
         if member.get("state") == "known-present" and raw is not None:
             kind, reason, unsupported = self._support_path_details(rel, raw)
+            if (
+                kind in {"verifier", "verification-support"}
+                and PurePosixPath(rel).suffix in _JS_SUFFIXES | {".go"}
+                and self.source.member(rel, include_bytes=True)[0] != member
+            ):
+                kind, reason = "unknown", "source-changed-during-observation"
         else:
             kind = "unknown"
             reason = str(member.get("reason") or "source-evidence-unqualified")

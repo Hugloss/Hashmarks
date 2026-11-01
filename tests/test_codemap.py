@@ -320,7 +320,7 @@ def test_polyglot_advisory_outlines_are_provenance_bounded(tmp_path: Path) -> No
         rust["outline"]
     )
     assert any(
-        edge["target"] == "./user" and edge["confidence"] == "lexical"
+        edge["target"] == "./user" and edge["confidence"] == "native"
         for edge in assert_records(deps["edges"])
     )
 
@@ -400,7 +400,7 @@ def test_optional_precision_provider_changes_artifact_namespace(
             return f"fake.v1:{language}"
 
         def enrich(
-            self, artifact: ParsedArtifact, source: str, language: str
+            self, artifact: ParsedArtifact, source: str | bytes, language: str
         ) -> ParsedArtifact:
             return artifact
 

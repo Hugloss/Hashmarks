@@ -212,6 +212,22 @@ Hashmarks owns repository qualification semantics: deterministic test membership
 
 Python tooling that repeatedly parses repository files must use `hashmarks.python_ast_cache.read_python_ast` rather than coupling `ast.parse` directly to `Path.read_text`. The cache is process-local acceleration only and is keyed by device/inode/size/mtime/ctime with a stable-read check. It must never become repository identity, freshness, or execution authority. Source-only analyzer APIs may retain `ast.parse(source)` as a fallback, but file-backed callers should pass the cached tree so one stable file snapshot can serve multiple analyzers.
 
+### Source syntax has one owner per language family
+
+JavaScript/JSX/TypeScript/TSX source intelligence uses the configured native
+syntax provider in `hashmarks.codemap.providers`; `source_grammar` owns grammar
+selection. Indexing, Source, verification and compiler-resolution inputs must
+consume that owner's admitted tree and canonical syntax projections. Reuse an
+already admitted tree within the same observation rather than parsing its bytes
+again. Missing/failed/recovered syntax stays unavailable or unknown: no local
+tokenizer, regex structural fallback or compiler preprocessor may restore a
+known import, declaration or verifier classification. Bind reuse to the exact
+source bytes and provider/grammar identity; do not add a global AST cache or
+path/mtime-only authority. Python keeps its native language owner. Lexical
+retrieval terms and approximate model-token budgets remain separate outputs
+and cannot establish structural facts. Native TypeScript configuration and
+module resolution keep their own explicit compiler provenance.
+
 ## Feature filter
 
 Before adding an agent-facing feature, ask:

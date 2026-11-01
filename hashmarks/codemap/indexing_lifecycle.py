@@ -408,7 +408,7 @@ class RepositoryIndex(IndexWatchMixin):
         self, rel: str, path: Path, language: str, digest_hash: str
     ) -> tuple[ParsedArtifact, bool]:
         key = artifact_key_for(
-            digest_hash, language, range_provider=self.range_provider
+            digest_hash, language, range_provider=self.range_provider, path=rel
         )
         cached = self.artifacts.get(key)
         if cached is not None:
@@ -416,15 +416,16 @@ class RepositoryIndex(IndexWatchMixin):
         raw, observed = self.file_store.read_bytes_stable(path)
         if observed.hash != digest_hash:
             key = artifact_key_for(
-                observed.hash, language, range_provider=self.range_provider
+                observed.hash, language, range_provider=self.range_provider, path=rel
             )
             cached = self.artifacts.get(key)
             if cached is not None:
                 return cached, True
         artifact = parse_source(
-            raw.decode("utf-8", errors="replace"),
+            raw,
             file_digest=observed.hash,
             language=language,
+            path=rel,
             range_provider=self.range_provider,
         )
         self.artifacts.put(artifact)
@@ -755,7 +756,10 @@ class RepositoryIndex(IndexWatchMixin):
         except (OSError, UnstableFileError):
             return None
         expected_artifact = artifact_key_for(
-            current_digest.hash, item.language, range_provider=self.range_provider
+            current_digest.hash,
+            item.language,
+            range_provider=self.range_provider,
+            path=item.rel,
         )
         if current_digest.hash != snap_digest or snap_artifact_key != expected_artifact:
             return None
@@ -918,6 +922,7 @@ class RepositoryIndex(IndexWatchMixin):
             digest.hash,
             item.language,
             range_provider=self.range_provider,
+            path=item.rel,
         )
         if row is not None and self._sync_file_reusable(
             self._sync_reuse_state(item.rel, row),
@@ -1403,6 +1408,7 @@ class RepositoryIndex(IndexWatchMixin):
             digest.hash,
             language,
             range_provider=self.range_provider,
+            path=rel,
         )
         module_name = _module_name(rel, self._python_import_roots) or ""
         return not (
