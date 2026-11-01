@@ -230,9 +230,8 @@ def _source_links(
                     return None
             codemap.source.ensure_current(source)
             second = codemap.source.observe(source)
-            if (
-                second.get("member") != source_member
-                or not codemap.index.is_current(source)
+            if second.get("member") != source_member or not codemap.index.is_current(
+                source
             ):
                 return None
             linked[source] = paths
