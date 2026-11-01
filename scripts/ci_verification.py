@@ -282,8 +282,7 @@ def main() -> int:
     args.output.write_text(json.dumps(plan, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     sys.stderr.write(
         json.dumps({key: plan[key] for key in ("mode", "reasons", "pytest_paths")})
-        + "
-"
+        + "\n"
     )
     # NUL-delimited argument transport: never use shell interpolation for test selectors.
     for path in plan["pytest_paths"]:
