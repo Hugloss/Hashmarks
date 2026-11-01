@@ -1,8 +1,19 @@
 # Changelog
 
-## 0.34.1 — Repository asset evidence and reliable Windows reinstallation
+## 0.34.2 — Expanded source binding evidence
+
+- Extend `hashmarks.source-bindings.v1` through binding interpreter v2 with ordered native call arguments, authored import and module syntax, Python class bases, and literal-to-call-argument containment. Preserve exact source ranges and independent qualification for every detail.
+- Describe parameter-based property paths through separate symbolic references while keeping supplied runtime values unknown. Default and local-helper argument bindings remain conditional evidence rather than unconditional callable identities.
+- Observe property write destinations and native ECMAScript method signatures, including their direct class or interface container and ordered parameter/type details. Keep receiver mutation, unsupported types, overloads and merged declarations explicit without resolving runtime behavior.
+- Raise the Python, CLI and service result ceiling to 100,000 facts while retaining the MCP limit of 50 and existing source/interpretation bounds. Call arguments, class bases and method parameters retain independent 256-detail limits, counts and truncation; a complete outer sequence does not imply complete nested or semantic coverage.
+- Correct the native dependency projection example to translate admitted Source bytes with their canonical member revision, preserving current input correspondence and incomplete consumer scope.
+
+## 0.34.1 — Source binding observations and reliable Windows reinstallation
 
 - Preserve an existing Windows executable when it already matches the fully verified release bytes, including while another reader denies deletion. Candidate checksum and requested-version checks still run, and different installed bytes still use the normal replacement path.
+- Add `CodeMap.source.bindings()` and `hashmarks.source-bindings.v1` for qualified Python and ECMAScript declarations, references, import bindings, bounded aliases and string values. Reuse admitted native syntax across Python, CLI, MCP and service surfaces while preserving lexical shadows, conditions, source identity, freshness and unknown runtime targets.
+
+## 0.34.0 — Repository asset and changed-set evidence
 
 - Observe bounded text/binary content, media signatures and Git LFS pointer declarations through the existing Source member authority. Keep declared object identity distinct from observed pointer bytes without downloading objects or validating image integrity.
 - Compose source-bound asset references from supported Markdown links and literal Python file reads. Preserve literal-only occurrences, repository roles, incomplete source coverage, explicit bounds and unknown dynamic consumers; execution and documentation policy remain external.

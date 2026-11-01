@@ -17,24 +17,26 @@ admission, execution and certification remain external.
 ```python
 from pathlib import Path
 
-from hashmarks import CodeMap, hash_bytes
+from hashmarks import CodeMap
 from hashmarks.adapters import npm_lock_dependency_observation
 
 workspace = Path("/path/to/repository")
-# The caller captures the artifact and claims the exact captured byte revision.
-lock_bytes = (workspace / "package-lock.json").read_bytes()
-snapshot = npm_lock_dependency_observation(
-    lock=lock_bytes,
-    repository_inputs=[
-        {
-            "path": "package-lock.json",
-            "member_revision": hash_bytes(lock_bytes).hash,
-        }
-    ],
-)
-
 with CodeMap(workspace) as repository:
     repository.index.sync()
+    member, lock_bytes = repository.source.member(
+        "package-lock.json", include_bytes=True
+    )
+    if member["state"] != "known-present" or lock_bytes is None:
+        raise ValueError("package-lock.json is not available as admitted source")
+    snapshot = npm_lock_dependency_observation(
+        lock=lock_bytes,
+        repository_inputs=[
+            {
+                "path": member["path"],
+                "member_revision": member["member_revision"],
+            }
+        ],
+    )
     observation = repository.dependencies.observe(snapshot)
     retained = repository.dependencies.projection(
         observation,
@@ -45,6 +47,10 @@ with CodeMap(workspace) as repository:
     )
     current = repository.dependencies.requalify(retained)
 ```
+
+Source returns the admitted bytes and their matching member revision together.
+Preserve that revision in `repository_inputs` so the producer can recheck the
+exact captured artifact through the same source authority.
 
 The input to `projection()` is an already-qualified v3 observation, including its
 original repository binding and identities. Use existing adapters and
