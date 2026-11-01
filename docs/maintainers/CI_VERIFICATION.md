@@ -25,6 +25,14 @@ exact source, even if the daily run previously passed.
 - `make test`: execute the complete native suite explicitly.
 - `make test-profile`: obtain pytest duration diagnostics for further optimization.
 
+Documentation changes explicitly run the native Markdown-link and publication-
+documentation contract tests in addition to the small mandatory baseline.
+A documentation-only change does not need a CodeMap query.
+
+The fast gate first runs a small selector self-test using real CodeMap on a
+controlled source-to-verifier repository. A selector regression fails before
+the broader native pytest selection begins; it does not replace that proof.
+
 The selection plan is JSON, bound to base SHA, effective checkout SHA, changed
 paths and a deterministic plan digest. CI preserves it as a run artifact. A
 `focused` plan is an **admission to run a subset**, not a completed verification
@@ -38,6 +46,11 @@ changes run the baseline tests. For Python source changes under `hashmarks/`
 or `scripts/`, CodeMap is queried for existing verification ownership; test
 nominations are validated from the live workspace. Only complete, untruncated,
 non-stale, non-ambiguous source-qualified links may reduce pytest membership.
+When the optional identity daemon cannot provide a freshness status, the
+selector does not turn unknown into fresh: it independently rechecks the exact
+source's indexed digest, validates each nominated test's source binding via
+Hashmarks's native observer, and rechecks the source digest before admitting
+the subset. An explicitly stale graph still selects the full suite.
 
 Any missing, truncated, stale, ambiguous or unqualified relevance, absent
 verifier, unexpected file, unusual Git operation, changed shared test harness,

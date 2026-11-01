@@ -32,8 +32,14 @@ def _write(root: Path, path: str, content: str) -> None:
 @pytest.fixture
 def repository(tmp_path: Path) -> tuple[Path, str]:
     _git(tmp_path, "init", "-q")
+    _write(tmp_path, "hashmarks/__init__.py", "")
     _write(tmp_path, "hashmarks/worker.py", "def compute():\n    return 1\n")
-    _write(tmp_path, "tests/test_worker.py", "def test_worker():\n    assert True\n")
+    _write(
+        tmp_path,
+        "tests/test_worker.py",
+        "from hashmarks.worker import compute\n\n"
+        "def test_worker():\n    assert compute() == 1\n",
+    )
     _write(tmp_path, "docs/README.md", "Original\n")
     _git(tmp_path, "add", ".")
     _git(
@@ -73,7 +79,9 @@ def test_docs_only_runs_baseline_without_scanning(repository: tuple[Path, str]) 
     _change(root, "docs/README.md", "Updated\n")
     plan = module.select(root, base, links=_unreachable)
     assert plan["mode"] == "focused"
-    assert plan["pytest_paths"] == sorted(module.BASELINE)
+    assert plan["pytest_paths"] == sorted(
+        set(module.BASELINE) | set(module.DOCUMENTATION_CHECKS)
+    )
     assert plan["base_sha"] == base
     assert plan["plan_identity"].startswith("sha256:")
 
@@ -93,6 +101,62 @@ def test_source_uses_proven_hashmarks_links(repository: tuple[Path, str]) -> Non
         root, base, links=lambda _root, paths: {paths[0]: ("tests/test_worker.py",)}
     )
     assert plan["mode"] == "focused"
+    assert "tests/test_worker.py" in plan["pytest_paths"]
+
+
+def test_actual_codemap_maps_changed_python_to_real_test(
+    repository: tuple[Path, str],
+) -> None:
+    """Exercise the real Hashmarks selection adapter, not an injected fake."""
+    root, base = repository
+    _change(root, "hashmarks/worker.py", "def compute():\n    return 2\n")
+    plan = module.select(root, base)
+    if plan["mode"] != "focused":
+        from hashmarks.codemap import CodeMap
+
+        with CodeMap(root) as observer:
+            observer.index.sync()
+            graph = observer.tasks.verification_ownership_graph(
+                "Change hashmarks/worker.py", limit=16, candidate_limit=16
+            )
+            nomination = observer.verification.nomination("tests/test_worker.py")
+        observed_owners = graph.get("verification_owners")
+        owners = observed_owners if isinstance(observed_owners, list) else []
+        pytest.fail(
+            json.dumps(
+                {
+                    "reasons": plan["reasons"],
+                    "edit_candidates": graph.get("edit_candidates"),
+                    "stale": graph.get("stale"),
+                    "qualification": graph.get("verification_qualification"),
+                    "owners": [
+                        {
+                            "path": row.get("path"),
+                            "covers": row.get("covers_edit_candidates"),
+                            "evidence": row.get("coverage_evidence"),
+                        }
+                        for row in owners
+                        if isinstance(row, dict)
+                    ],
+                    "nomination_available": nomination.get("available"),
+                    "runner": nomination.get("runner_evidence"),
+                },
+                sort_keys=True,
+                default=str,
+            )
+        )
+    assert "tests/test_worker.py" in plan["pytest_paths"]
+
+
+def test_mixed_documentation_and_test_edits_keep_documentation_proof(
+    repository: tuple[Path, str],
+) -> None:
+    root, base = repository
+    _write(root, "docs/README.md", "Updated\n")
+    _change(root, "tests/test_worker.py", "def test_worker():\n    assert True\n")
+    plan = module.select(root, base, links=_unreachable)
+    assert plan["mode"] == "focused"
+    assert set(module.DOCUMENTATION_CHECKS).issubset(plan["pytest_paths"])
     assert "tests/test_worker.py" in plan["pytest_paths"]
 
 
@@ -193,6 +257,16 @@ def test_incomplete_graph_cannot_authorize_reduced_suite() -> None:
     assert module._qualified_links(graph, "hashmarks/worker.py") == (
         "tests/test_worker.py",
     )
+    graph["stale"] = None
+    assert module._qualified_links(graph, "hashmarks/worker.py") is None
+    assert module._qualified_links(graph, "hashmarks/worker.py", source_bound=True) == (
+        "tests/test_worker.py",
+    )
+    graph["stale"] = True
+    assert (
+        module._qualified_links(graph, "hashmarks/worker.py", source_bound=True) is None
+    )
+    graph["stale"] = False
     graph["verification_qualification"]["completeness"] = "incomplete"
     assert module._qualified_links(graph, "hashmarks/worker.py") is None
     graph["verification_qualification"]["completeness"] = "complete"
@@ -221,5 +295,5 @@ def test_hosted_cli_emits_nul_delimited_safe_paths(
         check=True,
     )
     paths = [row.decode() for row in result.stdout.split(b"\0") if row]
-    assert paths == sorted(module.BASELINE)
+    assert paths == sorted(set(module.BASELINE) | set(module.DOCUMENTATION_CHECKS))
     assert json.loads(output.read_text())["pytest_paths"] == paths

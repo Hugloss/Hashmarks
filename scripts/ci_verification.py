@@ -25,6 +25,10 @@ BASELINE = (
     "tests/test_verification_nomination_validation.py",
     "tests/test_verification_selection_identity.py",
 )
+DOCUMENTATION_CHECKS = (
+    "tests/test_documentation_links.py",
+    "tests/test_publication_docs.py",
+)
 # A change to an authority or broadly shared toolchain cannot be covered by
 # a bounded source-to-test nomination. Keep the entire real suite in the PR.
 BROAD_PATHS = frozenset(
@@ -138,9 +142,14 @@ def _source_file(path: str) -> bool:
     return path.endswith(".py") and path.startswith(("hashmarks/", "scripts/"))
 
 
-def _qualified_links(graph: Mapping[str, Any], source: str) -> tuple[str, ...] | None:
+def _qualified_links(
+    graph: Mapping[str, Any], source: str, *, source_bound: bool = False
+) -> tuple[str, ...] | None:
     qualification = graph.get("verification_qualification")
-    if not isinstance(qualification, dict) or graph.get("stale") is not False:
+    if not isinstance(qualification, dict):
+        return None
+    freshness = graph.get("stale")
+    if freshness is not False and not (freshness is None and source_bound):
         return None
     conditions = (
         qualification.get("completeness") == "complete",
@@ -187,21 +196,44 @@ def _source_links(
     with CodeMap(root) as codemap:
         codemap.index.sync()
         for source in sources:
+            codemap.source.ensure_current(source)
+            first = codemap.source.observe(source)
+            source_member = first.get("member")
+            if (
+                not isinstance(source_member, dict)
+                or source_member.get("state") != "known-present"
+            ):
+                return None
             graph = codemap.tasks.verification_ownership_graph(
-                f"Verify {source}", limit=16, candidate_limit=16
+                f"Change {source}", limit=16, candidate_limit=16
             )
-            paths = _qualified_links(graph, source)
+            paths = _qualified_links(
+                graph, source, source_bound=codemap.index.is_current(source)
+            )
             if paths is None:
                 return None
             for path in paths:
                 nomination = codemap.verification.nomination(path)
-                if (
-                    not (root / path).is_file()
-                    or validate_verification_nomination(nomination)["valid"] is not True
-                    or nomination.get("available") is not True
-                    or nomination.get("runner_evidence") != "pytest"
-                ):
+                validation = validate_verification_nomination(nomination)
+                binding = codemap.verification.observe_nomination_source_binding(
+                    nomination
+                )
+                qualified = (
+                    (root / path).is_file(),
+                    validation["valid"] is True,
+                    nomination.get("available") is True,
+                    nomination.get("runner_evidence") == "pytest",
+                    binding.get("source_binding_state") == "matched",
+                    binding.get("packet_valid") is True,
+                )
+                if not all(qualified):
                     return None
+            codemap.source.ensure_current(source)
+            second = codemap.source.observe(source)
+            if second.get("member") != source_member or not codemap.index.is_current(
+                source
+            ):
+                return None
             linked[source] = paths
     return linked
 
@@ -222,7 +254,7 @@ def _classify_changes(
         if path in BROAD_PATHS or path.startswith(BROAD_PREFIXES):
             full_reasons.append(f"broad-authority:{path}")
         elif _documentation(path):
-            continue
+            tests.update(DOCUMENTATION_CHECKS)
         elif _test_file(path):
             tests.add(path)
         elif _source_file(path) and (root / path).is_file():
