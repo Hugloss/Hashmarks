@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING, Any
 from ._version import __version__
 from .digest import Digest, hash_bytes, hash_file
 from .graph import IdentityCycleError, IdentityGraph
-from .identity import RepositoryIdentity, RepositoryIdentityMode
 from .inputs import InputManifest, resolve_inputs
 from .observation import (
     ChangeSnapshot,
@@ -37,6 +36,7 @@ from .specs import (
 )
 
 if TYPE_CHECKING:
+    from .client import RepositoryIdentityMode as RepositoryIdentityMode
     from .codemap import (
         CodeMap as CodeMap,
     )
@@ -61,6 +61,7 @@ if TYPE_CHECKING:
     from .consumer_conformance import (
         validate_native_consumer_bundle as validate_native_consumer_bundle,
     )
+    from .identity import RepositoryIdentity as RepositoryIdentity
     from .producer_identity import (
         native_producer_implementation_identity as native_producer_implementation_identity,
     )
@@ -110,11 +111,16 @@ __all__ = [
 
 
 def __getattr__(name: str) -> object:
-    """Lazily expose CodeMap APIs without loading the analysis graph eagerly."""
-    if name == "CodeMap":
-        from .codemap import CodeMap
+    """Lazily expose component APIs without loading unrelated engines eagerly."""
+    if name in {"CodeMap", "RepositoryIdentity", "RepositoryIdentityMode"}:
+        from importlib import import_module
 
-        return CodeMap
+        owner = {
+            "CodeMap": ".codemap",
+            "RepositoryIdentity": ".identity",
+            "RepositoryIdentityMode": ".client",
+        }[name]
+        return getattr(import_module(owner, __name__), name)
     if name == "native_producer_implementation_identity":
         from .producer_identity import native_producer_implementation_identity
 

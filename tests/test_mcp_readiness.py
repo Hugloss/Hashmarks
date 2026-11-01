@@ -169,7 +169,7 @@ def test_doctor_mcp_is_opt_in_and_machine_readable(
         def doctor(self) -> dict[str, object]:
             return {"identity": "ready"}
 
-    monkeypatch.setattr(cli, "RepositoryIdentity", Identity)
+    monkeypatch.setattr("hashmarks.identity.RepositoryIdentity", Identity)
     monkeypatch.setattr(
         readiness,
         "mcp_readiness",

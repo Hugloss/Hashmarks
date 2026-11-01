@@ -18,13 +18,12 @@ from .client import (
     DaemonProtocolError,
     DaemonUnavailableError,
     IdentityClient,
+    RepositoryIdentityMode,
     StateDirectoryError,
     prepare_default_state_dir,
 )
-from .daemon import IdentityDaemon
 from .errors import UserFacingError
 from .file_store import UnstableFileError
-from .identity import RepositoryIdentity, RepositoryIdentityMode
 from .input_observation import DEFAULT_MAX_INPUT_MEMBERS
 from .mcp_launch import installed_mcp_command
 from .observation import UnstableObservationError
@@ -250,6 +249,8 @@ def _daemon_start(args: argparse.Namespace) -> int:
 
 
 def _daemon_serve(args: argparse.Namespace) -> int:
+    from .daemon import IdentityDaemon
+
     daemon = IdentityDaemon(args.workspace, state_dir=args.state_dir)
     daemon.serve_forever()
     return 0
@@ -268,6 +269,8 @@ def _daemon_stop(args: argparse.Namespace) -> int:
 
 
 def _snapshot(args: argparse.Namespace) -> int:
+    from .identity import RepositoryIdentity
+
     with RepositoryIdentity(
         args.workspace,
         state_dir=args.state_dir,
@@ -280,6 +283,8 @@ def _snapshot(args: argparse.Namespace) -> int:
 
 
 def _observe_inputs(args: argparse.Namespace) -> int:
+    from .identity import RepositoryIdentity
+
     with RepositoryIdentity(
         args.workspace,
         state_dir=args.state_dir,
@@ -298,6 +303,8 @@ def _observe_inputs(args: argparse.Namespace) -> int:
 
 
 def _stats(args: argparse.Namespace) -> int:
+    from .identity import RepositoryIdentity
+
     with RepositoryIdentity(
         args.workspace,
         state_dir=args.state_dir,
@@ -310,6 +317,8 @@ def _stats(args: argparse.Namespace) -> int:
 
 
 def _doctor(args: argparse.Namespace) -> int:
+    from .identity import RepositoryIdentity
+
     with RepositoryIdentity(
         args.workspace,
         state_dir=args.state_dir,
