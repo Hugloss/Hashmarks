@@ -86,6 +86,61 @@ def test_native_import_aliases_and_object_binding_facts(
     assert send["declaration_range"] is not None
 
 
+def test_module_declarations_include_side_effects_reexports_and_type_only_syntax(
+    tmp_path: Path, native_syntax: TreeSitterRangeProvider
+) -> None:
+    raw = (
+        b'import "side-effect";\n'
+        b'export * from "@scope/package/subpath";\n'
+        b'import type { A } from "types";\n'
+        b'import { type A, /* source comment */ type B } from "types-only";\n'
+        b'import { type A, value } from "mixed";\n'
+        b'export type { A } from "export-types";\n'
+        b"export const local = 1;\n"
+        b'const dynamic = import("dynamic");\n'
+    )
+    (tmp_path / "consumer.ts").write_bytes(raw)
+    with CodeMap(tmp_path, range_provider=native_syntax) as codemap:
+        codemap.index.sync()
+        packet = codemap.source.ecmascript("consumer.ts")
+    facts = _facts(packet, "module-declaration")
+    assert [
+        (
+            row["module_specifier"],
+            row["declaration_kind"],
+            row["type_only"],
+            row["line"],
+        )
+        for row in facts
+    ] == [
+        ("side-effect", "import", False, 1),
+        ("@scope/package/subpath", "export", False, 2),
+        ("types", "import", True, 3),
+        ("types-only", "import", True, 4),
+        ("mixed", "import", False, 5),
+        ("export-types", "export", True, 6),
+    ]
+    assert all(row["evidence_identity"] for row in facts)
+    assert raw[: assert_integer(assert_object(facts[0]["range"])["end_byte"])] == (
+        b'import "side-effect";'
+    )
+    assert packet["semantic_resolution"] == "not-performed"
+
+
+@pytest.mark.parametrize("literal", ['"escaped\\u002dname"', '"' + "x" * 300 + '"'])
+def test_module_literals_do_not_acquire_a_guessed_or_clipped_identity(
+    tmp_path: Path, native_syntax: TreeSitterRangeProvider, literal: str
+) -> None:
+    (tmp_path / "consumer.ts").write_text(f"import {literal};\n")
+    with CodeMap(tmp_path, range_provider=native_syntax) as codemap:
+        codemap.index.sync()
+        packet = codemap.source.ecmascript("consumer.ts")
+    fact = _facts(packet, "module-declaration")[0]
+    assert fact["module_specifier"] is None
+    assert fact["source"] is not None
+    assert packet["negative_evidence"] == "not-admissible"
+
+
 def test_dynamic_properties_reassignment_and_shadowing_remain_unresolved(
     tmp_path: Path, native_syntax: TreeSitterRangeProvider, source_bytes: bytes
 ) -> None:
@@ -143,12 +198,16 @@ def test_comments_strings_and_type_queries_do_not_claim_value_calls(
     ("filename", "raw", "grammar"),
     [
         ("plain.js", b"const alias = registry; alias.send();", "javascript"),
+        ("plain.mjs", b"const alias = registry; alias.send();", "javascript"),
+        ("plain.cjs", b"const alias = registry; alias.send();", "javascript"),
         (
             "component.jsx",
             b"const view = <Panel action={() => registry.send()} />;",
             "javascript",
         ),
         ("typed.ts", b"const alias: Channel = registry; alias.send();", "typescript"),
+        ("typed.mts", b"const alias: Channel = registry; alias.send();", "typescript"),
+        ("typed.cts", b"const alias: Channel = registry; alias.send();", "typescript"),
         ("typed.tsx", b"const view = <Panel action={() => registry.send()} />;", "tsx"),
     ],
 )

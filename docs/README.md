@@ -16,6 +16,7 @@ This is the single catalog for the current maintained documentation in `docs/`.
 - [`reference/ECMASCRIPT_SOURCE_OBSERVATIONS.md`](reference/ECMASCRIPT_SOURCE_OBSERVATIONS.md) — native JavaScript/TypeScript alias, binding, property, and call syntax over canonical Source bytes.
 - [`reference/FILESYSTEM_LIFECYCLE_EVIDENCE.md`](reference/FILESYSTEM_LIFECYCLE_EVIDENCE.md) — qualified Python filesystem checks, source-reference flow, protection syntax and uncertainty.
 - [`reference/DEPENDENCY_EVIDENCE.md`](reference/DEPENDENCY_EVIDENCE.md) — producer-neutral dependency evidence, adapter boundaries, semantic authorities, and coverage rules.
+- [`reference/DEPENDENCY_PROJECTION.md`](reference/DEPENDENCY_PROJECTION.md) — stable package/source-consumer projections, retained evidence requalification, scoped absence and npm metadata support.
 - [`reference/INVARIANTS.md`](reference/INVARIANTS.md) — normative correctness, freshness, and authority guarantees.
 - [`reference/INPUT_OBSERVATIONS.md`](reference/INPUT_OBSERVATIONS.md) — coherent selected-input identity, recursive inventory, counts, and local/daemon/CLI transport bounds.
 - [`reference/MAKE_SHELL_EVIDENCE.md`](reference/MAKE_SHELL_EVIDENCE.md) — explicitly selected Make/shell declarations, invocation syntax, and unresolved expansion.

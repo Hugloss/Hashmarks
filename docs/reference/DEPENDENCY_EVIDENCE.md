@@ -1,5 +1,9 @@
 # Dependency evidence adapters and producer-neutral authority
 
+For the stable package/source-consumer handoff and retained requalification, use
+[`DEPENDENCY_PROJECTION.md`](DEPENDENCY_PROJECTION.md). The producer API composes
+the authorities described here and retains each authority's original scope.
+
 ## Python distribution metadata and source consumers
 
 The uv adapter accepts optional `distribution_metadata` entries containing an
@@ -54,10 +58,12 @@ The existing relationship owner supplies unchanged bounded advisory downstream
 relations; no second impact graph is constructed. No row asserts that a runtime
 import executed successfully or that a verifier is sufficient.
 
-Selected nodes must belong to the existing semantic `pypi` ecosystem. Other
-module namespaces, such as Maven/JPMS names that happen to have the same spelling,
-cannot become Python consumer ownership. This is a supported semantic profile,
-not a test of producer kind or adapter name.
+Python ownership requires the semantic `pypi` ecosystem; the adjacent native
+JavaScript/TypeScript profile uses `npm` ownership from supplied package-lock
+installation namespaces. Other ecosystems retain explicit unsupported capability.
+Module namespaces, such as Maven/JPMS names that happen to have the same spelling,
+cannot become Python or npm consumer ownership. These are supported semantic
+profiles, not tests of producer kind or adapter name.
 
 The observation rejects stale/foreign/tampered dependency packets and rechecks
 source members before returning. Missing, denied or malformed source, missing
@@ -84,7 +90,8 @@ Maven evidence ──> Maven adapter ──┐
                                    │
 uv.lock evidence ─> uv adapter ────┼──> general Hashmarks dependency evidence model
                                    │
-future Gradle/npm/etc. ────────────┘
+npm package-lock evidence ────────┤
+future Gradle/Cargo/etc. ─────────┘
 ```
 
 Package-manager and resolver semantics belong at the adapter edge. The shared dependency model owns only producer-neutral dependency facts, evidence authority, completeness, provenance, identity, delta, and bounded queries.

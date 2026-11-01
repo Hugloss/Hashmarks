@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import ast
+import re
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field
+from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 from hashmarks.file_store import UnstableFileError
@@ -17,9 +20,131 @@ from .dependency_resolution_correlation import (
     _ownership_summary,
 )
 from .python_exports import python_import_target
+from .source_languages import SOURCE_LANGUAGES
 
 if TYPE_CHECKING:
     from .repository_dependencies import RepositoryDependencies
+
+_SUPPORTED_ECOSYSTEMS = frozenset({"npm", "pypi"})
+_PACKAGE_NAME = re.compile(r"(?:@[A-Za-z0-9._~-]+/)?[A-Za-z0-9._~-]+\Z")
+# Conservatively omit known bare runtime namespaces; this is not a runtime inventory.
+_NODE_RUNTIME_NAMES = frozenset(
+    "assert async_hooks buffer child_process cluster console constants crypto dgram "
+    "diagnostics_channel dns domain events fs http http2 https inspector module net "
+    "os path perf_hooks process punycode querystring readline repl stream "
+    "string_decoder sys timers tls trace_events tty url util v8 vm wasi "
+    "worker_threads zlib".split()
+)
+
+
+@dataclass(frozen=True)
+class _Import:
+    target: str
+    line: int
+    conditional: bool
+    type_only: bool = False
+    syntax_evidence: Mapping[str, object] = field(default_factory=dict)
+
+
+@dataclass
+class _SourceImports:
+    member: dict[str, object]
+    ecosystem: str | None
+    imports: list[_Import]
+    observation: dict[str, object]
+
+    @property
+    def path(self) -> str:
+        return str(self.member["path"])
+
+
+@dataclass(frozen=True)
+class _Selections:
+    selected: set[str]
+    ecosystems: Mapping[str, str]
+    profiles: Mapping[str, set[str]]
+
+    def profile_nodes(self, ecosystem: str | None) -> set[str]:
+        return self.profiles.get(ecosystem or "", set())
+
+    def capability(self) -> dict[str, object]:
+        unsupported = sorted(
+            node
+            for node in self.selected
+            if self.ecosystems[node] not in _SUPPORTED_ECOSYSTEMS
+        )
+        return {
+            "supported_ecosystems": sorted(_SUPPORTED_ECOSYSTEMS),
+            "unsupported_node_ids": unsupported,
+            "state": "unsupported"
+            if len(unsupported) == len(self.selected)
+            else "partial"
+            if unsupported
+            else "supported",
+        }
+
+
+def _npm_candidates(target: str) -> tuple[str, ...]:
+    parts = target.split("/")
+    root_size = 2 if target.startswith("@") else 1
+    namespace = "/".join(parts[:root_size])
+    if (
+        not _PACKAGE_NAME.fullmatch(namespace)
+        or namespace in _NODE_RUNTIME_NAMES
+        or any(part in {"", ".", ".."} for part in parts)
+        or any(character in target for character in ("\\", ":", "#", "?", "%"))
+    ):
+        return ()
+    return tuple("/".join(parts[:end]) for end in range(len(parts), root_size - 1, -1))
+
+
+def _source_observation(
+    member: Mapping[str, object], ecosystem: str | None
+) -> dict[str, object]:
+    return {
+        "path": member["path"],
+        "ecosystem": ecosystem,
+        "availability": "unavailable",
+        "completeness": "unknown",
+        "truncation": "unknown",
+        "reasons": [member.get("reason") or "unsupported-source-language"],
+    }
+
+
+def _native_import(
+    fact: Mapping[str, object], observation: Mapping[str, object]
+) -> _Import:
+    return _Import(
+        str(fact["module_specifier"]),
+        cast("int", fact["line"]),
+        fact["parent_syntax_type"] != "program",
+        bool(fact["type_only"]),
+        {
+            "observation_identity": observation["observation_identity"],
+            "fact_identity": fact["evidence_identity"],
+            "range": fact["range"],
+            "declaration_kind": fact["declaration_kind"],
+            "syntax_context": fact["syntax_context"],
+        },
+    )
+
+
+def _ecmascript_imports(
+    packet: Mapping[str, object],
+) -> tuple[list[_Import], list[str]]:
+    imports: list[_Import] = []
+    reasons: set[str] = set()
+    for fact in cast("Sequence[Mapping[str, object]]", packet["facts"]):
+        if fact["kind"] == "module-declaration":
+            if isinstance(fact["module_specifier"], str):
+                imports.append(_native_import(fact, packet))
+            else:
+                reasons.add("nonliteral-module-declaration-not-observed")
+        elif fact["kind"] == "call-site":
+            callee = cast("Mapping[str, object] | None", fact["callee"])
+            if callee is not None and callee["text"] in {"import", "require"}:
+                reasons.add("dynamic-or-commonjs-loading-not-observed")
+    return imports, sorted(reasons)
 
 
 def _source_imports(tree: ast.Module) -> list[tuple[str, int, bool]]:
@@ -63,7 +188,7 @@ def _selected_nodes(
     node_ids: Sequence[str],
     limit: int,
     max_depth: int,
-) -> tuple[set[str], set[str]]:
+) -> _Selections:
     if type(limit) is not int or not 1 <= limit <= 1000:
         raise ValueError("dependency consumer limit must be between 1 and 1000")
     if type(max_depth) is not int or not 1 <= max_depth <= 12:
@@ -77,112 +202,174 @@ def _selected_nodes(
     if any(not isinstance(node_id, str) or not node_id.strip() for node_id in node_ids):
         raise ValueError("dependency consumer node IDs must be nonblank strings")
     selected = set(node_ids)
-    python_components = {
-        str(row["component_id"])
+    components = {
+        str(row["component_id"]): str(row["ecosystem"])
         for row in cast("Sequence[Mapping[str, object]]", observation["components"])
-        if row["ecosystem"] == "pypi"
     }
     known = {
-        str(row["node_id"])
+        str(row["node_id"]): components[str(row["component_id"])]
         for row in cast("Sequence[Mapping[str, object]]", observation["selections"])
-        if row["component_id"] in python_components
     }
-    if len(selected) != len(node_ids) or not selected <= known:
+    if len(selected) != len(node_ids) or not selected <= known.keys():
         raise ValueError(
-            "dependency consumer node IDs must be unique known Python distribution selections"
+            "dependency consumer node IDs must be unique known dependency selections"
         )
-    return selected, known
+    profiles = {
+        ecosystem: {node for node, value in known.items() if value == ecosystem}
+        for ecosystem in _SUPPORTED_ECOSYSTEMS
+    }
+    return _Selections(selected, known, profiles)
 
 
 class DependencyConsumersMixin(ReadScopeOwner):
-    def _dependency_consumer_source(
-        self, path: str
-    ) -> tuple[dict[str, object], ast.Module | None]:
+    def _dependency_python_source(self, path: str) -> _SourceImports:
         if TYPE_CHECKING:
             self = cast("RepositoryDependencies", self)
         member, raw = self.source._bounded_source_observation(path, 1_048_576)
-        if (
-            raw is None
-            or member["state"] != "known-present"
-            or not path.endswith((".py", ".pyi"))
-        ):
-            return member, None
+        observation = _source_observation(member, "pypi")
+        result = _SourceImports(member, "pypi", [], observation)
+        if raw is None or member["state"] != "known-present":
+            return result
         try:
             parsed = read_python_ast(self.source.workspace / path)
         except (OSError, SyntaxError, UnicodeError):
-            return member, None
+            observation["reasons"] = ["native-python-parse-failed"]
+            return result
         if parsed.source != raw.decode("utf-8").replace("\r\n", "\n").replace(
             "\r", "\n"
         ):
             raise UnstableFileError(
                 "dependency consumer source changed during observation"
             )
-        return member, parsed.tree
+        result.imports = [_Import(*row) for row in _source_imports(parsed.tree)]
+        observation.update(
+            availability="observed",
+            completeness="complete",
+            truncation="complete",
+            reasons=[],
+        )
+        return result
+
+    def _dependency_ecmascript_source(self, path: str) -> _SourceImports:
+        if TYPE_CHECKING:
+            self = cast("RepositoryDependencies", self)
+        packet = self.source.ecmascript(path, limit=500)
+        member = cast("dict[str, object]", packet["member"])
+        imported, reasons = _ecmascript_imports(packet)
+        observation = {
+            "path": path,
+            "ecosystem": "npm",
+            "availability": packet["availability"],
+            "completeness": packet["completeness"],
+            "truncation": "complete"
+            if packet["truncation"] == "not-truncated"
+            else packet["truncation"],
+            "reasons": reasons + ([packet["reason"]] if packet["reason"] else []),
+            "observation_identity": packet["observation_identity"],
+            "parser": packet["parser"],
+        }
+        if reasons:
+            observation["completeness"] = "incomplete"
+        return _SourceImports(member, "npm", imported, observation)
+
+    def _dependency_consumer_source(self, path: str) -> _SourceImports:
+        if TYPE_CHECKING:
+            self = cast("RepositoryDependencies", self)
+        language = SOURCE_LANGUAGES.get(Path(path).suffix.lower())
+        if language == "python":
+            return self._dependency_python_source(path)
+        if language in {"javascript", "typescript"}:
+            return self._dependency_ecmascript_source(path)
+        member, _raw = self.source._bounded_source_observation(path, 1_048_576)
+        return _SourceImports(member, None, [], _source_observation(member, None))
+
+    def _dependency_import_candidates(
+        self, source: _SourceImports, imported: _Import
+    ) -> tuple[str, ...]:
+        if TYPE_CHECKING:
+            self = cast("RepositoryDependencies", self)
+        if source.ecosystem == "npm":
+            return _npm_candidates(imported.target)
+        if (
+            imported.target.startswith(".")
+            or self.imports._resolve_import_paths(source.path, imported.target)
+            or self.imports._python_import_identity_ambiguous(
+                source.path, imported.target
+            )
+        ):
+            return ()
+        return self.imports._python_import_module_candidates(
+            source.path, imported.target
+        )
 
     def _dependency_consumer_row(
         self,
-        path: str,
-        member: Mapping[str, object],
-        imported: tuple[str, int, bool],
+        source: _SourceImports,
+        imported: _Import,
         ownership: Sequence[Mapping[str, object]],
-        node_ids: set[str],
-        python_nodes: set[str],
+        selections: _Selections,
     ) -> dict[str, object] | None:
         if TYPE_CHECKING:
             self = cast("RepositoryDependencies", self)
-        target, line, conditional = imported
-        if target.startswith(".") or self.imports._resolve_import_paths(path, target):
-            return None
-        candidates = self.imports._python_import_module_candidates(path, target)
+        candidates = self._dependency_import_candidates(source, imported)
         matches = self._import_ownership_matches(ownership, candidates, None)
+        profile_nodes = selections.profile_nodes(source.ecosystem)
         matches = [
             row
             for row in matches
-            if set(cast("Sequence[str]", row["owners"])) <= python_nodes
+            if set(cast("Sequence[str]", row["owners"])) <= profile_nodes
         ]
         if not any(
-            node_ids.intersection(cast("Sequence[str]", row["owners"]))
+            selections.selected.intersection(cast("Sequence[str]", row["owners"]))
             for row in matches
         ):
             return None
         return {
-            "source_path": path,
-            "source_member": dict(member),
-            "import_target": target,
-            "line": line,
-            "conditional_or_deferred": conditional,
+            "source_path": source.path,
+            "source_member": dict(source.member),
+            "ecosystem": source.ecosystem,
+            "import_target": imported.target,
+            "line": imported.line,
+            "conditional_or_deferred": imported.conditional,
+            "type_only": imported.type_only,
             "import_claim_authority": "source-observed-static-import",
+            "runtime_resolution": "not-observed",
+            "syntax_evidence": dict(imported.syntax_evidence),
             "matched_modules": [dict(row) for row in matches],
             **_ownership_summary(matches),
         }
 
     def _dependency_consumer_rows(
         self,
-        paths: Sequence[str],
+        sources: Sequence[_SourceImports],
         ownership: Sequence[Mapping[str, object]],
-        selected: set[str],
+        selections: _Selections,
         limit: int,
-        python_nodes: set[str],
-    ) -> tuple[list[dict[str, object]], list[str], list[dict[str, object]], int]:
-        members: list[dict[str, object]] = []
-        unavailable: list[str] = []
+    ) -> tuple[list[dict[str, object]], int]:
         rows: list[dict[str, object]] = []
         count = 0
-        for path in paths:
-            member, tree = self._dependency_consumer_source(path)
-            members.append(member)
-            if tree is None:
-                unavailable.append(path)
-                continue
-            for imported in _source_imports(tree):
+        for source in sources:
+            for imported in source.imports:
                 row = self._dependency_consumer_row(
-                    path, member, imported, ownership, selected, python_nodes
+                    source, imported, ownership, selections
                 )
                 if row is not None:
                     count += 1
                     if len(rows) < limit:
                         rows.append(row)
-        return members, unavailable, rows, count
+        return rows, count
+
+    def _dependency_consumer_recheck(self, sources: Sequence[_SourceImports]) -> None:
+        if TYPE_CHECKING:
+            self = cast("RepositoryDependencies", self)
+        for source in sources:
+            current, _raw = self.source._bounded_source_observation(
+                source.path, 1_048_576
+            )
+            if current != source.member:
+                raise UnstableFileError(
+                    "dependency consumer source changed during observation"
+                )
 
     @operation_response("dependency_consumers")
     @decision_scoped
@@ -205,14 +392,13 @@ class DependencyConsumersMixin(ReadScopeOwner):
             self = cast("RepositoryDependencies", self)
         paths = _paths(source_paths)
         self._require_current_dependency_observation_v3(observation)
-        selected, python_nodes = _selected_nodes(
-            observation, node_ids, limit, max_depth
-        )
+        selections = _selected_nodes(observation, node_ids, limit, max_depth)
         ownership = cast(
             "Sequence[Mapping[str, object]]", observation["module_ownership"]
         )
-        members, unavailable, returned, count = self._dependency_consumer_rows(
-            paths, ownership, selected, limit, python_nodes
+        sources = [self._dependency_consumer_source(path) for path in paths]
+        returned, count = self._dependency_consumer_rows(
+            sources, ownership, selections, limit
         )
         downstream = [
             {
@@ -221,12 +407,7 @@ class DependencyConsumersMixin(ReadScopeOwner):
             }
             for path in sorted({str(row["source_path"]) for row in returned})
         ]
-        for path, member in zip(paths, members, strict=True):
-            current, _raw = self.source._bounded_source_observation(path, 1_048_576)
-            if current != member:
-                raise UnstableFileError(
-                    "dependency consumer source changed during observation"
-                )
+        self._dependency_consumer_recheck(sources)
         self._require_current_dependency_observation_v3(observation)
         source_ids = {
             str(source)
@@ -239,32 +420,65 @@ class DependencyConsumersMixin(ReadScopeOwner):
             "repository_binding": dict(
                 cast("Mapping[str, object]", observation["repository_binding"])
             ),
-            "selected_node_ids": sorted(selected),
-            "source_scope": {
-                "paths": paths,
-                "members": members,
-                "unavailable": unavailable,
-                "completeness": "incomplete" if unavailable else "complete",
-            },
+            "selected_node_ids": sorted(selections.selected),
+            "capability": selections.capability(),
+            "source_scope": _consumer_source_scope(sources),
             "consumers": returned,
             "observed_consumer_count": count,
-            "truncation": "truncated" if count > limit else "complete",
+            "observed_consumer_count_scope": "observed-static-import-facts",
+            "truncation": "truncated"
+            if count > limit
+            or any(row.observation["truncation"] == "truncated" for row in sources)
+            else "complete",
             "downstream_relationships": downstream,
             "dependency_provenance": _dependency_provenance(observation, source_ids),
-            "consumer_scope": {
-                "completeness": "incomplete",
-                "negative_evidence": "not-admissible",
-                "reasons": [
-                    "explicit-source-scope",
-                    "dynamic-imports-and-custom-loaders-not-observed",
-                    "metadata-owner-scope-not-exhaustive",
-                    "downstream-relations-bounded-and-advisory",
-                    "only-pypi-module-namespace-observed",
-                ],
-            },
+            "consumer_scope": _consumer_scope(sources, selections),
             "authority": "repository-intelligence-only",
             "producer_authority": "caller-claimed",
             "execution_authority": "external",
             "result_authority": "external",
             "certification_authority": "external",
         }
+
+
+def _consumer_source_scope(sources: Sequence[_SourceImports]) -> dict[str, object]:
+    return {
+        "paths": [row.path for row in sources],
+        "members": [row.member for row in sources],
+        "observations": [row.observation for row in sources],
+        "unavailable": [
+            row.path for row in sources if row.observation["availability"] != "observed"
+        ],
+        "completeness": "complete"
+        if all(row.observation["completeness"] == "complete" for row in sources)
+        else "incomplete",
+    }
+
+
+def _consumer_scope(
+    sources: Sequence[_SourceImports], selections: _Selections
+) -> dict[str, object]:
+    reasons = [
+        "explicit-source-scope",
+        "dynamic-imports-and-custom-loaders-not-observed",
+        "metadata-owner-scope-not-exhaustive",
+        "downstream-relations-bounded-and-advisory",
+        "supported-static-import-profiles-only",
+    ]
+    if any(row.ecosystem == "npm" for row in sources):
+        reasons.extend(
+            [
+                "positive-package-namespace-correspondence-only",
+                "node-subpath-exports-and-runtime-resolution-not-observed",
+                "node-builtins-and-nonpackage-specifiers-not-matched",
+                "typescript-path-mappings-not-resolved",
+                "workspace-context-and-installation-visibility-not-resolved",
+            ]
+        )
+    if selections.capability()["unsupported_node_ids"]:
+        reasons.append("unsupported-selected-ecosystem")
+    return {
+        "completeness": "incomplete",
+        "negative_evidence": "not-admissible",
+        "reasons": reasons,
+    }

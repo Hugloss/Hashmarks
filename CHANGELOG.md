@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add a stable package/source-consumer projection and retained requalification through the existing dependency and Source owners. Preserve original bindings, historical inventory scope, current input correspondence, ambiguity, explicit bounds and qualified absence without consumer-side table joins.
+- Translate supplied npm package-lock v2/v3 installation metadata and observe native JavaScript/TypeScript static imports, side effects and re-exports. Preserve aliases, type-only syntax, unsupported workspace/local cases and incomplete runtime/consumer scope without resolving or executing packages.
 - Add one public, command-free changed-set verification contract composing source-qualified targets, exact returned logical membership, shared-support applicability, workspace context and optional runtime/source correlation.
 - Preserve support/helpers, ambiguous ownership, bounded or unknown consumer scope, re-export contributors and source drift without introducing command or execution authority.
 - Bind nested Python/frontend nominations to their applicable manifest inputs and requalify Python workspace roots through the canonical index reconciliation path.

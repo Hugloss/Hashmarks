@@ -11,6 +11,11 @@ from collections.abc import Mapping
 from copy import deepcopy
 from typing import Any, Literal, TypedDict, Unpack, cast, get_args
 
+from hashmarks.evidence_presentation_dependencies import (
+    project_dependency,
+    project_dependency_consumers,
+    project_dependency_projection,
+)
 from hashmarks.evidence_presentation_task import (
     compact_initial_declarations,
     compact_initial_groups,
@@ -904,74 +909,6 @@ def _bindings(
     )
 
 
-def _dependency(
-    p: _Projection,
-    packet: Mapping[str, object],
-    ref: tuple[object, ...],
-    ctx: Mapping[str, object],
-) -> None:
-    _fields(
-        p,
-        packet,
-        ref,
-        ctx,
-        (
-            ("change_axes", "dependency", "record"),
-            ("component_selection_transitions", "dependency", "records"),
-        ),
-        assertion="producer_claim",
-    )
-    p.nested(packet, "observation", ref, ctx)
-    _fields(
-        p,
-        packet,
-        ref,
-        ctx,
-        (
-            ("components", "dependency", "records"),
-            ("selections", "dependency", "records"),
-            ("inventory", "dependency", "records"),
-            ("relationships", "dependency", "records"),
-            ("module_ownership", "dependency", "records"),
-            ("evidence_sources", "dependency", "records"),
-            ("repository_inputs", "source", "records"),
-            ("root_evidence", "dependency", "records"),
-            ("queries", "dependency", "record"),
-            ("explanations", "dependency", "records"),
-        ),
-        assertion="producer_claim",
-    )
-    for subject in (
-        "components",
-        "selections",
-        "inventory",
-        "relationships",
-        "module_ownership",
-    ):
-        for change in ("added", "removed", "changed"):
-            key = subject + "_" + change
-            p.field(
-                packet,
-                key,
-                "dependency",
-                ref,
-                ctx,
-                assertion="producer_claim",
-                shape="values",
-            )
-    _fields(
-        p,
-        packet,
-        ref,
-        ctx,
-        (
-            ("semantic_result", "dependency", "record"),
-            ("derivation", "dependency", "record"),
-        ),
-        assertion="producer_claim",
-    )
-
-
 def _correlation(
     p: _Projection,
     packet: Mapping[str, object],
@@ -1363,7 +1300,7 @@ def _projectors() -> dict[str, Any]:
         VERIFICATION_EXPLANATION_SCHEMA: _verification,
         CROSS_REPOSITORY_SCHEMA: _cross_repository,
         INTELLIGENCE_ECONOMICS_SCHEMA: _economics,
-        SCHEMA_V3: _dependency,
+        SCHEMA_V3: project_dependency,
         CORRELATION_DELTA_SCHEMA: _correlation,
         REPOSITORY_BINDING_DELTA_SCHEMA: _binding_delta,
         operation_schema("structural_locality_delta"): _structural_comparison,
@@ -1386,9 +1323,11 @@ def _projectors() -> dict[str, Any]:
         operation_schema("repository_evidence", "observation"): _bindings,
         operation_schema("repository_evidence", "coverage"): _bindings,
         operation_schema("repository_evidence", "membership"): _verification,
-        operation_schema("dependency_codemap", "observation"): _dependency,
-        operation_schema("dependency_codemap", "explain"): _dependency,
-        operation_schema("dependency_codemap", "compare"): _dependency,
+        operation_schema("dependency_codemap", "observation"): project_dependency,
+        operation_schema("dependency_codemap", "explain"): project_dependency,
+        operation_schema("dependency_codemap", "compare"): project_dependency,
+        operation_schema("dependency_projection"): project_dependency_projection,
+        operation_schema("dependency_consumers"): project_dependency_consumers,
         operation_schema("correlate_evidence"): _correlation,
         operation_schema("changed_set_verification"): project_changed_set,
         operation_schema("verification_nomination"): project_nomination,
@@ -1437,6 +1376,14 @@ def _require_fields(packet: Mapping[str, object], schema: str) -> None:
             "derivation",
         ),
         operation_schema("dependency_codemap", "compare"): ("comparability",),
+        operation_schema("dependency_projection"): (
+            "request",
+            "observation",
+            "assessment",
+            "packages",
+            "source_scope",
+            "consumer_evidence",
+        ),
         operation_schema("repository_declarations", "observation"): ("groups",),
         operation_schema("repository_declarations", "discovery"): (
             "providers",
@@ -1480,6 +1427,7 @@ def presentation_source_identity(packet: Mapping[str, object]) -> object:
                     "receipt_identity",
                     "source_observation_identity",
                     "scope_identity",
+                    "projection_identity",
                 )
                 if packet.get(key) is not None
             ),

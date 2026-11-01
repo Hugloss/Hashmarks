@@ -18,6 +18,7 @@ ECMASCRIPT_SOURCE_SCHEMA = operation_schema("source_ecmascript")
 MAX_SYNTAX_NODES = 100_000
 EXPRESSION_PREVIEW_BYTES = 256
 FACT_KINDS = (
+    "module-declaration",
     "import-binding",
     "export-binding",
     "binding",
@@ -174,6 +175,44 @@ class _SyntaxProjection:
     def _has_token(node: StructuralNode | None, token: str) -> bool:
         return node is not None and any(child.type == token for child in node.children)
 
+    def _module_type_only(self, node: StructuralNode) -> bool:
+        if self._has_token(node, "type"):
+            return True
+        clauses = [
+            child
+            for child in node.named_children
+            if child.type in {"import_clause", "export_clause"}
+        ]
+        bindings = [child for clause in clauses for child in clause.named_children]
+        bindings = [
+            nested
+            for child in bindings
+            for nested in (
+                child.named_children if child.type == "named_imports" else [child]
+            )
+            if nested.type != "comment"
+        ]
+        return bool(bindings) and all(
+            child.type in {"import_specifier", "export_specifier"}
+            and self._has_token(child, "type")
+            for child in bindings
+        )
+
+    def _module_declaration(self, visit: _Visit) -> dict[str, object] | None:
+        source = visit.node.child_by_field_name("source")
+        if source is None and visit.node.type == "export_statement":
+            return None
+        return {
+            "kind": "module-declaration",
+            "declaration_kind": "import"
+            if visit.node.type == "import_statement"
+            else "export",
+            "source": self.expression(source),
+            "module_specifier": self._literal_text(source),
+            "type_only": self._module_type_only(visit.node),
+            "line": visit.node.start_point[0] + 1,
+        }
+
     def _module_binding(self, visit: _Visit) -> dict[str, object] | None:
         if visit.module is None:
             return None
@@ -326,6 +365,8 @@ class _SyntaxProjection:
 
     def fact(self, visit: _Visit) -> dict[str, object] | None:
         builder = {
+            "import_statement": self._module_declaration,
+            "export_statement": self._module_declaration,
             "import_specifier": self._module_binding,
             "export_specifier": self._module_binding,
             "namespace_import": self._namespace_binding,

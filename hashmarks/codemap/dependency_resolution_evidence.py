@@ -33,6 +33,7 @@ _MAX_INPUTS = 256
 _MAX_MODULE_OWNERSHIP = 4096
 _MAX_ID_CHARS = 512
 _MAX_REQUEST_BYTES = 1_048_576
+_MAX_OBSERVATION_BYTES = 4_194_304
 _SHA256 = re.compile(r"^sha256:[0-9a-f]{64}$")
 _MEMBER_REVISION = re.compile(r"^[0-9a-f]{64}$")
 
@@ -262,12 +263,24 @@ class DependencyResolutionEvidenceMixin(DependencyResolutionCorrelationMixin):
         definition_identity, resolution_identity, observation_identity = (
             _dependency_identities_v3(packet)
         )
-        return {
+        observation = {
             **packet,
             "definition_identity": definition_identity,
             "resolution_identity": resolution_identity,
             "observation_identity": observation_identity,
         }
+        self._validate_dependency_observation_size_v3(observation)
+        return observation
+
+    @staticmethod
+    def _validate_dependency_observation_size_v3(
+        observation: Mapping[str, object],
+    ) -> None:
+        if len(_canonical(observation)) > _MAX_OBSERVATION_BYTES:
+            raise ValueError(
+                "qualified dependency observation exceeds "
+                f"{_MAX_OBSERVATION_BYTES} encoded bytes"
+            )
 
     @classmethod
     def _require_qualified_dependency_observation_v3(
@@ -298,6 +311,7 @@ class DependencyResolutionEvidenceMixin(DependencyResolutionCorrelationMixin):
         }
         if not isinstance(observation, Mapping) or set(observation) != fields:
             raise ValueError("dependency observation is not a qualified v3 packet")
+        cls._validate_dependency_observation_size_v3(observation)
         if observation["schema"] != _contract.SCHEMA_V3 or (
             observation["authority"] != "qualified-external-observation"
             or observation["producer_authority"] != "caller-claimed"
@@ -450,8 +464,9 @@ class DependencyResolutionEvidenceMixin(DependencyResolutionCorrelationMixin):
             selections=selections, sources_by_id=sources_by_id
         )
 
-    @staticmethod
+    @classmethod
     def _validate_dependency_repository_binding_v3(
+        cls,
         observation: Mapping[str, object],
     ) -> None:
         binding = observation["repository_binding"]
@@ -476,35 +491,54 @@ class DependencyResolutionEvidenceMixin(DependencyResolutionCorrelationMixin):
             label="repository_inputs",
             limit=_MAX_INPUTS,
         )
-        paths: list[str] = []
-        for row in inputs:
-            if set(row) != {
-                "path",
-                "claimed_member_revision",
-                "observed_member_revision",
-                "source_equivalence",
-                "repository_state",
-            }:
-                raise ValueError("dependency repository input is malformed")
-            paths.append(_identifier(row["path"], label="repository input path"))
-            claimed = row["claimed_member_revision"]
-            observed = row["observed_member_revision"]
-            if any(
-                revision is not None and not _MEMBER_REVISION.fullmatch(str(revision))
-                for revision in (claimed, observed)
-            ):
-                raise ValueError("dependency repository input revision is malformed")
-            equivalence = (
-                "unknown"
-                if claimed is None or observed is None
-                else "proven"
-                if claimed == observed
-                else "mismatch"
-            )
-            if row["source_equivalence"] != equivalence:
-                raise ValueError("dependency repository input equivalence is malformed")
+        paths = [cls._validate_dependency_repository_input_v3(row) for row in inputs]
         if paths != sorted(set(paths)):
             raise ValueError("dependency repository inputs are not normalized")
+
+    @staticmethod
+    def _validate_dependency_repository_input_v3(row: Mapping[str, object]) -> str:
+        if set(row) != {
+            "path",
+            "claimed_member_revision",
+            "observed_member_revision",
+            "source_equivalence",
+            "repository_state",
+        }:
+            raise ValueError("dependency repository input is malformed")
+        path = _identifier(row["path"], label="repository input path")
+        if (
+            row["path"] != path
+            or normalize_relative_path(path, allow_root=False) != path
+        ):
+            raise ValueError("dependency repository input path is not normalized")
+        state = row["repository_state"]
+        if state not in ("known-present", "known-absent", "unknown", "unsupported"):
+            raise ValueError("dependency repository input state is malformed")
+        claimed = row["claimed_member_revision"]
+        observed = row["observed_member_revision"]
+        if any(
+            revision is not None
+            and (
+                not isinstance(revision, str)
+                or not _MEMBER_REVISION.fullmatch(revision)
+            )
+            for revision in (claimed, observed)
+        ):
+            raise ValueError("dependency repository input revision is malformed")
+        if (state == "known-present" and observed is None) or (
+            state == "known-absent" and observed is not None
+        ):
+            raise ValueError("dependency repository input state and revision disagree")
+        equivalence = (
+            "unknown"
+            if claimed is None or observed is None
+            else "proven"
+            if claimed == observed
+            else "mismatch"
+        )
+        if row["source_equivalence"] != equivalence:
+            raise ValueError("dependency repository input equivalence is malformed")
+        return path
 
     @staticmethod
     def _dependency_header_v3(

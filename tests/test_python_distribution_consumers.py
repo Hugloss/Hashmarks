@@ -206,10 +206,18 @@ def test_python_consumer_profile_uses_semantic_namespace_not_producer_kind(
             if component["component_id"] == "sample-distribution":
                 component["ecosystem"] = "maven"
         unsupported = codemap.dependencies.observe(raw)
-        with pytest.raises(ValueError, match="Python distribution selections"):
-            codemap.dependencies.consumers(
-                unsupported, source_paths=["bridge.py"], node_ids=nodes
-            )
+        result = codemap.dependencies.consumers(
+            unsupported, source_paths=["bridge.py"], node_ids=nodes
+        )
+        assert result["consumers"] == []
+        assert assert_object(result["capability"]) == {
+            "supported_ecosystems": ["npm", "pypi"],
+            "unsupported_node_ids": nodes,
+            "state": "unsupported",
+        }
+        assert "unsupported-selected-ecosystem" in assert_array(
+            assert_object(result["consumer_scope"])["reasons"]
+        )
 
 
 def test_mixed_module_namespaces_do_not_upgrade_a_python_owner_to_unique(
@@ -300,6 +308,27 @@ def test_bounded_projection_does_not_strengthen_consumer_scope(tmp_path: Path) -
     assert result["observed_consumer_count"] == 3
     assert len(assert_array(result["consumers"])) == 1
     assert result["truncation"] == "truncated"
+    assert (
+        assert_object(result["consumer_scope"])["negative_evidence"] == "not-admissible"
+    )
+
+
+def test_ambiguous_repository_shadow_cannot_become_an_external_owner(
+    tmp_path: Path,
+) -> None:
+    _workspace(tmp_path)
+    (tmp_path / "different_import.py").write_text("api = object()\n")
+    (tmp_path / "different_import").mkdir()
+    (tmp_path / "different_import/__init__.py").write_text("api = object()\n")
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        observation = _observation(codemap, _lock(), [_metadata(_lock())])
+        result = codemap.dependencies.consumers(
+            observation,
+            source_paths=["bridge.py"],
+            node_ids=[str(_metadata(_lock())["node_id"])],
+        )
+    assert result["consumers"] == []
     assert (
         assert_object(result["consumer_scope"])["negative_evidence"] == "not-admissible"
     )
