@@ -5,6 +5,7 @@ import json
 import os
 import socket
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -59,6 +60,14 @@ class RepositoryObservation:
             and self.dirty_path_count == len(self.dirty_paths)
             and self.dirty_path_count > 0
         )
+
+
+class RepositoryIdentityMode(str, Enum):
+    """Canonical identity client/facade routing without loading the engine."""
+
+    AUTO = "auto"
+    LOCAL = "local"
+    DAEMON = "daemon"
 
 
 class DaemonUnavailableError(ConnectionError):

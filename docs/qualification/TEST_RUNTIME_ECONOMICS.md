@@ -100,3 +100,24 @@ A new oracle placement does not inherently require re-running identical CLI
 subprocesses when the contract is retained evidence grading rather than
 freshness or transport acquisition. A source change, native transport
 contract, or receipt freshness test still needs independent genuine captures.
+
+## Native CLI cold-start import boundary
+
+Every genuine CLI capture launches a new Python interpreter for each
+presentation format. The same CLI request must continue to invoke the
+installed public command through a real subprocess, with current source,
+state, output, presentation, and command validation.
+
+Importing the CLI dispatcher no longer eagerly imports the *identity
+engine or identity daemon* used by separate `snapshot`, `observe-inputs`,
+`stats`, `doctor`, and `daemon serve` command families. The identity
+mode enum has one lightweight public owner in `hashmarks.client`, with
+`hashmarks.identity` retaining the existing public re-export.
+The identity/daemon implementations are imported only by their native
+command handlers. This shortens unrelated CLI startup without adding
+new command paths, changing repository intelligence, or skipping
+one of the authentic CLI presentation formats.
+
+No speed improvement should be claimed without comparing real backend
+workflow timings on matching work and environments; import isolation is
+a separate behavioral regression.

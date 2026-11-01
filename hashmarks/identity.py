@@ -1,10 +1,14 @@
 from __future__ import annotations
 
-from enum import Enum
 from types import TracebackType
 from typing import TYPE_CHECKING
 
-from .client import DaemonCompatibilityError, DaemonUnavailableError, IdentityClient
+from .client import (
+    DaemonCompatibilityError,
+    DaemonUnavailableError,
+    IdentityClient,
+    RepositoryIdentityMode,
+)
 from .digest import Digest
 from .engine import IdentityEngine
 from .generation_domain import require_generation
@@ -21,12 +25,6 @@ if TYPE_CHECKING:
 
     from .codemap import CodeMap
     from .watcher import NativeLinuxBatchWatcher, WatchdogBatchWatcher
-
-
-class RepositoryIdentityMode(str, Enum):
-    AUTO = "auto"
-    LOCAL = "local"
-    DAEMON = "daemon"
 
 
 class RepositoryIdentity:
