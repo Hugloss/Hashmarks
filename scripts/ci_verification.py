@@ -29,6 +29,27 @@ DOCUMENTATION_CHECKS = (
     "tests/test_documentation_links.py",
     "tests/test_publication_docs.py",
 )
+# Historical regressions are explicit CI priority probes, not a claim that
+# CodeMap's bounded reverse references enumerate every dynamic verifier.
+# Shared verification changes still run the entire native pytest suite.
+CRITICAL_VERIFICATION_TESTS = (
+    "tests/test_agent_start_provenance.py",
+    "tests/test_verification_observation_freshness.py",
+    "tests/test_verification_nomination_binding.py",
+    "tests/test_changed_set_verification.py",
+    "tests/test_changed_set_membership.py",
+)
+CRITICAL_SOURCE_PATHS = frozenset(
+    {
+        "hashmarks/codemap/engine.py",
+        "hashmarks/codemap/evidence_verification.py",
+        "hashmarks/codemap/decision_session.py",
+        "hashmarks/codemap/indexing_lifecycle.py",
+        "hashmarks/codemap/import_resolution.py",
+        "hashmarks/codemap/repository_domains.py",
+    }
+)
+EARLY_TEST_LIMIT = 16
 # A change to an authority or broadly shared toolchain cannot be covered by
 # a bounded source-to-test nomination. Keep the entire real suite in the PR.
 BROAD_PATHS = frozenset(
@@ -286,6 +307,23 @@ def _source_test_files(
     return {path for paths in nominations.values() for path in paths}, None
 
 
+def _early_tests(root: Path, changed: tuple[str, ...], *, full: bool) -> list[str]:
+    """Order bounded development-only probes; never reduce required membership."""
+    if not full:
+        return []
+    critical_change = any(
+        path in CRITICAL_SOURCE_PATHS
+        or path.startswith("hashmarks/codemap/verification_")
+        or path.startswith("hashmarks/codemap/task_evidence_")
+        for path in changed
+    )
+    priority = list(CRITICAL_VERIFICATION_TESTS) if critical_change else []
+    priority.extend(path for path in changed if _test_file(path))
+    return [
+        path for path in dict.fromkeys(priority) if (root / path).is_file()
+    ][:EARLY_TEST_LIMIT]
+
+
 def select(
     root: Path,
     base: str,
@@ -322,6 +360,7 @@ def select(
         "dirty_worktree": worktree,
         "mode": mode,
         "changed_paths": list(changed),
+        "early_pytest_paths": _early_tests(root, changed, full=mode == "full"),
         "pytest_paths": ["tests"] if mode == "full" else sorted(tests),
         "reasons": sorted(set(full_reasons))
         if full_reasons
@@ -337,6 +376,7 @@ def main() -> int:
     parser.add_argument("--base", required=True, help="A Git commit ancestor of HEAD")
     parser.add_argument("--root", type=Path, default=ROOT)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--early-output", type=Path)
     parser.add_argument("--worktree", action="store_true")
     args = parser.parse_args()
     plan = select(args.root, args.base, worktree=args.worktree)
@@ -348,6 +388,12 @@ def main() -> int:
         json.dumps({key: plan[key] for key in ("mode", "reasons", "pytest_paths")})
         + "\n"
     )
+    # Early probes are consumer-ordering hints, never a reduced correctness claim.
+    if args.early_output is not None:
+        args.early_output.parent.mkdir(parents=True, exist_ok=True)
+        args.early_output.write_bytes(
+            b"".join(path.encode("utf-8") + b"\0" for path in plan["early_pytest_paths"])
+        )
     # NUL-delimited argument transport: never use shell interpolation for test selectors.
     for path in plan["pytest_paths"]:
         sys.stdout.buffer.write(path.encode("utf-8") + b"\0")

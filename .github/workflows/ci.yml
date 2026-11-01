@@ -64,15 +64,26 @@ jobs:
           fi
           uv run --frozen --offline --no-sync --group test python scripts/ci_verification.py \
             --base "$base" --output "$RUNNER_TEMP/hashmarks-ci-plan.json" \
+            --early-output "$RUNNER_TEMP/hashmarks-ci-early.nul" \
             > "$RUNNER_TEMP/hashmarks-ci-paths.nul"
           test -s "$RUNNER_TEMP/hashmarks-ci-paths.nul"
           cat "$RUNNER_TEMP/hashmarks-ci-plan.json" >> "$GITHUB_STEP_SUMMARY"
+      - name: Prove critical changed-verifier regressions before full pytest
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -s "$RUNNER_TEMP/hashmarks-ci-early.nul" ]; then
+            xargs -0 -r uv run --frozen --offline --no-sync --group test \
+              python -m pytest -q --maxfail=1 --durations=10 \
+              < "$RUNNER_TEMP/hashmarks-ci-early.nul"
+          fi
       - name: Execute selected tests through native pytest
         shell: bash
         run: |
           set -euo pipefail
           xargs -0 -r uv run --frozen --offline --no-sync --group test \
-            python -m pytest -q < "$RUNNER_TEMP/hashmarks-ci-paths.nul"
+            python -m pytest -q --maxfail=1 --durations=10 \
+            < "$RUNNER_TEMP/hashmarks-ci-paths.nul"
       - name: Prove installed wheel and sdist remain usable
         run: make artifact-check ARTIFACT_PYTHON=3.11
       - name: Smoke a real installed wheel through the official MCP SDK

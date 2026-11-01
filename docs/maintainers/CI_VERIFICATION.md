@@ -33,6 +33,20 @@ The fast gate first runs a small selector self-test using real CodeMap on a
 controlled source-to-verifier repository. A selector regression fails before
 the broader native pytest selection begins; it does not replace that proof.
 
+For broad/shared verification changes, the consumer also executes a bounded
+critical regression cohort **before** the full native pytest suite. The cohort
+includes the stale/removed/renamed-verifier provenance regression that escaped
+early feedback in PR #481. Newly changed tests are added as early probes
+within a fixed limit. These priorities are *explicit development policy*, not
+proof that the observer has exhaustively discovered every verifier. They may
+not authorize skipping any required tests. They are recorded in the plan
+alongside the full-suite membership and exact Git identities.
+
+Both early tests and the PR's normal selected pytest phase use
+`--maxfail=1`, stopping after the first failure. A green PR still completes
+every selected test. Nightly and release qualification remain unchanged and
+continue to report the complete suite's failures.
+
 The selection plan is JSON, bound to base SHA, effective checkout SHA, changed
 paths and a deterministic plan digest. CI preserves it as a run artifact. A
 `focused` plan is an **admission to run a subset**, not a completed verification

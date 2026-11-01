@@ -83,6 +83,7 @@ def test_docs_only_runs_baseline_without_scanning(repository: tuple[Path, str]) 
         set(module.BASELINE) | set(module.DOCUMENTATION_CHECKS)
     )
     assert plan["base_sha"] == base
+    assert plan["early_pytest_paths"] == []
     assert plan["plan_identity"].startswith("sha256:")
 
 
@@ -158,6 +159,47 @@ def test_mixed_documentation_and_test_edits_keep_documentation_proof(
     assert plan["mode"] == "focused"
     assert set(module.DOCUMENTATION_CHECKS).issubset(plan["pytest_paths"])
     assert "tests/test_worker.py" in plan["pytest_paths"]
+
+
+def test_shared_verification_change_prioritizes_original_stale_regression(
+    repository: tuple[Path, str],
+) -> None:
+    """PR #481 exposed stale-verifier bugs at 3% of an eight-minute full run."""
+    root, base = repository
+    for priority in module.CRITICAL_VERIFICATION_TESTS:
+        _write(root, priority, "def test_regression():\n    assert True\n")
+    path = "hashmarks/codemap/evidence_verification.py"
+    _change(root, path, "def changed():\n    return False\n")
+    plan = module.select(root, base, links=_unreachable)
+    assert plan["mode"] == "full"
+    assert plan["pytest_paths"] == ["tests"]
+    assert "tests/test_agent_start_provenance.py" in plan["early_pytest_paths"]
+    assert plan["early_pytest_paths"] == list(module.CRITICAL_VERIFICATION_TESTS)
+    assert "broad-authority:" + path in plan["reasons"]
+
+
+def test_full_suite_keeps_changed_tests_in_early_probe(
+    repository: tuple[Path, str],
+) -> None:
+    root, base = repository
+    _write(root, "tests/test_core_repair.py", "def test_repair():\n    assert True\n")
+    _change(root, "pyproject.toml", "[project]\nname='sample'\n")
+    plan = module.select(root, base, links=_unreachable)
+    assert plan["mode"] == "full"
+    assert plan["pytest_paths"] == ["tests"]
+    assert plan["early_pytest_paths"] == ["tests/test_core_repair.py"]
+
+
+def test_focused_python_change_does_not_repeat_tests_in_early_probe(
+    repository: tuple[Path, str],
+) -> None:
+    root, base = repository
+    _change(root, "hashmarks/worker.py", "def compute():\n    return 2\n")
+    plan = module.select(
+        root, base, links=lambda _root, paths: {paths[0]: ("tests/test_worker.py",)}
+    )
+    assert plan["mode"] == "focused"
+    assert plan["early_pytest_paths"] == []
 
 
 def test_unknown_source_relevance_runs_entire_suite(
@@ -280,6 +322,7 @@ def test_hosted_cli_emits_nul_delimited_safe_paths(
     root, base = repository
     _change(root, "docs/README.md", "changed\n")
     output = tmp_path.parent / "ci-plan.json"
+    early = tmp_path.parent / "ci-early.nul"
     result = subprocess.run(
         [
             sys.executable,
@@ -290,6 +333,8 @@ def test_hosted_cli_emits_nul_delimited_safe_paths(
             base,
             "--output",
             str(output),
+            "--early-output",
+            str(early),
         ],
         capture_output=True,
         check=True,
@@ -297,3 +342,4 @@ def test_hosted_cli_emits_nul_delimited_safe_paths(
     paths = [row.decode() for row in result.stdout.split(b"\0") if row]
     assert paths == sorted(set(module.BASELINE) | set(module.DOCUMENTATION_CHECKS))
     assert json.loads(output.read_text())["pytest_paths"] == paths
+    assert early.read_bytes() == b""

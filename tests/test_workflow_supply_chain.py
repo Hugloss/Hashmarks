@@ -478,6 +478,11 @@ def test_fast_ci_remains_a_native_pytest_gate() -> None:
     )
     full = fast.index("Execute selected tests through native pytest")
     assert early < full
+    critical = fast.index("Prove critical changed-verifier regressions before full pytest")
+    assert early < critical < full
+    assert "--early-output" in fast
+    assert fast.count("--maxfail=1") == 2
+    assert "python -m pytest -q --maxfail=1" in fast
     assert "make artifact-check" in fast
     assert "mcp_installed_artifact_smoke.py" in fast
     assert 'if [ "$GITHUB_EVENT_NAME" != "push" ]; then' in fast
