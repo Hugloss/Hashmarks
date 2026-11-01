@@ -54,6 +54,10 @@ jobs:
           set -euo pipefail
           base="$BASE_SHA"
           if ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+            if [ "$GITHUB_EVENT_NAME" != "push" ]; then
+              echo "::error::Missing exact PR or merge-group base commit" >&2
+              exit 2
+            fi
             base="$(git rev-parse HEAD^)"
           fi
           uv run --frozen --offline --no-sync --group test python scripts/ci_verification.py \
@@ -69,6 +73,17 @@ jobs:
             python -m pytest -q < "$RUNNER_TEMP/hashmarks-ci-paths.nul"
       - name: Prove installed wheel and sdist remain usable
         run: make artifact-check ARTIFACT_PYTHON=3.11
+      - name: Smoke a real installed wheel through the official MCP SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          uv build --wheel --out-dir dist
+          uv venv --python 3.11 "$RUNNER_TEMP/mcp-venv"
+          wheel="$(find dist -maxdepth 1 -type f -name '*.whl' -print -quit)"
+          test -n "$wheel"
+          uv pip install --python "$RUNNER_TEMP/mcp-venv/bin/python" "$wheel" "mcp==2.2.0"
+          "$RUNNER_TEMP/mcp-venv/bin/python" -I scripts/mcp_installed_artifact_smoke.py \
+            --hashmarks "$RUNNER_TEMP/mcp-venv/bin/hashmarks"
       - name: Preserve selection evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

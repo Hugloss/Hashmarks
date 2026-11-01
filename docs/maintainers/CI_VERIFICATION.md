@@ -9,7 +9,7 @@ tests; GitHub Actions and the local developer retain execution/result authority.
 
 | Check | Trigger | Coverage | Status |
 | --- | --- | --- | --- |
-| Relevant verification | Pull requests, merge queue, main pushes | Locked dependencies, compile, Ruff, typing, selected pytest, real installed wheel/sdist smoke | `Qualification convergence` required |
+| Relevant verification | Pull requests, merge queue, main pushes | Locked dependencies, compile, Ruff, typing, selected pytest, real installed wheel/sdist and MCP SDK smoke | `Qualification convergence` status (can be required by ruleset) |
 | Full qualification | Every day at 02:23 UTC, or manual dispatch | Existing full Python 3.11–3.14 matrix, MCP compatibility/stress, source qualification, standalone Linux/Windows, publication aggregation | Daily diagnostic, not a PR-green claim |
 | Publish qualification | Existing reviewed release request/explicit dispatch | Independently qualifies exact release source and published bytes | Release authority; unchanged |
 
@@ -69,3 +69,6 @@ The independent `publish.yml` source-bound release qualification remains.
 Check repository rulesets after merging, especially any requirements naming
 removed *individual* legacy CI jobs. Do not weaken those rules until the
 replacement check is observed on a real PR and on the merge queue.
+
+The active `main` ruleset observed during this PR has no required-status rule; 
+configure `Qualification convergence` as required separately after this PR passes.

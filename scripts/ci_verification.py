@@ -18,7 +18,10 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA = "hashmarks.development-ci-selection.v1"
 BASELINE = (
+    "tests/test_codemap_state_binding.py",
     "tests/test_qualification_classification.py",
+    "tests/test_repository_evidence_bindings.py",
+    "tests/test_semantic_ownership_architecture.py",
     "tests/test_verification_nomination_validation.py",
     "tests/test_verification_selection_identity.py",
 )

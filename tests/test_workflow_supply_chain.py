@@ -473,6 +473,8 @@ def test_fast_ci_remains_a_native_pytest_gate() -> None:
     assert "scripts/ci_verification.py" in fast
     assert "python -m pytest -q" in fast
     assert "make artifact-check" in fast
+    assert "mcp_installed_artifact_smoke.py" in fast
+    assert 'if [ "$GITHUB_EVENT_NAME" != "push" ]; then' in fast
     assert "needs: [fast-gate]" in fast
     assert 'run: test "$FAST_GATE" = success' in fast
 
