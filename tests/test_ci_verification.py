@@ -257,6 +257,16 @@ def test_incomplete_graph_cannot_authorize_reduced_suite() -> None:
     assert module._qualified_links(graph, "hashmarks/worker.py") == (
         "tests/test_worker.py",
     )
+    graph["stale"] = None
+    assert module._qualified_links(graph, "hashmarks/worker.py") is None
+    assert module._qualified_links(
+        graph, "hashmarks/worker.py", source_bound=True
+    ) == ("tests/test_worker.py",)
+    graph["stale"] = True
+    assert module._qualified_links(
+        graph, "hashmarks/worker.py", source_bound=True
+    ) is None
+    graph["stale"] = False
     graph["verification_qualification"]["completeness"] = "incomplete"
     assert module._qualified_links(graph, "hashmarks/worker.py") is None
     graph["verification_qualification"]["completeness"] = "complete"

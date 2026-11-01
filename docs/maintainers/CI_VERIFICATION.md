@@ -46,6 +46,11 @@ changes run the baseline tests. For Python source changes under `hashmarks/`
 or `scripts/`, CodeMap is queried for existing verification ownership; test
 nominations are validated from the live workspace. Only complete, untruncated,
 non-stale, non-ambiguous source-qualified links may reduce pytest membership.
+When the optional identity daemon cannot provide a freshness status, the
+selector does not turn unknown into fresh: it independently rechecks the exact
+source's indexed digest, validates each nominated test's source binding via
+Hashmarks's native observer, and rechecks the source digest before admitting
+the subset. An explicitly stale graph still selects the full suite.
 
 Any missing, truncated, stale, ambiguous or unqualified relevance, absent
 verifier, unexpected file, unusual Git operation, changed shared test harness,
