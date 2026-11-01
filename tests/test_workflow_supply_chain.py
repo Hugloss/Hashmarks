@@ -483,13 +483,19 @@ def test_fast_ci_remains_a_native_pytest_gate() -> None:
     )
     assert early < critical < full
     assert "--early-output" in fast
-    assert fast.count("--maxfail=1") == 2
+    fast_gate = fast.split("  full-shards:", 1)[0]
+    assert fast_gate.count("--maxfail=1") == 2
     assert "python -m pytest -q --maxfail=1" in fast
     assert "make artifact-check" in fast
     assert "mcp_installed_artifact_smoke.py" in fast
     assert 'if [ "$GITHUB_EVENT_NAME" != "push" ]; then' in fast
-    assert "needs: [fast-gate]" in fast
-    assert 'run: test "$FAST_GATE" = success' in fast
+    assert "needs: [fast-gate, full-shards]" in fast
+    assert 'test "$FAST_GATE" = success' in fast
+    assert 'test "$FULL_SHARDS" = success' in fast
+    assert "scripts/ci_full_shards.py" in fast
+    assert "Native full pytest shard" in fast
+    assert "Recheck all native collected tests" in fast
+    assert "Run process-sensitive tests in singleton native pytest processes" in fast
 
 
 def test_full_regression_remains_daily_and_manual_without_pr_cancellation() -> None:

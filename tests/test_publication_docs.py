@@ -627,9 +627,10 @@ def test_ci_and_dev_check_enforce_current_ruff_gate() -> None:
     assert "make typecheck" in gate_block
     assert "continue-on-error" not in gate_block
     convergence = workflow.split("  qualification-convergence:", 1)[1]
-    assert "needs: [fast-gate]" in convergence
+    assert "needs: [fast-gate, full-shards]" in convergence
     assert "FAST_GATE:" in convergence
     assert 'test "$FAST_GATE" = success' in convergence
+    assert 'test "$FULL_SHARDS" = success' in convergence
 
     nightly = _text(".github/workflows/full-qualification.yml")
     debt_marker = "      - name: Enforce configured Ruff and zero complexity debt\n"

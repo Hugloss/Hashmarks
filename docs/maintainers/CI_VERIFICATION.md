@@ -77,6 +77,30 @@ full suite is intentionally the safe answer. Optimize real producers, fixtures
 and qualification before weakening a fallback. The nightly workflow is not
 permission to claim unverified test coverage in a PR.
 
+## Exact native full-suite parallelism
+
+For a PR whose selection is `full`, external CI first asks **native pytest**
+for every collected node ID, including parametrized cases. The development
+handoff partitions those exact IDs across four GitHub-hosted runners, retaining
+whole test-file fixture groups where possible. Hashmarks' existing repository
+isolation inventory names tests that run in their own independent pytest
+process; those node IDs are excluded from ordinary file selectors. The plan
+records the candidate Git SHA, native collection identity, every shard's
+membership, and a deterministic identity.
+
+Every runner re-collects native pytest before execution and rejects any
+mismatch with the artifact. No missing, duplicate or unknown collected item
+can be accepted as green. GitHub Actions groups workers and starts ordinary
+`python -m pytest` executions; Hashmarks has no worker or result authority.
+All four runners must pass for `Qualification convergence` to succeed.
+If the initial native collection cannot be qualified, the development gate
+**falls back to its existing unsharded full pytest**. A later shard membership
+mismatch fails closed, never silently downgrading or skipping tests.
+
+Focused source-only and documentation PRs retain the one-runner fast path.
+Nightly and exact-release qualification remain independent and unchanged.
+The matrix's potential wall-time benefit must be measured rather than assumed.
+
 ## Follow-up optimization
 
 Profile the expensive backend workflow fixtures and benchmark specimens. Split
