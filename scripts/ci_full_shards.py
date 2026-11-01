@@ -45,16 +45,8 @@ def _prior_duration(path: object, duration: object) -> tuple[str, int]:
     return path, duration
 
 
-def _load_duration_priors() -> tuple[int, int, dict[str, int]]:
-    packet = json.loads(_PRIOR_PATH.read_text(encoding="utf-8"))
-    if not isinstance(packet, dict) or packet.get("schema") != _PRIOR_SCHEMA:
-        raise ValueError("unsupported development CI duration reference")
-    fallback = packet.get("fallback_ms_per_native_node")
-    isolated = packet.get("singleton_process_ms")
-    if type(fallback) is not int or not 1 <= fallback <= 1_000:
-        raise ValueError("invalid fallback test duration cost")
-    if type(isolated) is not int or not 1 <= isolated <= 120_000:
-        raise ValueError("invalid singleton process cost")
+def _duration_samples(packet: Mapping[str, object]) -> dict[str, int]:
+    """Admit only unambiguous source-file duration observations."""
     hints: dict[str, int] = {}
     for section in ("observed_phase_ms", "historical_lower_bound_ms"):
         rows = packet.get(section)
@@ -67,7 +59,20 @@ def _load_duration_priors() -> tuple[int, int, dict[str, int]]:
             hints[name] = ms
     if not hints:
         raise ValueError("empty development CI duration sample")
-    return fallback, isolated, hints
+    return hints
+
+
+def _load_duration_priors() -> tuple[int, int, dict[str, int]]:
+    packet = json.loads(_PRIOR_PATH.read_text(encoding="utf-8"))
+    if not isinstance(packet, dict) or packet.get("schema") != _PRIOR_SCHEMA:
+        raise ValueError("unsupported development CI duration reference")
+    fallback = packet.get("fallback_ms_per_native_node")
+    isolated = packet.get("singleton_process_ms")
+    if type(fallback) is not int or not 1 <= fallback <= 1_000:
+        raise ValueError("invalid fallback test duration cost")
+    if type(isolated) is not int or not 1 <= isolated <= 120_000:
+        raise ValueError("invalid singleton process cost")
+    return fallback, isolated, _duration_samples(packet)
 
 
 _NODE_COST_MS, _SINGLETON_COST_MS, _OBSERVED_FILE_MS = _load_duration_priors()
