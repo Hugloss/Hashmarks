@@ -1275,9 +1275,7 @@ def observed_batch_reports(
 
 
 def test_aggregate_admits_disjoint_bounded_reports_and_preserves_namespaces(
-    observed_batch_reports: tuple[
-        tuple[Path, dict[str, Path]], tuple[str, str, str]
-    ],
+    observed_batch_reports: tuple[tuple[Path, dict[str, Path]], tuple[str, str, str]],
     tmp_path: Path,
 ) -> None:
     from scripts.repository_evaluation.aggregate_backend import aggregate_backend
@@ -1310,9 +1308,7 @@ def test_aggregate_admits_disjoint_bounded_reports_and_preserves_namespaces(
 
 @pytest.mark.parametrize("reverse", [False, True])
 def test_aggregate_overlapping_batches_cannot_choose_a_winner(
-    observed_batch_reports: tuple[
-        tuple[Path, dict[str, Path]], tuple[str, str, str]
-    ],
+    observed_batch_reports: tuple[tuple[Path, dict[str, Path]], tuple[str, str, str]],
     tmp_path: Path,
     reverse: bool,
 ) -> None:
