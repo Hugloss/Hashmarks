@@ -618,7 +618,9 @@ def test_public_docs_expose_bounded_mcp_integration_and_apache_license() -> None
 
 def test_ci_and_dev_check_enforce_current_ruff_gate() -> None:
     workflow = _text(".github/workflows/ci.yml")
-    marker = "      - name: Validate dependency, formatting, static and typing authority\n"
+    marker = (
+        "      - name: Validate dependency, formatting, static and typing authority\n"
+    )
     assert marker in workflow
     gate_block = workflow.split(marker, 1)[1].split("      - name:", 1)[0]
     assert "make lint" in gate_block
