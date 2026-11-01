@@ -1,5 +1,7 @@
 # Hashmarks — Repository intelligence and a local MCP server for coding agents
 
+[![CI](https://github.com/Hugloss/Hashmarks/actions/workflows/ci.yml/badge.svg)](https://github.com/Hugloss/Hashmarks/actions/workflows/ci.yml)
+
 **Give AI coding agents a fast, local map of a codebase before they start reading everything.**
 
 Hashmarks is **local repository intelligence** and a read-only **Model Context Protocol (MCP) server for coding agents**. It provides **codebase search for agents**, repository context, code navigation, symbols and references, code ownership, dependency relationships, **change impact analysis**, freshness, and verification evidence from the repository itself.
@@ -20,6 +22,48 @@ curl -fsSL https://github.com/Hugloss/Hashmarks/releases/latest/download/install
 The installer downloads checksum-verified, self-contained release bytes from GitHub Releases. The target machine does not need Python, uv, pip, or PyPI access.
 
 For source-development bootstrap only, the repository-maintained script remains available at `https://raw.githubusercontent.com/Hugloss/Hashmarks/main/install.sh`; end-user installs should use the published release installer above.
+
+
+## Engineering properties
+
+Hashmarks is designed as repository-evidence infrastructure rather than an
+agent runtime:
+
+- **Local and read-only.** Analysis runs against repository bytes and supported metadata; Hashmarks does not choose edits or execute repository commands.
+- **Freshness-aware.** Evidence is bound to repository generations and reports current, stale, unknown and incomplete states explicitly.
+- **Bounded retrieval.** Tools return task-local paths, symbols, relationships, source ranges and verification evidence instead of requiring a whole-repository context load.
+- **Explicit authority.** Canonical identity, derived CodeMap intelligence and consumer decisions remain separate owners.
+- **Rebuildable state.** The CodeMap is derived local state; caches and watchers can accelerate observation but cannot manufacture freshness.
+- **Multiple integration surfaces.** The same repository-intelligence model is available through the CLI, Python API and local stdio MCP server.
+
+## Qualification evidence
+
+Qualification records are scoped to exact source, workloads and checks. They
+do not turn a stress result into a universal performance or correctness
+guarantee.
+
+- MCP concurrency hardening completed 11,520/11,520 calls with zero exceptions across 16 reader processes and 240 live repository writes. The retry remained limited to already-classified recomputable races and did not return stale fallbacks ([PR #271](https://github.com/Hugloss/Hashmarks/pull/271)).
+- A qualification and test optimization retained the complete selected corpus—5,418 passed with zero skips or warnings—while one comparable serial run changed from 457.08 to 374.60 seconds and setup from 131.12 to 44.11 seconds. An 8,192-file SQLite benchmark changed from 311.30 to 23.71 ms with identical result and counter checksums ([PR #441](https://github.com/Hugloss/Hashmarks/pull/441)).
+- External agent campaigns, scoring and experimental reports remain owned by [EvalShot](https://github.com/Hugloss/EvalShot); Hashmarks supplies the subject and repository evidence, not its own evaluation verdict.
+
+
+## Related projects and ownership
+
+Hashmarks is the repository-intelligence owner in a deliberately separated
+toolchain. It can be used on its own; the neighboring projects consume or
+evaluate its evidence without moving their responsibilities into Hashmarks.
+
+| Project | Owns | Does not own |
+| --- | --- | --- |
+| **Hashmarks** | Local repository facts, identity, relationships, freshness, impact and verification evidence | Reasoning, edits, command execution, retries or final policy decisions |
+| [OH-Goon](https://github.com/oh-goon/oh-goon) | Declared workflow admission, supervised execution, durable Run/Game Tape evidence and recovery | A second repository-identity or repository-intelligence implementation |
+| [Agents Cookbook](https://github.com/Hugloss/agentsCookbook) | Portable review and investigation methods, thin agent roles and optional flows | Repository indexing, execution or persistent runtime state |
+| [EvalShot](https://github.com/Hugloss/EvalShot) | Frozen evaluation suites, adapters, independent oracles, scoring and reports | Product-owned repository facts or execution authority |
+
+OH-Goon is one first-party consumer, not a required host for public
+Hashmarks use. EvalShot owns comparative campaigns, while Agents Cookbook
+can teach an agent how to investigate evidence; neither changes the
+read-only product boundary.
 
 ### Update awareness and explicit upgrades
 
@@ -249,7 +293,8 @@ For the complete tool schemas, freshness behavior, concurrency guarantees, and h
 | Structural locality | Exact-symbol call/caller closure, forwarding shape, context/file fan-out, verifier paths, ambiguity and pre/post structural deltas without refactor policy |
 | Content identity | Canonical file, directory, manifest, and repository identities |
 | Interchange | Strict producer/consumer contracts, provenance, validation, and conformance surfaces |
-| Evidence bindings | Opaque consumer bindings to exact line/member evidence, declared dependencies, relationship evidence, deltas, and change coverage |\n| Evidence correlation | Request-scoped external/derived anchors correlated to repository paths, symbols, source equivalence, relationships, and before/after deltas |
+| Evidence bindings | Opaque consumer bindings to exact line/member evidence, declared dependencies, relationship evidence, deltas, and change coverage |
+| Evidence correlation | Request-scoped external/derived anchors correlated to repository paths, symbols, source equivalence, relationships, and before/after deltas |
 | Repository declarations | Explicitly correlated conceptual declarations distributed across files/formats, with exact evidence, normalized equality/difference, ambiguity, coverage-qualified absence, identity, and factual deltas |
 
 Built-in lightweight structural parsing covers Python, JavaScript/TypeScript, Go, and Rust. Optional Tree-sitter range enrichment can add precise symbol ranges for additional languages when available. Native/project evidence can also be imported from supported adapters and SCIP.
