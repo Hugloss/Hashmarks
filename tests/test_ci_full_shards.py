@@ -19,8 +19,7 @@ def native_repository(tmp_path: Path) -> Path:
         "def test_standard():\n    assert True\n", encoding="utf-8"
     )
     (tests / "test_b.py").write_text(
-        "def test_sensitive():\n    assert True\n"
-        "def test_other():\n    assert True\n",
+        "def test_sensitive():\n    assert True\ndef test_other():\n    assert True\n",
         encoding="utf-8",
     )
     (tests / "test_c.py").write_text(
@@ -116,9 +115,7 @@ def test_rechecked_native_membership_rejects_drift(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
-    plan = handoff._build_plan(
-        native_repository, collected, isolated=(), shard_count=2
-    )
+    plan = handoff._build_plan(native_repository, collected, isolated=(), shard_count=2)
     manifest = tmp_path / "plan.json"
     manifest.write_text(json.dumps(plan), encoding="utf-8")
     monkeypatch.setattr(handoff, "_native_collection", lambda: collected)

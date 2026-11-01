@@ -92,9 +92,7 @@ def _least_loaded(shards: list[dict[str, Any]]) -> dict[str, Any]:
     return min(shards, key=lambda item: (item["weight"], item["index"]))
 
 
-def _group_native_members(
-    root: Path, nodeids: Sequence[str]
-) -> dict[str, list[str]]:
+def _group_native_members(root: Path, nodeids: Sequence[str]) -> dict[str, list[str]]:
     grouped: dict[str, list[str]] = {}
     for nodeid in nodeids:
         path = _test_file(root, nodeid)
@@ -102,9 +100,7 @@ def _group_native_members(
     return grouped
 
 
-def _admit_isolation(
-    nodeids: Sequence[str], isolated: Sequence[str]
-) -> set[str]:
+def _admit_isolation(nodeids: Sequence[str], isolated: Sequence[str]) -> set[str]:
     required = set(isolated)
     observed = {
         _test_function(nodeid)
@@ -148,9 +144,7 @@ def _assign_singletons(
         shard["weight"] += 10
 
 
-def _validate_and_sort(
-    shards: list[dict[str, Any]], nodeids: Sequence[str]
-) -> None:
+def _validate_and_sort(shards: list[dict[str, Any]], nodeids: Sequence[str]) -> None:
     assigned = [nodeid for shard in shards for nodeid in shard["native_nodeids"]]
     if sorted(assigned) != sorted(nodeids):
         raise ValueError("full-suite sharding lost or duplicated native members")
