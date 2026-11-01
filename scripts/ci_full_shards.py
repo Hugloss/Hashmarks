@@ -320,9 +320,7 @@ def pytest_collection_finish(session: pytest.Session) -> None:
     )
 
 
-def _accumulate_phase(
-    samples: dict[str, float], nodeid: str, duration: float
-) -> None:
+def _accumulate_phase(samples: dict[str, float], nodeid: str, duration: float) -> None:
     path = nodeid.split("::", 1)[0]
     samples[path] = samples.get(path, 0.0) + duration
 
@@ -340,8 +338,7 @@ def _duration_profile(samples: Mapping[str, float]) -> dict[str, object]:
         "candidate_sha": _git_head(Path.cwd()),
         "measurement": "pytest-phase-runtime-diagnostics-only",
         "file_seconds": {
-            path: round(seconds, 3)
-            for path, seconds in sorted(samples.items())
+            path: round(seconds, 3) for path, seconds in sorted(samples.items())
         },
     }
 
@@ -354,7 +351,8 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     destination = Path(raw)
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(
-        json.dumps(_duration_profile(_DURATION_BY_FILE), indent=2, sort_keys=True) + "\n",
+        json.dumps(_duration_profile(_DURATION_BY_FILE), indent=2, sort_keys=True)
+        + "\n",
         encoding="utf-8",
     )
     ranked = sorted(_DURATION_BY_FILE.items(), key=lambda row: (-row[1], row[0]))
