@@ -63,6 +63,49 @@ The exact member source observation is now also exposed through the existing
 read-only `source_observation` MCP tool. This is transport over the same CodeMap
 owner; it adds no independent index or execution backend.
 
+## Content kind and Git LFS observations
+
+The existing `source.observe(path)` result also carries `content` metadata from
+the same bounded, admitted member bytes. It describes text, binary data, a
+recognized Git LFS pointer, or an unavailable observation. It does not disclose
+binary payloads or make binary members eligible for textual occurrence queries.
+Member identity, visibility, freshness and byte limits retain their existing
+Source authority.
+
+The outer `availability` field still describes textual observation. A binary
+member can therefore have `availability="unsupported"` while
+`content.state="observed"` and `content.source_member.state="known-present"`.
+Consumers of content metadata use those content/member qualifications; they do
+not treat textual unavailability as missing binary bytes.
+
+For recognized image signatures, the media type is an observation of the
+captured bytes. It is not a full image-decoding, integrity or safety claim.
+Filename extensions and repository roles remain separate evidence: an image
+can be application data, a test fixture or documentation.
+
+Supported signature observations cover PNG, JPEG, GIF, WebP, PDF, ZIP and gzip.
+An unrecognized signature leaves `media_type` unset. No decoder runs and
+`integrity` remains `not-validated`, including when a header is recognizable.
+
+A recognized LFS pointer retains the declared object identifier and size while
+explicitly reporting that the object bytes were not observed. Those declarations
+do not replace the canonical revision of the pointer file. Hashmarks does not
+download an object, execute Git filters or change the checkout. Observation of
+hydrated image bytes describes those actual bytes instead; a pointer and its
+object are not silently treated as the same source member.
+
+Pointer interpretation supports the canonical three-line Git LFS v1 form with
+LF line endings, a lowercase SHA-256 object identifier and a decimal size.
+Pointer-like bytes outside that form retain an unavailable, unsupported-syntax
+qualification instead of becoming image or object evidence. The observed
+`byte_count` is the pointer file's byte count; `lfs.size` is the separately
+declared object size.
+
+This is repository evidence only. Consumers retain image-quality requirements,
+asset size policy, storage selection and any decision to execute or omit checks.
+For supported asset-consumer observations in a changed set, see
+[Changed-set verification evidence](CHANGED_SET_VERIFICATION.md).
+
 ## Optional contextual match excerpts (Hermes harness borrowing)
 
 Hermes's `search_files` can return source context around matching lines. Hashmarks

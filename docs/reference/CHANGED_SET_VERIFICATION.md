@@ -28,7 +28,7 @@ new root alias, CLI command or MCP tool for this component operation.
 
 | Field | Meaning |
 | --- | --- |
-| `changes` | Per-path canonical source observation, source-qualified role, project/workspace context, existing relevance and explanation, qualified relationships and consumer-scope qualifications. |
+| `changes` | Per-path canonical source observation, source-qualified role, project/workspace context, existing relevance and explanation, qualified relationships, optional asset observations and consumer-scope qualifications. |
 | `targets` | Deduplicated logical verification targets, their canonical command-free nominations, stable member identities and context. An unavailable nomination retains its reason and supplies no membership. |
 | `membership` | Existing `hashmarks.verification-membership.v1` identity for exactly the returned, available logical targets; `null` when none qualify. This is not native collected membership or a complete set of consumers. |
 | `collection` | Optional unchanged observation of a caller-supplied native collection report, through `observe_membership()`. |
@@ -80,6 +80,55 @@ runner collection and runtime configuration selection are not inferred. The
 packet preserves unknown consumer coverage and observed unsupported features.
 Ordinary imported factories/helpers reuse import evidence; structurally proven
 repository file reads reuse the existing literal-read owner.
+
+## Repository assets
+
+For an observed asset, `changes[i]["asset"]` describes its content kind,
+repository roles and supported references from other repository members.
+Content metadata comes from the existing Source observer. Consumer candidates
+reuse the maintained repository index and supporting members are bound to their
+canonical source revisions; this does not add another repository walk, index or
+persistent asset graph.
+
+Refresh the existing index with `repository.index.sync()` before a new
+observation when files may have been added. Opening a retained CodeMap alone
+does not rediscover new consumers. The changed-set operation rechecks its
+known supporting members; it does not introduce an implicit repository scan
+to turn an old candidate inventory into complete consumer coverage.
+
+Qualified consumer relationships remain distinct from literal occurrences that
+have not been established as a read or link. A reference from a Markdown document,
+an application file and a test fixture have different repository roles. A
+documentation directory or image extension does not establish that an asset has
+only documentation consumers. The evidence preserves unknown dynamic consumers,
+unsupported reference forms and projection bounds.
+
+Candidate discovery intersects indexed lexical tokens from the asset basename.
+Within those candidates, the supported positive syntax is a local relative
+inline Markdown image/link or an unshadowed, repository-root-qualified literal
+`pathlib` read. Unsupported reference syntax and ordinary mentions can remain
+`literal-only`; computed paths, dynamic loaders and files outside the maintained
+index are not an exhaustively observed consumer set.
+
+The asset packet reports its actual limits: currently 64 candidate members,
+64 returned references, 1 MiB per supporting member and 4 MiB of supporting
+source bytes. `source_coverage` qualifies the selected source observations, not
+the entire repository. A missing, denied, unreadable or oversized candidate
+marks that coverage incomplete; candidate, byte and result bounds remain
+explicit. Even complete selected-source coverage leaves global consumer
+`completeness` unknown.
+
+The asset projection has no `safe_to_skip` or merge decision. Empty or exclusively
+documentation-shaped returned references do not prove complete absence of other
+consumers. `negative_evidence_admissible` remains false, and incomplete or unknown
+coverage cannot be promoted to a repository-wide negative claim. A consumer may
+apply its own explicit, bounded documentation policy, but must retain the
+producer's qualifications instead of presenting that policy as exhaustive proof.
+
+LFS pointer declarations remain distinct from observed object bytes. Hashmarks
+never hydrates missing objects or invokes checkout filters while classifying an
+asset. A missing, denied, oversized or stale source remains qualified as such;
+it cannot acquire image authority from its filename.
 
 ## Workspace context
 
@@ -156,3 +205,9 @@ before syntax interpretation. The supported Python component method serves
 this distinct consumer responsibility; MCP promotion is not part of this change.
 Execution, sufficiency, outcomes, certification, Git lifecycle and OH-Goon
 workflow policy remain explicit non-goals.
+
+**OBSERVER extension:** content kind, LFS declarations and supported asset
+references describe captured repository material. Source owns the byte facts;
+the existing verification composition owns their consumer projection. No
+OH-Goon filename, documentation exemption, image-decoding policy or execution
+decision is part of the reusable producer contract.

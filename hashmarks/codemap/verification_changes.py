@@ -27,6 +27,7 @@ from .decision_session import (
 )
 from .query_router import normalize_task_query
 from .repository_observation import evidence_identity
+from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
 from .verification_relevance_model import VerificationRequest
 
 if TYPE_CHECKING:
@@ -73,21 +74,25 @@ def _consumer_scope(
     relevance: Mapping[str, object],
     support: Mapping[str, object],
     context: Mapping[str, object],
+    asset: Mapping[str, object] | None,
 ) -> dict[str, object]:
     candidates = _records(relevance.get("candidates"))
     count = relevance.get("candidate_count")
     omitted = max(0, count - len(candidates)) if type(count) is int else 0
     bounded = relevance.get("completeness") == "incomplete"
+    asset_scope = cast("Mapping[str, object]", asset["consumer_scope"]) if asset else {}
     truncated = (
         bounded
         or bool(omitted)
         or support.get("truncated") is True
         or context.get("truncation") == "truncated"
+        or asset_scope.get("truncated") is True
     )
     incomplete = (
         truncated
         or support.get("completeness") == "incomplete"
         or context.get("completeness") == "incomplete"
+        or asset_scope.get("completeness") == "incomplete"
     )
     return {
         "completeness": "incomplete" if incomplete else "unknown",
@@ -105,6 +110,7 @@ def _consumer_scope(
             *cast("list[str]", relevance.get("search_bound_reasons", [])),
             *cast("list[str]", support.get("reasons", [])),
             *cast("list[str]", context.get("reasons", [])),
+            *cast("list[str]", asset_scope.get("reasons", [])),
         ],
     }
 
@@ -228,7 +234,9 @@ class VerificationChangesMixin:
         if TYPE_CHECKING:
             self = cast("RepositoryVerification", self)
         self.source.ensure_current(path)
-        source = self.source.observe(path)
+        source = self.source.observe(
+            path, max_bytes=VERIFICATION_RELEVANCE_DEFAULTS.source_member_bytes
+        )
         classification = self._verification_path_kind(path)
         context = self._verification_context(path)
         member = cast("Mapping[str, object]", source["member"])
@@ -240,6 +248,7 @@ class VerificationChangesMixin:
         support = self._verification_support_scope(path, limit=limit)
         relationships = self._changed_relationships(path, classification, relevance)
         relationships.extend(_records(support.get("relationships")))
+        asset = self._asset_observation(path, source)
         return {
             "path": path,
             "source": source,
@@ -251,7 +260,8 @@ class VerificationChangesMixin:
             else None,
             "support_scope": support,
             "relationships": relationships,
-            "consumer_scope": _consumer_scope(relevance, support, context),
+            "asset": asset,
+            "consumer_scope": _consumer_scope(relevance, support, context, asset),
         }
 
     def _changed_target(self, path: str) -> dict[str, object]:
@@ -285,7 +295,7 @@ class VerificationChangesMixin:
         for change in changes:
             source = cast("Mapping[str, object]", change["source"])
             members.append(dict(cast("Mapping[str, object]", source["member"])))
-            for key in ("classification", "context", "support_scope"):
+            for key in ("classification", "context", "support_scope", "asset"):
                 members.extend(_supporting_members(change.get(key)))
             for relationship in _records(change.get("relationships")):
                 members.extend(_supporting_members(relationship))

@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased
+## 0.34.0 — Repository asset and changed-set evidence
+
+- Observe bounded text/binary content, media signatures and Git LFS pointer declarations through the existing Source member authority. Keep declared object identity distinct from observed pointer bytes without downloading objects or validating image integrity.
+- Compose source-bound asset references from supported Markdown links and literal Python file reads. Preserve literal-only occurrences, repository roles, incomplete source coverage, explicit bounds and unknown dynamic consumers; execution and documentation policy remain external.
+- Use one configured native ECMAScript syntax owner across indexing, Source, verification and TypeScript resolution inputs. Missing or failed syntax remains unavailable without structural tokenizer fallbacks; operation-local reuse retains exact source and provider identity.
 
 - Add a stable package/source-consumer projection and retained requalification through the existing dependency and Source owners. Preserve original bindings, historical inventory scope, current input correspondence, ambiguity, explicit bounds and qualified absence without consumer-side table joins.
 - Translate supplied npm package-lock v2/v3 installation metadata and observe native JavaScript/TypeScript static imports, side effects and re-exports. Preserve aliases, type-only syntax, unsupported workspace/local cases and incomplete runtime/consumer scope without resolving or executing packages.

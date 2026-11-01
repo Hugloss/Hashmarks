@@ -23,6 +23,7 @@ from .python_ast import estimate_tokens
 from .query_primitives import _WORD_RE
 from .repository_observation import evidence_identity, packet_digest
 from .scoped_source_literals import ScopedSourceLiteralsMixin
+from .source_content import source_content_observation
 from .source_ecmascript import SourceEcmascriptMixin
 from .source_line_correspondence import (
     source_line_anchors,
@@ -697,6 +698,7 @@ class RepositorySource(
             "negative_evidence": "not-admissible",
             "authority": "repository-evidence-only",
             "execution_effect": "none",
+            "content": source_content_observation(member, raw),
         }
         self._record_source_context_limits(packet, context_lines, anchor_context_lines)
         if raw is None:
@@ -708,6 +710,7 @@ class RepositorySource(
             operation_schema("source_observation", "member"),
             {
                 "member": member,
+                "content": packet["content"],
                 "literal_query": literal,
                 "source_shape": packet["source_shape"],
                 "requested_lines": requested,

@@ -20,6 +20,7 @@ from .query_primitives import _TASK_STOPWORDS, _query_terms
 from .repository_domains import RepositoryDomain, classify_repository_path
 from .repository_observation import evidence_identity
 from .task_evidence_contract import read_task_candidate
+from .verification_assets import VerificationAssetsMixin
 from .verification_changes import VerificationChangesMixin
 from .verification_context import VerificationContextMixin
 from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
@@ -107,6 +108,7 @@ class _VerificationRelevanceState:
 
 
 class RepositoryVerification(
+    VerificationAssetsMixin,
     VerificationChangesMixin,
     VerificationContextMixin,
     VerificationSupportMixin,
