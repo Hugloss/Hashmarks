@@ -404,6 +404,14 @@ def test_shell_indirection_uses_only_prior_top_level_single_atoms(
         ("RUNNER := python\nRUNNER := other\nall:\n\t$(RUNNER) arg\n", True),
         ("A = $(B)\nB = $(A)\nall:\n\t$(A) arg\n", True),
         ("RUNNER := python\ninclude override.mk\nall:\n\t$(RUNNER) arg\n", True),
+        (
+            "RUNNER := python\nSIDE := $(eval RUNNER := evil)\nall:\n\t$(RUNNER) arg\n",
+            True,
+        ),
+        (
+            "RUNNER=python\nmutate() { RUNNER=evil; }\n\"$RUNNER\" arg\n",
+            False,
+        ),
         ("RUNNER ?= python\nall:\n\t$(RUNNER) arg\n", True),
         ("RUNNER := python\nall: RUNNER=other\n\t$(RUNNER) arg\n", True),
     ],
