@@ -469,8 +469,14 @@ def test_fast_ci_remains_a_native_pytest_gate() -> None:
     assert "  pull_request:" in fast
     assert "  merge_group:" in fast
     assert "name: Qualification convergence" in fast
-    assert "make lint" in fast and "make typecheck" in fast
-    assert "scripts/ci_verification.py" in fast
+    static_gate = fast.split("  static-gate:\n", 1)[1].split("  fast-gate:\n", 1)[0]
+    native_gate = fast.split("  fast-gate:\n", 1)[1].split("  full-shards:\n", 1)[0]
+    assert "make lint" in static_gate and "make typecheck" in static_gate
+    assert "make artifact-check" in static_gate
+    assert "mcp_installed_artifact_smoke.py" in static_gate
+    assert "make lint" not in native_gate and "make typecheck" not in native_gate
+    assert "uv sync --frozen --group test --extra mcp" in native_gate
+    assert "scripts/ci_verification.py" in native_gate
     assert "python -m pytest -q" in fast
     assert "Prove selector behavior against actual CodeMap before broad pytest" in fast
     early = fast.index(
@@ -489,7 +495,9 @@ def test_fast_ci_remains_a_native_pytest_gate() -> None:
     assert "make artifact-check" in fast
     assert "mcp_installed_artifact_smoke.py" in fast
     assert 'if [ "$GITHUB_EVENT_NAME" != "push" ]; then' in fast
-    assert "needs: [fast-gate, full-shards]" in fast
+    assert "needs: [static-gate, fast-gate, full-shards]" in fast
+    assert "STATIC_GATE:" in fast
+    assert 'test "$STATIC_GATE" = success' in fast
     assert 'test "$FAST_GATE" = success' in fast
     assert 'test "$FULL_SHARDS" = success' in fast
     assert "scripts/ci_full_shards.py" in fast

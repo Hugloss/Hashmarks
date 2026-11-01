@@ -14,14 +14,10 @@ permissions:
   contents: read
 
 jobs:
-  fast-gate:
-    name: Relevant verification and native smoke
-    outputs:
-      full_sharded: ${{ steps.admission.outputs.mode == 'full' && steps.full_membership.outcome == 'success' }}
+  static-gate:
+    name: Locked static checks and installed artifact smoke
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    env:
-      BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -50,6 +46,39 @@ jobs:
           if ! git diff --quiet "$PR_BASE_SHA" HEAD -- .github/release-request.toml; then
             python3 scripts/release_contract.py validate-release-candidate --base-ref "$PR_BASE_SHA"
           fi
+      - name: Prove installed wheel and sdist remain usable
+        run: make artifact-check ARTIFACT_PYTHON=3.11
+      - name: Smoke a real installed wheel through the official MCP SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          uv build --wheel --out-dir dist
+          uv venv --python 3.11 "$RUNNER_TEMP/mcp-venv"
+          wheel="$(find dist -maxdepth 1 -type f -name '*.whl' -print -quit)"
+          test -n "$wheel"
+          uv pip install --python "$RUNNER_TEMP/mcp-venv/bin/python" "$wheel" "mcp==2.2.0"
+          "$RUNNER_TEMP/mcp-venv/bin/python" -I scripts/mcp_installed_artifact_smoke.py \
+            --hashmarks "$RUNNER_TEMP/mcp-venv/bin/hashmarks"
+
+  fast-gate:
+    name: Relevant pytest and full-suite admission
+    outputs:
+      full_sharded: ${{ steps.admission.outputs.mode == 'full' && steps.full_membership.outcome == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          enable-cache: true
+      - run: uv python install 3.11
+      - name: Install locked native verification toolchain
+        run: uv sync --frozen --group test --extra mcp --python 3.11
       - name: Prove selector behavior against actual CodeMap before broad pytest
         run: uv run --frozen --offline --no-sync --group test python -m pytest -q tests/test_ci_verification.py
       - name: Admit candidate-scoped Hashmarks test membership
@@ -105,19 +134,6 @@ jobs:
           xargs -0 -r uv run --frozen --offline --no-sync --group test \
             python -m pytest -q --maxfail=1 --durations=10 \
             < "$RUNNER_TEMP/hashmarks-ci-paths.nul"
-      - name: Prove installed wheel and sdist remain usable
-        run: make artifact-check ARTIFACT_PYTHON=3.11
-      - name: Smoke a real installed wheel through the official MCP SDK
-        shell: bash
-        run: |
-          set -euo pipefail
-          uv build --wheel --out-dir dist
-          uv venv --python 3.11 "$RUNNER_TEMP/mcp-venv"
-          wheel="$(find dist -maxdepth 1 -type f -name '*.whl' -print -quit)"
-          test -n "$wheel"
-          uv pip install --python "$RUNNER_TEMP/mcp-venv/bin/python" "$wheel" "mcp==2.2.0"
-          "$RUNNER_TEMP/mcp-venv/bin/python" -I scripts/mcp_installed_artifact_smoke.py \
-            --hashmarks "$RUNNER_TEMP/mcp-venv/bin/hashmarks"
       - name: Preserve selection evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -194,16 +210,18 @@ jobs:
   qualification-convergence:
     name: Qualification convergence
     if: always()
-    needs: [fast-gate, full-shards]
+    needs: [static-gate, fast-gate, full-shards]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: Require every mandatory verification stage
         env:
+          STATIC_GATE: ${{ needs.static-gate.result }}
           FAST_GATE: ${{ needs.fast-gate.result }}
           FULL_SHARDED: ${{ needs.fast-gate.outputs.full_sharded }}
           FULL_SHARDS: ${{ needs.full-shards.result }}
         run: |
+          test "$STATIC_GATE" = success
           test "$FAST_GATE" = success
           if [ "$FULL_SHARDED" = true ]; then
             test "$FULL_SHARDS" = success
