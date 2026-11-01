@@ -643,3 +643,46 @@ def test_projection_presentation_rejects_malformed_native_collections(
     packet[field] = ["malformed"]
     with pytest.raises(ValueError, match="malformed"):
         present_repository_evidence(packet)
+
+
+def test_complete_inventory_does_not_strengthen_other_projection_domains(
+    repository: CodeMap,
+) -> None:
+    snapshot = _snapshot(repository.workspace)
+    for coverage in assert_records(snapshot["coverage"]):
+        if coverage["kind"] == "module-ownership":
+            coverage["completeness"] = "incomplete"
+        elif coverage["kind"] == "resolution-graph":
+            coverage["completeness"] = "unknown"
+    observation = repository.dependencies.observe(snapshot)
+    packet = repository.dependencies.projection(observation, packages=_ABSENT)
+    package = assert_records(packet["packages"])[0]
+
+    assert packet["completeness"] == "incomplete"
+    assert packet["negative_evidence"] == "not-admissible"
+    assert packet["observation"] == observation
+    assert _consumer(packet)["state"] == "not-requested"
+    inventory = assert_records(package["contexts"])[0]
+    assert inventory["completeness"] == "complete"
+    assert inventory["membership"] == "absent"
+    assert inventory["negative_evidence"] == "admissible-within-declared-scope"
+    current = assert_records(package["current_inventory"])[0]
+    assert current["membership"] == "absent"
+    assert current["negative_evidence"] == "admissible-within-declared-scope"
+
+    presentation = present_repository_evidence(packet, format="structured")
+    findings = {
+        str(row["kind"]): row
+        for row in _findings(presentation)
+        if row["kind"] in {"relationships", "module_ownership"}
+    }
+    assert set(findings) == {"relationships", "module_ownership"}
+    for finding in findings.values():
+        context = assert_object(finding["source_context"])
+        assert context["completeness"] == "incomplete"
+        coverage_by_kind = {
+            str(row["kind"]): row["completeness"]
+            for row in assert_records(context["coverage"])
+        }
+        assert coverage_by_kind["module-ownership"] == "incomplete"
+        assert coverage_by_kind["resolution-graph"] == "unknown"

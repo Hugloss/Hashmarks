@@ -99,6 +99,11 @@ does not prove that a package is currently installed, importable or executable.
 The overall packet always has `negative_evidence: not-admissible`; qualified
 absence belongs to the individual inventory context.
 
+Aggregate projection `completeness` stays `incomplete`. Complete inventory
+coverage does not establish complete graph, module-ownership or consumer
+coverage, including when no source paths were requested. Each canonical domain
+retains its own completeness qualification in every presentation format.
+
 Exact scoped input correspondence and whole-repository identity are independent.
 For example, an unrelated Git commit may change the repository identity while the
 explicit lockfile bytes remain unchanged. Scoped inventory correspondence can

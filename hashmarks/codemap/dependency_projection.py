@@ -449,15 +449,9 @@ class DependencyProjectionMixin:
                 "current_binding": binding,
                 "binding_state": "current" if binding_current else "stale",
             },
-            "completeness": "complete"
-            if not request.source_paths
-            and _inputs_current(assessment)
-            and all(
-                row["completeness"] == "complete"
-                for package in packages
-                for row in cast("Sequence[Mapping[str, object]]", package["contexts"])
-            )
-            else "incomplete",
+            # Inventory coverage never qualifies the graph, module owners or the
+            # consumer universe. Keep completeness on each canonical domain.
+            "completeness": "incomplete",
             "truncation": "truncated"
             if consumers["omitted_node_count"]
             or any(row["truncation"] == "truncated" for row in packages)
