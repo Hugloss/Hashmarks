@@ -23,27 +23,59 @@ import pytest
 
 from hashmarks._development.test_shards import ISOLATED_NODEIDS
 
-SCHEMA = "hashmarks.ci-native-full-shards.v2"
+SCHEMA = "hashmarks.ci-native-full-shards.v3"
 SHARD_COUNT = 4
 
-# Development CI cost *estimates*, not product evidence or guaranteed timings.
-# Three genuine Ubuntu runner profiles (41315277100, 41315915103,
-# 41316522630) show these modules dominate the critical path. Values are
-# conservative reservations informed by repeated slowest-phase observations;
-# pytest does not report a complete per-file runtime in those logs.
-# Keep weights explicit and reviewed. A new/unknown file uses node-count cost.
-_NODE_COST_MS = 40
-_SINGLETON_COST_MS = 3_000
-_HOT_FILE_EXTRA_MS = {
-    "tests/test_backend_evaluation_workflows.py": 50_000,
-    "tests/test_backend_source_workflow.py": 16_000,
-    "tests/test_backend_structural_workflow.py": 15_000,
-    "tests/test_backend_runtime_workflow.py": 16_000,
-    "tests/test_repository_observation_cli.py": 10_000,
-    "tests/test_native_evidence_transport.py": 9_000,
-    "tests/test_extended_adversarial_authority.py": 9_000,
-    "tests/test_backend_declaration_transport.py": 4_000,
-}
+# Frozen developer-only duration reference, reviewed and source-bound by Git.
+# It changes ONLY external CI allocation. Native pytest controls all membership.
+_PRIOR_SCHEMA = "hashmarks.ci-native-duration-priors.v1"
+_PRIOR_PATH = Path(__file__).with_name("ci_shard_duration_priors.json")
+
+
+def _prior_duration(path: object, duration: object) -> tuple[str, int]:
+    if (
+        not isinstance(path, str)
+        or not path.startswith("tests/test_")
+        or not path.endswith(".py")
+        or ".." in Path(path).parts
+    ):
+        raise ValueError("invalid development CI duration path")
+    if type(duration) is not int or not 1 <= duration <= 120_000:
+        raise ValueError("invalid development CI duration sample")
+    return path, duration
+
+
+def _duration_samples(packet: Mapping[str, object]) -> dict[str, int]:
+    """Admit only unambiguous source-file duration observations."""
+    hints: dict[str, int] = {}
+    for section in ("observed_phase_ms", "historical_lower_bound_ms"):
+        rows = packet.get(section)
+        if not isinstance(rows, dict):
+            raise ValueError("missing development CI duration section")
+        for path, duration in rows.items():
+            name, ms = _prior_duration(path, duration)
+            if name in hints:
+                raise ValueError("duplicate development CI duration path")
+            hints[name] = ms
+    if not hints:
+        raise ValueError("empty development CI duration sample")
+    return hints
+
+
+def _load_duration_priors() -> tuple[int, int, dict[str, int]]:
+    packet = json.loads(_PRIOR_PATH.read_text(encoding="utf-8"))
+    if not isinstance(packet, dict) or packet.get("schema") != _PRIOR_SCHEMA:
+        raise ValueError("unsupported development CI duration reference")
+    fallback = packet.get("fallback_ms_per_native_node")
+    isolated = packet.get("singleton_process_ms")
+    if type(fallback) is not int or not 1 <= fallback <= 1_000:
+        raise ValueError("invalid fallback test duration cost")
+    if type(isolated) is not int or not 1 <= isolated <= 120_000:
+        raise ValueError("invalid singleton process cost")
+    return fallback, isolated, _duration_samples(packet)
+
+
+_NODE_COST_MS, _SINGLETON_COST_MS, _OBSERVED_FILE_MS = _load_duration_priors()
 
 # Per-file pytest-phase timings are diagnostic-only. Nothing in test membership,
 # plan identity, execution, exit status, or certification reads these samples.
@@ -97,8 +129,8 @@ def _test_function(nodeid: str) -> str:
 
 
 def _weight(path: str, count: int) -> int:
-    """Estimated milliseconds for a test-file group, never a membership rule."""
-    return count * _NODE_COST_MS + _HOT_FILE_EXTRA_MS.get(path, 0)
+    """Cost is a bounded measured prior or conservative unknown-test fallback."""
+    return max(count * _NODE_COST_MS, _OBSERVED_FILE_MS.get(path, 0))
 
 
 def _empty_shards(count: int) -> list[dict[str, Any]]:
@@ -288,22 +320,25 @@ def pytest_collection_finish(session: pytest.Session) -> None:
     )
 
 
+def _accumulate_phase(samples: dict[str, float], nodeid: str, duration: float) -> None:
+    path = nodeid.split("::", 1)[0]
+    samples[path] = samples.get(path, 0.0) + duration
+
+
 def pytest_runtest_logreport(report: pytest.TestReport) -> None:
     """Capture real setup, call and teardown durations without touching results."""
     if not os.environ.get("HASHMARKS_CI_DURATION_REPORT"):
         return
-    path = report.nodeid.split("::", 1)[0]
-    _DURATION_BY_FILE[path] = _DURATION_BY_FILE.get(path, 0.0) + report.duration
+    _accumulate_phase(_DURATION_BY_FILE, report.nodeid, report.duration)
 
 
-def _duration_profile() -> dict[str, object]:
+def _duration_profile(samples: Mapping[str, float]) -> dict[str, object]:
     return {
         "schema": _DURATION_PROFILE_SCHEMA,
         "candidate_sha": _git_head(Path.cwd()),
         "measurement": "pytest-phase-runtime-diagnostics-only",
         "file_seconds": {
-            path: round(seconds, 3)
-            for path, seconds in sorted(_DURATION_BY_FILE.items())
+            path: round(seconds, 3) for path, seconds in sorted(samples.items())
         },
     }
 
@@ -316,7 +351,8 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     destination = Path(raw)
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(
-        json.dumps(_duration_profile(), indent=2, sort_keys=True) + "\n",
+        json.dumps(_duration_profile(_DURATION_BY_FILE), indent=2, sort_keys=True)
+        + "\n",
         encoding="utf-8",
     )
     ranked = sorted(_DURATION_BY_FILE.items(), key=lambda row: (-row[1], row[0]))

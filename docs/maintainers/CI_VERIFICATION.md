@@ -106,14 +106,16 @@ The matrix's potential wall-time benefit must be measured rather than assumed.
 
 ### Duration-aware distribution
 
-The developer-only shard planner uses explicitly reviewed runtime-cost
-reservations from three recent successful CI profiles for repeatedly expensive
-backend workflows, real CLI/MCP transports, and native evidence tests. The
-reservation weights are **estimates**, not measured exact per-file durations
-and not product source/verification authority. Unknown files fall back to
-collected test count; singleton/process-sensitive tests retain dedicated
-pytest processes with their own estimated setup cost. Each planned run records
-per-shard estimated weights for reviewer diagnostics.
+The developer-only shard planner reads one committed duration-prior file,
+`scripts/ci_shard_duration_priors.json`, recording real per-test setup, call
+and teardown phase-time totals from GitHub Actions run 41326163538. It retains
+a small, explicitly labeled historical floor for two files whose first-phase
+measurements were lost to an instrumentation test. Values below one second
+need no individual override; files without measurements use a conservative
+20ms-per-collected-node fallback. Singletons remain in their own native pytest
+processes with a separate estimated startup cost. The plan publishes its
+estimated per-runner allocation but **does not treat time as coverage evidence**.
+The runtime reference is reviewed in Git, not automatically rewritten by CI.
 
 This allocation changes only GitHub Actions worker assignment. Native pytest
 still defines all membership, every selected process proves its exact
@@ -121,9 +123,12 @@ collection, and the four shards must all pass. Do not use empirical time
 weights to skip tests, change completeness, or turn a green subset into release
 certification. The existing pytest plugin also emits a small, diagnostic per-file phase-time
 receipt from the **actual ordinary pytest execution** (no new collection or
-test invocation). GitHub Actions retains these samples with the run, and the
-slowest measured modules are printed for review. This diagnostic output
-does not enter plan identity, test selection, exit status, or certification.
+test invocation). The timing unit test uses its own local dictionary, never
+clearing already-recorded plugin measurements. GitHub Actions retains these
+samples with the run, and the slowest measured modules are printed for review.
+This diagnostic output does not enter test selection, exit status, or
+certification; only deliberately reviewed and committed prior data affects
+the next run's external shard allocation.
 
 Reprofile before changing pinned weights; compare actual
 slowest-shard runtime and end-to-end issue-to-merge time with the prior gate.
