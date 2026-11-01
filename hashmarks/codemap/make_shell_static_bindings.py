@@ -48,7 +48,12 @@ def _source_barrier(facts: Sequence[_Fact]) -> str | None:
             if isinstance(words, list) and words:
                 first = words[0]
                 if isinstance(first, dict) and first.get("literal") in {
-                    ".", "source", "eval", "exec", "declare", "typeset"
+                    ".",
+                    "source",
+                    "eval",
+                    "exec",
+                    "declare",
+                    "typeset",
                 }:
                     return "external-or-dynamic-shell-state"
     return None
@@ -157,11 +162,7 @@ def _evidence(facts: Sequence[_Fact]) -> list[dict[str, object]]:
             "start_line": start,
             "end_line": end,
             "assignment_operator": fact.value.get("assignment_operator", "="),
-            "expression": (
-                fact.value["value_expression"]
-                if isinstance(fact.value["value_expression"], str)
-                else fact.value["value_expression"]["expression"]
-            ),
+            "expression": _expression(fact),
         }
         for (name, start, end), fact in sorted(distinct.items())
     ]
@@ -172,10 +173,7 @@ def _observe_command(
 ) -> dict[str, object]:
     if barrier is not None:
         return {"state": "unclassified", "reason": barrier}
-    if any(
-        not part.startswith("make-recipe:")
-        for part in fact.context
-    ):
+    if any(not part.startswith("make-recipe:") for part in fact.context):
         return {"state": "unclassified", "reason": "non-top-level-or-conditional"}
     words = fact.value.get("words")
     if not isinstance(words, list) or not words:
@@ -185,7 +183,11 @@ def _observe_command(
     for item in words:
         if not isinstance(item, dict):
             return {"state": "unclassified", "reason": "unsupported-command-word"}
-        derived = _command_word(cast("Mapping[str, object]", item), fact=fact, definitions=definitions)
+        derived = _command_word(
+            cast("Mapping[str, object]", item),
+            fact=fact,
+            definitions=definitions,
+        )
         if derived is None:
             return {"state": "unclassified", "reason": "unresolved-word-or-binding"}
         rendered.append(derived[0])
