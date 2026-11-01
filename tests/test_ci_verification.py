@@ -111,7 +111,37 @@ def test_actual_codemap_maps_changed_python_to_real_test(
     root, base = repository
     _change(root, "hashmarks/worker.py", "def compute():\n    return 2\n")
     plan = module.select(root, base)
-    assert plan["mode"] == "focused", plan["reasons"]
+    if plan["mode"] != "focused":
+        from hashmarks.codemap import CodeMap
+
+        with CodeMap(root) as observer:
+            observer.index.sync()
+            graph = observer.tasks.verification_ownership_graph(
+                "Change hashmarks/worker.py", limit=16, candidate_limit=16
+            )
+            nomination = observer.verification.nomination("tests/test_worker.py")
+        pytest.fail(
+            json.dumps(
+                {
+                    "reasons": plan["reasons"],
+                    "edit_candidates": graph.get("edit_candidates"),
+                    "stale": graph.get("stale"),
+                    "qualification": graph.get("verification_qualification"),
+                    "owners": [
+                        {
+                            "path": row.get("path"),
+                            "covers": row.get("covers_edit_candidates"),
+                            "evidence": row.get("coverage_evidence"),
+                        }
+                        for row in graph.get("verification_owners", [])
+                    ],
+                    "nomination_available": nomination.get("available"),
+                    "runner": nomination.get("runner_evidence"),
+                },
+                sort_keys=True,
+                default=str,
+            )
+        )
     assert "tests/test_worker.py" in plan["pytest_paths"]
 
 

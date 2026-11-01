@@ -29,6 +29,10 @@ Documentation changes explicitly run the native Markdown-link and publication-
 documentation contract tests in addition to the small mandatory baseline.
 A documentation-only change does not need a CodeMap query.
 
+The fast gate first runs a small selector self-test using real CodeMap on a
+controlled source-to-verifier repository. A selector regression fails before
+the broader native pytest selection begins; it does not replace that proof.
+
 The selection plan is JSON, bound to base SHA, effective checkout SHA, changed
 paths and a deterministic plan digest. CI preserves it as a run artifact. A
 `focused` plan is an **admission to run a subset**, not a completed verification

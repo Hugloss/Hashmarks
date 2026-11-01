@@ -192,7 +192,7 @@ def _source_links(
         codemap.index.sync()
         for source in sources:
             graph = codemap.tasks.verification_ownership_graph(
-                f"Verify {source}", limit=16, candidate_limit=16
+                f"Change {source}", limit=16, candidate_limit=16
             )
             paths = _qualified_links(graph, source)
             if paths is None:

@@ -48,6 +48,8 @@ jobs:
           if ! git diff --quiet "$PR_BASE_SHA" HEAD -- .github/release-request.toml; then
             python3 scripts/release_contract.py validate-release-candidate --base-ref "$PR_BASE_SHA"
           fi
+      - name: Prove selector behavior against actual CodeMap before broad pytest
+        run: uv run --frozen --offline --no-sync --group test python -m pytest -q tests/test_ci_verification.py
       - name: Admit candidate-scoped Hashmarks test membership
         shell: bash
         run: |
