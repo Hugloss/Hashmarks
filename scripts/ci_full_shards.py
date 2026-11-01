@@ -193,9 +193,17 @@ def _git_head(root: Path) -> str:
     ).strip()
 
 
-def _bound_plan(root: Path, path: Path, *, shard_count: int) -> dict[str, Any]:
+def _bound_plan(
+    root: Path,
+    path: Path,
+    *,
+    shard_count: int,
+    isolated: Sequence[str] = ISOLATED_NODEIDS,
+) -> dict[str, Any]:
     loaded = json.loads(path.read_text(encoding="utf-8"))
-    fresh = _build_plan(root, _native_collection(), shard_count=shard_count)
+    fresh = _build_plan(
+        root, _native_collection(), shard_count=shard_count, isolated=isolated
+    )
     if loaded != fresh:
         raise ValueError("shard evidence differs from current native collection")
     return fresh

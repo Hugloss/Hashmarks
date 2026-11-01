@@ -483,7 +483,8 @@ def test_fast_ci_remains_a_native_pytest_gate() -> None:
     )
     assert early < critical < full
     assert "--early-output" in fast
-    assert fast.count("--maxfail=1") == 2
+    fast_gate = fast.split("  full-shards:", 1)[0]
+    assert fast_gate.count("--maxfail=1") == 2
     assert "python -m pytest -q --maxfail=1" in fast
     assert "make artifact-check" in fast
     assert "mcp_installed_artifact_smoke.py" in fast

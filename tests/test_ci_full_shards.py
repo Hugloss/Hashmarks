@@ -119,10 +119,13 @@ def test_rechecked_native_membership_rejects_drift(
     manifest = tmp_path / "plan.json"
     manifest.write_text(json.dumps(plan), encoding="utf-8")
     monkeypatch.setattr(handoff, "_native_collection", lambda: collected)
-    assert handoff._bound_plan(native_repository, manifest, shard_count=2) == plan
+    assert (
+        handoff._bound_plan(native_repository, manifest, shard_count=2, isolated=())
+        == plan
+    )
     monkeypatch.setattr(handoff, "_native_collection", lambda: collected[:-1])
     with pytest.raises(ValueError, match="differs"):
-        handoff._bound_plan(native_repository, manifest, shard_count=2)
+        handoff._bound_plan(native_repository, manifest, shard_count=2, isolated=())
 
 
 def test_nul_argv_preserves_exact_nodeids(tmp_path: Path) -> None:
