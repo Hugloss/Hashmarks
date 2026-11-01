@@ -37,3 +37,15 @@ Repeated explicit-packet explain/delta fails if it touches repository-member obs
 Do not infer that a cache is useful merely because an explain packet is larger than its observation or because one machine reports a particular latency. Retention requires material repeated cost in genuine workflows after explicit packets are reused. A future cache must remain bounded, evictable, reconstructible, and irrelevant to semantic correctness.
 
 Current derived-authority qualification completed with two consecutive real uv/Maven passes and did not admit a retention layer. The explicit-packet design is therefore the current baseline. This does not claim that every future workload will have negligible cost; it means no measured evidence in this program justified making server-side history part of Hashmarks.
+
+## Reuse genuine artifacts for read-only proofs
+
+If several tests inspect the same immutable reference workflow, capture it once
+with the actual repository observer and native backend runner. Only read-only
+aggregators and retained-evidence graders share the capture; tests that inject
+invalid in-memory claims deep-copy the outcome before mutation. Tests that alter
+source files, evidence bytes, transport behavior, or receipt history continue
+using isolated inputs and directories.
+
+This is a **pytest fixture-cost optimization**, never a Hashmarks runtime cache,
+new result authority, or a replacement for genuine CLI/MCP end-to-end checks.

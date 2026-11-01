@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
@@ -17,8 +18,7 @@ from scripts.repository_evaluation.common import GRADER_SCHEMA, write_json
 from scripts.repository_evaluation.run_backend import run_backend
 
 
-@pytest.fixture
-def corpus(tmp_path: Path) -> tuple[Path, dict[str, Path]]:
+def _make_corpus(tmp_path: Path) -> tuple[Path, dict[str, Path]]:
     sources = {}
     definitions = {}
     labels = {}
@@ -99,6 +99,31 @@ def corpus(tmp_path: Path) -> tuple[Path, dict[str, Path]]:
     return suite_path, sources
 
 
+@pytest.fixture
+def corpus(tmp_path: Path) -> tuple[Path, dict[str, Path]]:
+    """Give tests that mutate evidence their own independent source tree."""
+    return _make_corpus(tmp_path)
+
+
+@pytest.fixture(scope="module")
+def observed_api_workflow(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> tuple[Path, dict[str, Path], Path, dict[str, Any]]:
+    """Capture the genuine API-only workflow once for read-only proof consumers."""
+    root = tmp_path_factory.mktemp("observed-backend-api")
+    suite_path, sources = _make_corpus(root)
+    output = root / "observed"
+    report = run_backend(
+        sources=sources,
+        suite_path=suite_path,
+        output_dir=output,
+        transports=(),
+    )
+    assert report["outcomes"][0]["receipt_reused"] is False
+    assert (output / "handler/observations/before/api.json").is_file()
+    return suite_path, sources, output, report
+
+
 def test_initial_size_grades_complete_visible_bytes_at_the_user_approved_boundary(
     corpus: tuple[Path, dict[str, Path]],
 ) -> None:
@@ -148,15 +173,9 @@ def test_initial_size_grades_complete_visible_bytes_at_the_user_approved_boundar
 
 
 def test_api_revision_workflow_cannot_qualify_missing_transports_or_breadth(
-    corpus: tuple[Path, dict[str, Path]], tmp_path: Path
+    observed_api_workflow: tuple[Path, dict[str, Path], Path, dict[str, Any]],
 ) -> None:
-    suite_path, sources = corpus
-    report = run_backend(
-        sources=sources,
-        suite_path=suite_path,
-        output_dir=tmp_path / "output",
-        transports=(),
-    )
+    _suite, sources, _output, report = observed_api_workflow
     outcome = report["outcomes"][0]
     assert outcome["gates"]["facts"] is True
     assert outcome["gates"]["authority"] is None
@@ -270,20 +289,17 @@ def _aggregate_campaign(corpus: tuple[Path, dict[str, Path]], root: Path) -> Pat
 
 
 def test_aggregate_retains_valid_observations_and_rejected_input(
-    corpus: tuple[Path, dict[str, Path]], tmp_path: Path
+    observed_api_workflow: tuple[Path, dict[str, Path], Path, dict[str, Any]],
+    tmp_path: Path,
 ) -> None:
     from scripts.repository_evaluation.aggregate_backend import aggregate_backend
 
-    suite_path, sources = corpus
-    valid_root = tmp_path / "valid"
-    run_backend(
-        sources=sources, suite_path=suite_path, output_dir=valid_root, transports=()
-    )
+    suite_path, sources, valid_root, _report = observed_api_workflow
     invalid = tmp_path / "invalid.json"
     invalid.write_text("{invalid")
     output = tmp_path / "aggregate"
     report = aggregate_backend(
-        campaign_path=_aggregate_campaign(corpus, tmp_path),
+        campaign_path=_aggregate_campaign((suite_path, sources), suite_path.parent),
         sources=sources,
         selections={
             "good": {"workflow_report": str(valid_root / "summary.json")},
@@ -1379,24 +1395,17 @@ def test_native_batches_keep_each_capture_root_and_acquisition_identity(
 
 
 def test_aggregate_reads_current_receipts_without_executing_work(
-    corpus: tuple[Path, dict[str, Path]], tmp_path: Path
+    observed_api_workflow: tuple[Path, dict[str, Path], Path, dict[str, Any]],
+    tmp_path: Path,
 ) -> None:
     from scripts.repository_evaluation.aggregate_backend import aggregate_backend
 
-    suite_path, sources = corpus
+    suite_path, sources, measured, _report = observed_api_workflow
     campaign = _campaign_for_fixture(suite_path)
-    run_backend(
-        sources=sources,
-        suite_path=suite_path,
-        output_dir=tmp_path / "measure",
-        transports=(),
-    )
     report = aggregate_backend(
         campaign_path=campaign,
         sources=sources,
-        selections={
-            "fixture": {"workflow_report": str(tmp_path / "measure/summary.json")}
-        },
+        selections={"fixture": {"workflow_report": str(measured / "summary.json")}},
         output_dir=tmp_path / "aggregate",
     )
     assert report["status"] == "INCOMPLETE"
@@ -1570,23 +1579,18 @@ def test_aggregate_rejects_unbound_or_modified_evidence(
     ["before", "after", "delta", "transport_grades", "initial_transport_grades"],
 )
 def test_regrading_rejects_forged_retained_subgrades(
-    corpus: tuple[Path, dict[str, Path]], tmp_path: Path, field: str
+    observed_api_workflow: tuple[Path, dict[str, Path], Path, dict[str, Any]],
+    field: str,
 ) -> None:
     from scripts.repository_evaluation.backend_regrading import verify_task_summary
 
-    suite_path, sources = corpus
-    report = run_backend(
-        sources=sources,
-        suite_path=suite_path,
-        output_dir=tmp_path / "result",
-        transports=(),
-    )
+    suite_path, sources, output, report = observed_api_workflow
     suite, grader = load_corpus(suite_path, sources)
-    outcome = report["outcomes"][0]
+    outcome = deepcopy(report["outcomes"][0])
     outcome[field] = {"classification": "PASS"}
     with pytest.raises(ValueError, match="summary differs from artifact proof"):
         verify_task_summary(
-            tmp_path / "result/handler/observations",
+            output / "handler/observations",
             suite["workflows"][0],
             grader["cases"]["handler"],
             sources,
@@ -1595,23 +1599,17 @@ def test_regrading_rejects_forged_retained_subgrades(
 
 
 def test_regrading_rejects_uncomputed_gate_claim(
-    corpus: tuple[Path, dict[str, Path]], tmp_path: Path
+    observed_api_workflow: tuple[Path, dict[str, Path], Path, dict[str, Any]],
 ) -> None:
     from scripts.repository_evaluation.backend_regrading import verify_task_summary
 
-    suite_path, sources = corpus
-    report = run_backend(
-        sources=sources,
-        suite_path=suite_path,
-        output_dir=tmp_path / "result",
-        transports=(),
-    )
+    suite_path, sources, output, report = observed_api_workflow
     suite, grader = load_corpus(suite_path, sources)
-    outcome = report["outcomes"][0]
+    outcome = deepcopy(report["outcomes"][0])
     outcome["gates"]["runtime_verified"] = True
     with pytest.raises(ValueError, match="unexpected or missing gate"):
         verify_task_summary(
-            tmp_path / "result/handler/observations",
+            output / "handler/observations",
             suite["workflows"][0],
             grader["cases"]["handler"],
             sources,
