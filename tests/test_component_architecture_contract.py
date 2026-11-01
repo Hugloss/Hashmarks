@@ -67,7 +67,9 @@ COMPONENTS: dict[str, tuple[str, frozenset[str]]] = {
     "RepositoryVerification": (
         "evidence_verification",
         # Supplied membership binds through the existing Correlation owner.
-        frozenset({"RepositoryImports", "RepositoryCorrelation"}),
+        frozenset(
+            {"RepositoryImports", "RepositoryCorrelation", "RepositoryNativeEvidence"}
+        ),
     ),
     "RepositoryTasks": (
         "repository_tasks",

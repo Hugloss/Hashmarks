@@ -36,6 +36,23 @@ Hashmarks and Oh-Goon are complementary systems with different authority.
 
 Hashmarks must never become Oh-Goon's execution motor. Oh-Goon must not create a second competing implementation of Hashmarks repository identity/intelligence.
 
+## Changed-set producer front door
+
+Use `codemap.verification.changed_set(changed_paths, ...)` for the canonical
+bounded producer result: changed verifier roles, qualified direct/indirect
+relationships, shared-support applicability, workspace context, structured
+targets and exact returned logical membership. Optional runtime correlation and
+externally supplied native collection reports remain source-qualified evidence.
+The [producer contract](../reference/CHANGED_SET_VERIFICATION.md) defines bounds,
+availability and unknown/incomplete consumer scope.
+
+OH-Goon consumes those facts through its integration boundary; it must not
+reassemble graph semantics, infer project ownership from path prefixes, or
+promote empty/bounded evidence into a claim that no tests are needed. OH-Goon
+retains physical command projection, grouping, environment, timeout, execution
+and result authority in its existing execution path. This producer API creates
+no second execution path in either repository.
+
 ## Agent responsibilities remain external
 
 Hashmarks may expose repository ambiguity, alternative candidates, likely repair surfaces, and verification relevance. It does not own:

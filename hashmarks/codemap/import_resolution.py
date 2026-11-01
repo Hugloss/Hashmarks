@@ -390,7 +390,7 @@ class RepositoryImports:
         )
 
     def _resolve_import_owner_evidence(
-        self, source_path: str, target: str
+        self, source_path: str, target: str, *, supporting_paths: set[str] | None = None
     ) -> tuple[list[str], bool]:
         """Resolve bounded import-owner evidence and report unresolved identity.
 
@@ -400,6 +400,8 @@ class RepositoryImports:
         a facade-only resolution as proof of the underlying owner.
         """
         resolved = list(self._resolve_import_paths(source_path, target))
+        if supporting_paths is not None:
+            supporting_paths.update((source_path, *resolved))
         module_candidates = self._python_import_module_candidates(source_path, target)
         direct_module = module_candidates[0] if module_candidates else ""
         if len(resolved) == 1 and direct_module:
@@ -419,6 +421,8 @@ class RepositoryImports:
         walk = _OwnerWalk(self)
         for facade_path in resolved[:20]:
             walk.visit(facade_path, short, 0)
+        if supporting_paths is not None:
+            supporting_paths.update(path for path, _name in walk.visited)
         if len(walk.leaves) > 1:
             walk.unresolved = True
         qualified = (

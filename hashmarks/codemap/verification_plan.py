@@ -259,9 +259,11 @@ class VerificationPlanMixin:
                 declared = True
         return declared
 
-    def _vitest_declared(self, members: list[dict[str, object]]) -> bool:
+    def _vitest_declared(self, rel: str, members: list[dict[str, object]]) -> bool:
         """Interpret qualified authored package metadata, not installed tools."""
-        raw = self._nomination_source_member("package.json", members)
+        if TYPE_CHECKING:
+            self = cast("RepositoryVerification", self)
+        _, raw = self._verification_manifest(rel, "package.json", members)
         return raw is not None and self._vitest_package_declaration(raw)
 
     def _source_test_import(self, source: bytes) -> bool:
@@ -356,16 +358,19 @@ class VerificationPlanMixin:
 
     def _python_surface_nomination(
         self,
+        rel: str,
         source: bytes,
         members: list[dict[str, object]],
         *,
         symbol: str | None,
         qualname: str | None,
     ) -> tuple[str, str, str, str, str | None]:
+        if TYPE_CHECKING:
+            self = cast("RepositoryVerification", self)
         test_symbol = self._qualified_python_test_symbol(symbol, qualname)
         if test_symbol:
             self._qualify_python_test_node(source, test_symbol)
-        raw = self._nomination_source_member("pyproject.toml", members)
+        _, raw = self._verification_manifest(rel, "pyproject.toml", members)
         declared = raw is not None and self._pytest_manifest_declaration(raw)
         return (
             "pytest",
@@ -390,8 +395,10 @@ class VerificationPlanMixin:
     def _ecmascript_surface_nomination(
         self, rel: str, source: bytes, members: list[dict[str, object]]
     ) -> tuple[str, str, str, str, str | None] | None:
+        if TYPE_CHECKING:
+            self = cast("RepositoryVerification", self)
         suffix = Path(rel).suffix.lower()
-        if self._vitest_declared(members):
+        if self._vitest_declared(rel, members):
             return (
                 "vitest",
                 "test-file",
@@ -409,7 +416,8 @@ class VerificationPlanMixin:
                     None,
                 )
         if suffix in {".ts", ".tsx", ".mts", ".cts"}:
-            if self._nomination_source_member("tsconfig.json", members) is not None:
+            _, config = self._verification_manifest(rel, "tsconfig.json", members)
+            if config is not None:
                 return (
                     "typescript-compiler",
                     "typescript-project",
@@ -432,7 +440,7 @@ class VerificationPlanMixin:
         suffix = Path(rel).suffix.lower()
         if suffix == ".py":
             return self._python_surface_nomination(
-                source, members, symbol=symbol, qualname=qualname
+                rel, source, members, symbol=symbol, qualname=qualname
             )
         if symbol is not None or qualname is not None:
             raise _UnqualifiedNominationMember("polyglot-test-node-not-qualified")

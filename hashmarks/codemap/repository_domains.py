@@ -57,7 +57,7 @@ def _explicit_control_domains(
 
 def _is_test_surface(name: str, parts: set[str]) -> bool:
     """Keep test role independent of test-shaped production source names."""
-    if parts.intersection({"test", "tests", "testing"}):
+    if parts.intersection({"test", "tests", "testing", "__tests__"}):
         return True
     if (
         name.startswith("test_") or name.endswith("_test.py")

@@ -15,6 +15,8 @@ from .query_primitives import _TASK_STOPWORDS, _query_terms
 from .repository_domains import RepositoryDomain, classify_repository_path
 from .repository_observation import evidence_identity
 from .task_evidence_contract import read_task_candidate
+from .verification_changes import VerificationChangesMixin
+from .verification_context import VerificationContextMixin
 from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
 from .verification_explanation import VerificationExplanationMixin
 from .verification_file_reads import VerificationFileReadsMixin
@@ -34,6 +36,7 @@ from .verification_relevance_model import (
     VerificationRequest,
     verification_without_edit_owner,
 )
+from .verification_support import VerificationSupportMixin
 
 _LIMIT = VERIFICATION_RELEVANCE_DEFAULTS.limit
 _CANDIDATES = VERIFICATION_RELEVANCE_DEFAULTS.candidate_limit
@@ -44,6 +47,7 @@ if TYPE_CHECKING:
     from .decision_session import DecisionScope
     from .evidence_correlation import RepositoryCorrelation
     from .import_resolution import RepositoryImports
+    from .native_evidence import RepositoryNativeEvidence
     from .query_router import NormalizedTaskQuery
     from .task_evidence_types import (
         VerificationRelevance,
@@ -75,9 +79,11 @@ class _VerificationRelevanceState:
     import_owner_evidence: dict[tuple[str, str], tuple[frozenset[str], bool]] = field(
         default_factory=dict
     )
+    import_owner_contributors: dict[str, set[str]] = field(default_factory=dict)
     unresolved_reference_identity_paths: set[str] = field(default_factory=set)
     unresolved_verifier_identity_paths: set[str] = field(default_factory=set)
     qualified_attribute_refs: dict[str, set[str]] = field(default_factory=dict)
+    reference_path_roles: dict[str, str] = field(default_factory=dict)
     lexical_test_paths: tuple[str, ...] | None = None
     module_test_paths: tuple[str, ...] | None = None
 
@@ -96,6 +102,9 @@ class _VerificationRelevanceState:
 
 
 class RepositoryVerification(
+    VerificationChangesMixin,
+    VerificationContextMixin,
+    VerificationSupportMixin,
     VerificationMembershipMixin,
     VerificationPlanMixin,
     VerificationOwnershipMixin,
@@ -110,6 +119,7 @@ class RepositoryVerification(
         imports: RepositoryImports,
         *,
         correlation: RepositoryCorrelation | None = None,
+        native: RepositoryNativeEvidence | None = None,
     ) -> None:
         self.source = source = imports.source
         self.imports = imports
@@ -126,6 +136,15 @@ class RepositoryVerification(
                 "verification and correlation must share their source owner"
             )
         self._collection_correlation = correlation
+        if native is None:
+            from .native_evidence import RepositoryNativeEvidence
+
+            native = RepositoryNativeEvidence(source)
+        if native.source is not source:
+            raise ValueError(
+                "verification and native evidence must share their source owner"
+            )
+        self.native = native
 
     @property
     def reads(self) -> DecisionScope:
@@ -376,8 +395,12 @@ class RepositoryVerification(
         key = (ref_path, target)
         observed = state.import_owner_evidence.get(key)
         if observed is None:
+            supporting_paths: set[str] = set()
             paths, unresolved = self.imports._resolve_import_owner_evidence(
-                ref_path, target
+                ref_path, target, supporting_paths=supporting_paths
+            )
+            state.import_owner_contributors.setdefault(ref_path, set()).update(
+                supporting_paths
             )
             if not paths and not unresolved:
                 paths = sorted(
@@ -611,6 +634,19 @@ class RepositoryVerification(
             else True
         )
 
+    def _verification_support_reference(
+        self, state: _VerificationRelevanceState, path: str
+    ) -> bool:
+        """Qualify shared test helpers once per bounded reference observation."""
+        if path not in state.reference_path_roles:
+            state.reference_path_roles[path] = str(
+                self._verification_path_kind(path)["kind"]
+            )
+        kind = state.reference_path_roles[path]
+        if kind == "unknown":
+            state.record_unresolved_reference(path)
+        return kind == "verification-support"
+
     def _verification_collect_direct_symbol_refs(
         self,
         state: _VerificationRelevanceState,
@@ -640,6 +676,11 @@ class RepositoryVerification(
                 state.candidate_paths.add(path)
                 if exact_reference:
                     state.refs_by_path.setdefault(path, set()).add(short)
+                    if (
+                        RepositoryDomain.SOURCE in domains
+                        and self._verification_support_reference(state, path)
+                    ):
+                        state.source_ref_paths.add(path)
             elif RepositoryDomain.SOURCE in domains and exact_reference:
                 state.source_ref_paths.add(path)
 
@@ -954,8 +995,6 @@ class RepositoryVerification(
         state: _VerificationRelevanceState,
         path: str,
         test_symbols: Sequence[Mapping[str, object]],
-        *,
-        pytest_declared: bool | None = None,
     ) -> dict[str, object]:
         if TYPE_CHECKING:
             self = cast("RepositoryVerification", self)
@@ -1008,14 +1047,27 @@ class RepositoryVerification(
             "task_anchor_terms": anchor_terms,
             "canonical_rank": state.canonical_rank.get(path),
             "test_symbol": test_symbol,
-            "runner_available": bool(
-                self._python_verification_plan(
-                    path, test_symbol, None, pytest_declared=pytest_declared
-                ).get("available")
-                if Path(path).suffix.lower() == ".py" and pytest_declared is not None
-                else self.plan(path, symbol=test_symbol).get("available")
+            # This is repository-declared nomination availability. Installed
+            # executables and physical commands are external consumer concerns.
+            "runner_available": bool(self.nomination(path)["available"]),
+            "supporting_source_members": self._verification_candidate_members(
+                state, path
             ),
         }
+
+    def _verification_candidate_members(
+        self, state: _VerificationRelevanceState, path: str
+    ) -> list[dict[str, object]]:
+        """Retain the existing import walk's actual qualification contributors."""
+        paths = {state.edit_path, path, *state.indirect_via_paths.get(path, ())}
+        for ref_path in tuple(paths):
+            paths.update(state.import_owner_contributors.get(ref_path, ()))
+        members: list[dict[str, object]] = []
+        for member_path in sorted(paths - {""}):
+            self.source.ensure_current(member_path)
+            member, _raw = self.source.member(member_path)
+            members.append(member)
+        return members
 
     def _verification_candidates(
         self,
@@ -1029,11 +1081,6 @@ class RepositoryVerification(
         self.reads.preload_symbols(paths)
         candidate_symbols = {path: self.reads.symbols_for_path(path) for path in paths}
         result: list[dict[str, object]] = []
-        pytest_declared = (
-            self._pytest_declared()
-            if any(Path(path).suffix.lower() == ".py" for path in paths)
-            else None
-        )
         for path in paths:
             if RepositoryDomain.TEST not in set(classify_repository_path(path)):
                 continue
@@ -1042,7 +1089,6 @@ class RepositoryVerification(
                     state,
                     path,
                     candidate_symbols.get(path, ()),
-                    pytest_declared=pytest_declared,
                 )
             )
         result.sort(key=self._verification_candidate_score, reverse=True)

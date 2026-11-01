@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Add one public, command-free changed-set verification contract composing source-qualified targets, exact returned logical membership, shared-support applicability, workspace context and optional runtime/source correlation.
+- Preserve support/helpers, ambiguous ownership, bounded or unknown consumer scope, re-export contributors and source drift without introducing command or execution authority.
+- Bind nested Python/frontend nominations to their applicable manifest inputs and requalify Python workspace roots through the canonical index reconciliation path.
+
 ## 0.33.0 — Native Python repository and dependency evidence
 
 - Preserve nested Python packaging roots and qualified verifier relationships when reopening an index. Reuse indexed manifest candidates and current repository admission without adding full discovery on reopen.

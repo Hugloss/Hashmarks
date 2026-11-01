@@ -585,7 +585,7 @@ def test_verification_reference_index_invalidates_when_source_changes(
         assert second_row["direct_reference"] is False
 
 
-def test_verification_candidate_projection_samples_pytest_config_once(
+def test_verification_candidate_projection_avoids_unqualified_pytest_probe(
     tmp_path: Path, monkeypatch: MonkeyPatch
 ) -> None:
     task, _ = _build_repetitive_verification_repo(tmp_path, distractors=80)
@@ -604,7 +604,7 @@ def test_verification_candidate_projection_samples_pytest_config_once(
 
     assert "candidate_count" in action["verification_relevance"]
     assert action["verification_relevance"]["candidate_count"] == 81
-    assert calls == 1
+    assert calls == 0
 
 
 def test_verification_reference_projection_reads_each_candidate_snapshot_once(

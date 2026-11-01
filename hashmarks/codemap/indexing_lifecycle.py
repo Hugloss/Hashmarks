@@ -6,16 +6,11 @@ import json
 import os
 import sqlite3
 import time
-import tomllib
 from bisect import bisect_left
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
-from hashmarks.codemap.uv_workspace import (
-    uv_workspace_member as _uv_workspace_member,
-)
-from hashmarks.codemap.uv_workspace import uv_workspace_patterns
 from hashmarks.digest import Digest
 from hashmarks.file_store import FileDigestStore, UnstableFileError
 from hashmarks.paths import normalize_relative_path
@@ -25,6 +20,7 @@ from .index_surfaces import index_surface_for_path
 from .index_watch import IndexWatchMixin
 from .model import EvidenceVisibility, ParsedArtifact, SyncResult
 from .parsers import artifact_key_for, parse_source
+from .python_import_roots import PythonImportRoots, observe_python_import_roots
 from .repository_file_discovery import _AdmittedRepositoryFile
 from .repository_index_store import (
     ArtifactStore,
@@ -107,111 +103,6 @@ def _language_for_path(path: Path) -> str | None:
     return None
 
 
-def _uv_workspace_pyprojects(
-    workspace: Path, pyprojects: Sequence[Path]
-) -> tuple[Path, ...]:
-    """Restrict nested project metadata to declared uv workspace members when configured."""
-    root_manifest = workspace / "pyproject.toml"
-    if root_manifest not in pyprojects:
-        return tuple(pyprojects)
-    try:
-        data = tomllib.loads(root_manifest.read_text(encoding="utf-8"))
-    except (OSError, tomllib.TOMLDecodeError):
-        return tuple(pyprojects)
-    tool = data.get("tool")
-    uv = tool.get("uv") if isinstance(tool, dict) else None
-    workspace_cfg = uv.get("workspace") if isinstance(uv, dict) else None
-    if not isinstance(workspace_cfg, dict):
-        return tuple(pyprojects)
-    members = workspace_cfg.get("members")
-    if not isinstance(members, list):
-        return tuple(pyprojects)
-    member_patterns = uv_workspace_patterns(members)
-    exclude_patterns = uv_workspace_patterns(workspace_cfg.get("exclude"))
-
-    return tuple(
-        pyproject
-        for pyproject in pyprojects
-        if _uv_workspace_member(pyproject, workspace, member_patterns, exclude_patterns)
-    )
-
-
-def _setuptools_source_roots(tool: dict[str, object]) -> set[str]:
-    configured: set[str] = set()
-    setuptools = tool.get("setuptools")
-    if not isinstance(setuptools, dict):
-        return configured
-    package_dir = setuptools.get("package-dir")
-    if not isinstance(package_dir, dict):
-        return configured
-    root = package_dir.get("")
-    if isinstance(root, str) and root.strip():
-        configured.add(root.strip().strip("/"))
-    return configured
-
-
-def _hatch_source_roots(tool: dict[str, object]) -> set[str]:
-    configured: set[str] = set()
-    hatch = tool.get("hatch")
-    if not isinstance(hatch, dict):
-        return configured
-    build = hatch.get("build")
-    targets = build.get("targets") if isinstance(build, dict) else None
-    wheel = targets.get("wheel") if isinstance(targets, dict) else None
-    packages = wheel.get("packages") if isinstance(wheel, dict) else None
-    if not isinstance(packages, list):
-        return configured
-    for package in packages:
-        if isinstance(package, str) and "/" in package.strip("/"):
-            configured.add(package.strip("/").split("/", 1)[0])
-    return configured
-
-
-def _poetry_source_roots(tool: dict[str, object]) -> set[str]:
-    configured: set[str] = set()
-    poetry = tool.get("poetry")
-    packages = poetry.get("packages") if isinstance(poetry, dict) else None
-    if not isinstance(packages, list):
-        return configured
-    for package in packages:
-        if not isinstance(package, dict):
-            continue
-        root = package.get("from")
-        if isinstance(root, str) and root.strip():
-            configured.add(root.strip().strip("/"))
-    return configured
-
-
-def _project_source_roots(data: object) -> set[str]:
-    tool = data.get("tool") if isinstance(data, dict) else None
-    tool = tool if isinstance(tool, dict) else {}
-    return {
-        *_setuptools_source_roots(tool),
-        *_hatch_source_roots(tool),
-        *_poetry_source_roots(tool),
-    }
-
-
-def _python_source_roots_from_pyprojects(
-    workspace: Path, pyprojects: Sequence[Path]
-) -> tuple[str, ...]:
-    """Return workspace-relative import roots from explicit project metadata."""
-    roots: set[str] = set()
-    for pyproject in _uv_workspace_pyprojects(workspace, pyprojects):
-        try:
-            data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
-            project_prefix = pyproject.parent.relative_to(workspace).as_posix()
-        except (OSError, ValueError, tomllib.TOMLDecodeError):
-            continue
-        for root in _project_source_roots(data):
-            combined = "/".join(
-                part for part in (project_prefix, root) if part and part != "."
-            )
-            if combined:
-                roots.add(combined)
-    return tuple(sorted(roots))
-
-
 def _module_name(relpath: str, source_roots: Sequence[str] = ()) -> str | None:
     if not relpath.endswith((".py", ".pyi")):
         return None
@@ -257,6 +148,13 @@ class _SyncDiscovery:
     files: list[_DiscoveredFile]
     full: bool
     requested_paths: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class _PythonRootRefresh:
+    previous_roots: tuple[str, ...]
+    observation: PythonImportRoots | None
+    removed: int = 0
 
 
 @dataclass(frozen=True)
@@ -348,14 +246,17 @@ class RepositoryIndex(IndexWatchMixin):
         # its nested manifests on reopen, then apply the current canonical file
         # policy; cold/full sync remains the owner of repository discovery.
         manifests = sorted({"pyproject.toml", *store.paths_named("pyproject.toml")})
-        self._python_import_roots = _python_source_roots_from_pyprojects(
+        roots = observe_python_import_roots(
             self.workspace,
             tuple(
                 item.path
                 for rel in manifests
                 if (item := files.visible_file(rel)) is not None
             ),
+            self.file_store,
         )
+        roots.recheck(self.files, self.file_store)
+        self._python_import_roots = roots.roots
 
     @property
     def observation_source(self) -> RepositoryObservationSource:
@@ -1164,7 +1065,7 @@ class RepositoryIndex(IndexWatchMixin):
         *,
         full: bool,
         requested_paths: Sequence[str],
-    ) -> None:
+    ) -> PythonImportRoots | None:
         """Refresh packaging-derived import roots from admitted visible manifests."""
         if full:
             pyprojects = tuple(
@@ -1176,10 +1077,12 @@ class RepositoryIndex(IndexWatchMixin):
         elif any(rel.endswith("pyproject.toml") for rel in requested_paths):
             pyprojects = self.files.visible_manifests("pyproject.toml")
         else:
-            return
-        self._python_import_roots = _python_source_roots_from_pyprojects(
-            self.workspace, pyprojects
+            return None
+        observed = observe_python_import_roots(
+            self.workspace, pyprojects, self.file_store
         )
+        self._python_import_roots = observed.roots
+        return observed
 
     def _extend_discovered_from_roots(
         self,
@@ -1211,14 +1114,14 @@ class RepositoryIndex(IndexWatchMixin):
         *,
         full: bool,
         requested_paths: Sequence[str],
-    ) -> int:
+    ) -> _PythonRootRefresh:
         """Re-index persisted Python files whose import identity changed with packaging authority."""
         previous_roots = self._python_import_roots
-        self._sync_refresh_python_import_roots(
+        observed = self._sync_refresh_python_import_roots(
             discovered, full=full, requested_paths=requested_paths
         )
         if full or tuple(previous_roots) == tuple(self._python_import_roots):
-            return 0
+            return _PythonRootRefresh(previous_roots, observed)
         seen = {item.rel for item in discovered}
         previous = set(previous_roots)
         current = set(self._python_import_roots)
@@ -1245,9 +1148,39 @@ class RepositoryIndex(IndexWatchMixin):
                 roots=(rel,),
                 seen=seen,
             )
-        return self.store.delete_paths(stale_missing) if stale_missing else 0
+        return _PythonRootRefresh(
+            previous_roots,
+            observed,
+            self.store.delete_paths(stale_missing) if stale_missing else 0,
+        )
 
-    def sync(self, paths: Iterable[str | Path] | None = None) -> SyncResult:
+    def _recheck_python_projection(self, projection: _PythonRootRefresh) -> None:
+        if projection.observation is None:
+            return
+        try:
+            projection.observation.recheck(self.files, self.file_store)
+        except UnstableFileError:
+            # The publication transaction rolls back persisted rows. Restore the
+            # matching in-memory roots so a failed read cannot leak new authority.
+            self._python_import_roots = projection.previous_roots
+            raise
+
+    def _require_expected_generation(self, expected: int | None) -> int:
+        """Check caller authority while the publication transaction owns the writer."""
+        generation = self.store.generation()
+        if expected is not None and generation != expected:
+            raise RuntimeError(
+                "CodeMap generation changed before expected decision session "
+                f"({expected} -> {generation})"
+            )
+        return generation
+
+    def sync(
+        self,
+        paths: Iterable[str | Path] | None = None,
+        *,
+        expected_generation: int | None = None,
+    ) -> SyncResult:
         # A semantic policy change changes both negative and positive admission.
         # Discover without a path bound so newly denied rows retire and
         # newly admitted paths are discovered from the same authority cut.
@@ -1264,16 +1197,18 @@ class RepositoryIndex(IndexWatchMixin):
         # publication boundary. WAL readers continue to see the previously
         # complete generation until rows + generation + COMPLETE commit together.
         with self.store.publication_transaction():
+            self._require_expected_generation(expected_generation)
             removed = self._reconcile_persisted_analysis_scope(conformance)
             identity_generation_before = getattr(
                 self._observation_source.observe(), "generation", None
             )
             discovery = self._sync_discovery(paths, warnings)
-            removed += self._sync_refresh_python_projection(
+            python = self._sync_refresh_python_projection(
                 discovery.files,
                 full=discovery.full,
                 requested_paths=discovery.requested_paths,
             )
+            removed += python.removed
             preflight = self._preflight_from_discovered(discovery.files)
             cache_state = self._sync_begin_build(
                 discovered=discovery.files,
@@ -1294,6 +1229,7 @@ class RepositoryIndex(IndexWatchMixin):
                 discovered=discovery.files,
                 requested_paths=discovery.requested_paths,
             )
+            self._recheck_python_projection(python)
             identity = self._sync_finalize_identity(
                 changed=state.changed or bool(removed),
                 identity_generation_before=identity_generation_before,
@@ -1483,13 +1419,12 @@ class RepositoryIndex(IndexWatchMixin):
         self, relpath: str, *, expected_generation: int | None = None
     ) -> int:
         rel = normalize_relative_path(relpath, allow_root=False)
+        if Path(rel).name == "pyproject.toml":
+            # Packaging changes affect module identities beyond the manifest row.
+            # Keep their projection in the existing atomic synchronization owner.
+            return self.sync((rel,), expected_generation=expected_generation).generation
         with self.store.publication_transaction():
-            generation = self.store.generation()
-            if expected_generation is not None and generation != expected_generation:
-                raise RuntimeError(
-                    "CodeMap generation changed before expected decision session "
-                    f"({expected_generation} -> {generation})"
-                )
+            generation = self._require_expected_generation(expected_generation)
             if not self.needs_reconcile(rel):
                 return generation
             row = self.store.file_row(rel)
