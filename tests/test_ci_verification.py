@@ -120,6 +120,8 @@ def test_actual_codemap_maps_changed_python_to_real_test(
                 "Change hashmarks/worker.py", limit=16, candidate_limit=16
             )
             nomination = observer.verification.nomination("tests/test_worker.py")
+        observed_owners = graph.get("verification_owners")
+        owners = observed_owners if isinstance(observed_owners, list) else []
         pytest.fail(
             json.dumps(
                 {
@@ -133,7 +135,8 @@ def test_actual_codemap_maps_changed_python_to_real_test(
                             "covers": row.get("covers_edit_candidates"),
                             "evidence": row.get("coverage_evidence"),
                         }
-                        for row in graph.get("verification_owners", [])
+                        for row in owners
+                        if isinstance(row, dict)
                     ],
                     "nomination_available": nomination.get("available"),
                     "runner": nomination.get("runner_evidence"),
