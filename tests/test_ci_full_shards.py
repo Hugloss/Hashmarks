@@ -210,38 +210,32 @@ def test_class_parametrization_keeps_full_isolated_function_name() -> None:
 
 def test_duration_profile_records_actual_phase_seconds_without_weight_feedback(
     native_repository: Path,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Measurement only: the same static plan stays valid when timing changes."""
-    from types import SimpleNamespace
-    from typing import cast
-
-    monkeypatch.setenv(
-        "HASHMARKS_CI_DURATION_REPORT", str(native_repository / "profile.json")
-    )
-    handoff._DURATION_BY_FILE.clear()
+    """Pure timing math cannot erase the plugin's already-observed test durations."""
     nodes = ["tests/test_a.py::test_standard"]
     initial = handoff._build_plan(native_repository, nodes, isolated=(), shard_count=1)
-    report = SimpleNamespace(nodeid=nodes[0], duration=0.25)
-    handoff.pytest_runtest_logreport(cast(pytest.TestReport, report))
-    report.duration = 0.5
-    handoff.pytest_runtest_logreport(cast(pytest.TestReport, report))
-    profile = handoff._duration_profile()
+    observed_before = dict(handoff._DURATION_BY_FILE)
+    samples: dict[str, float] = {}
+    handoff._accumulate_phase(samples, nodes[0], 0.25)
+    handoff._accumulate_phase(samples, nodes[0], 0.50)
+    profile = handoff._duration_profile(samples)
     assert profile["file_seconds"] == {"tests/test_a.py": 0.75}
     assert profile["measurement"] == "pytest-phase-runtime-diagnostics-only"
+    assert handoff._DURATION_BY_FILE == observed_before
     assert (
         handoff._build_plan(native_repository, nodes, isolated=(), shard_count=1)
         == initial
     )
-    handoff._DURATION_BY_FILE.clear()
 
 
 def test_hotspot_costs_follow_observed_runtime_not_source_size() -> None:
     slow = "tests/test_backend_evaluation_workflows.py"
     ordinary = "tests/test_small_fast_suite.py"
+    assert handoff._weight(slow, 5) == 38_078
     assert handoff._weight(slow, 5) > handoff._weight(ordinary, 200)
     assert handoff._weight(ordinary, 2) == 2 * handoff._NODE_COST_MS
     assert handoff._SINGLETON_COST_MS > handoff._NODE_COST_MS
+    assert handoff._weight("tests/test_release_contract.py", 1) == 16_556
 
 
 def test_hotspot_affinity_balances_files_without_dropping_cases(
