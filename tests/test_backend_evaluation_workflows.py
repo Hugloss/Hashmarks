@@ -1219,10 +1219,9 @@ def _campaign_for_fixture(suite_path: Path) -> Path:
     return path
 
 
-def _workflow_batch_reports(
-    corpus: tuple[Path, dict[str, Path]], root: Path
-) -> list[str]:
-    suite_path, sources = corpus
+def _add_second_workflow(corpus: tuple[Path, dict[str, Path]]) -> None:
+    """Prepare a two-workflow corpus independently of native observation."""
+    suite_path, _sources = corpus
     suite = json.loads(suite_path.read_text())
     suite["workflows"].append(
         {**suite["workflows"][0], "id": "second", "problem_id": "second-problem"}
@@ -1232,6 +1231,13 @@ def _workflow_batch_reports(
     grader["cases"]["second"] = grader["cases"]["handler"]
     write_json(suite_path, suite)
     write_json(grader_path, grader)
+
+
+def _workflow_batch_reports(
+    corpus: tuple[Path, dict[str, Path]], root: Path
+) -> list[str]:
+    _add_second_workflow(corpus)
+    suite_path, sources = corpus
     reports = []
     for identifier in ("handler", "second"):
         output = root / identifier
@@ -1246,16 +1252,41 @@ def _workflow_batch_reports(
     return reports
 
 
+@pytest.fixture(scope="module")
+def observed_batch_reports(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> tuple[tuple[Path, dict[str, Path]], tuple[str, str, str]]:
+    """Capture each genuine API batch once for independent read-only checks."""
+    root = tmp_path_factory.mktemp("observed-backend-batches")
+    captured_corpus = _make_corpus(root)
+    reports = _workflow_batch_reports(captured_corpus, root / "batches")
+    duplicate = root / "duplicate"
+    run_backend(
+        sources=captured_corpus[1],
+        suite_path=captured_corpus[0],
+        output_dir=duplicate,
+        workflow_ids=["handler"],
+        transports=(),
+    )
+    reports.append(str(duplicate / "summary.json"))
+    assert len(reports) == 3 and len(set(reports)) == 3
+    assert all(Path(path).is_file() for path in reports)
+    return captured_corpus, (reports[0], reports[1], reports[2])
+
+
 def test_aggregate_admits_disjoint_bounded_reports_and_preserves_namespaces(
-    corpus: tuple[Path, dict[str, Path]], tmp_path: Path
+    observed_batch_reports: tuple[
+        tuple[Path, dict[str, Path]], tuple[str, str, str]
+    ],
+    tmp_path: Path,
 ) -> None:
     from scripts.repository_evaluation.aggregate_backend import aggregate_backend
 
-    reports = _workflow_batch_reports(corpus, tmp_path / "batches")
+    captured_corpus, reports = observed_batch_reports
     report = aggregate_backend(
-        campaign_path=_campaign_for_fixture(corpus[0]),
-        sources=corpus[1],
-        selections={"fixture": {"workflow_reports": reports}},
+        campaign_path=_campaign_for_fixture(captured_corpus[0]),
+        sources=captured_corpus[1],
+        selections={"fixture": {"workflow_reports": list(reports[:2])}},
         output_dir=tmp_path / "aggregate",
     )
     assert report["input_integrity"]["state"] == "PASS"
@@ -1279,26 +1310,20 @@ def test_aggregate_admits_disjoint_bounded_reports_and_preserves_namespaces(
 
 @pytest.mark.parametrize("reverse", [False, True])
 def test_aggregate_overlapping_batches_cannot_choose_a_winner(
-    corpus: tuple[Path, dict[str, Path]], tmp_path: Path, reverse: bool
+    observed_batch_reports: tuple[
+        tuple[Path, dict[str, Path]], tuple[str, str, str]
+    ],
+    tmp_path: Path,
+    reverse: bool,
 ) -> None:
     from scripts.repository_evaluation.aggregate_backend import aggregate_backend
 
-    reports = _workflow_batch_reports(corpus, tmp_path / "batches")
-    duplicate = tmp_path / "duplicate"
-    run_backend(
-        sources=corpus[1],
-        suite_path=corpus[0],
-        output_dir=duplicate,
-        workflow_ids=["handler"],
-        transports=(),
-    )
-    reports.append(str(duplicate / "summary.json"))
+    captured_corpus, reports = observed_batch_reports
+    submitted = list(reports[::-1] if reverse else reports)
     report = aggregate_backend(
-        campaign_path=_campaign_for_fixture(corpus[0]),
-        sources=corpus[1],
-        selections={
-            "fixture": {"workflow_reports": reports[::-1] if reverse else reports}
-        },
+        campaign_path=_campaign_for_fixture(captured_corpus[0]),
+        sources=captured_corpus[1],
+        selections={"fixture": {"workflow_reports": submitted}},
         output_dir=tmp_path / "aggregate",
     )
     assert report["status"] == "FAIL"
@@ -1387,7 +1412,9 @@ def test_native_batches_keep_each_capture_root_and_acquisition_identity(
     )
     from scripts.repository_evaluation.run_backend import _observer_identity
 
-    _workflow_batch_reports(corpus, tmp_path / "batches")
+    # This test constructs synthetic native packets to assert capture-root and
+    # acquisition-ID handoff. It does not consume actual workflow captures.
+    _add_second_workflow(corpus)
     suite, grader = load_corpus(*corpus)
     entries = []
     observed = []

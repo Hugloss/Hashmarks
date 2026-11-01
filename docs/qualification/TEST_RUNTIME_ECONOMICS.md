@@ -66,3 +66,19 @@ matching copied suite; no test corrupts the shared fixture.
 
 Tests that explicitly prove capture freshness, receipt reuse, transport behavior,
 or source mutation still acquire independent real witnesses.
+
+## Avoid duplicate native acquisitions in read-only aggregation tests
+
+For multi-workflow aggregation, capture one real, source-bound set of backend
+workflow reports with ordinary `run_backend()` and share that unchanged evidence
+across independent read-only qualification and order-invariance checks.
+A separate genuine duplicate workflow capture remains necessary to establish
+overlapping membership. Tests that deliberately corrupt a report still use
+isolated evidence and never mutate the shared capture.
+
+A native-packet handoff test which constructs explicit packets and replaces the
+native verifier only needs a valid two-workflow corpus; it must not perform
+unused real backend acquisitions. True native capture and transport semantics
+remain covered by the separate genuine backend workflow tests. This is a
+pytest-fixture optimization, not a product cache, test runner, or substitute for
+nightly and exact-source release verification.
