@@ -235,6 +235,7 @@ def test_shared_policy_requires_full_suite(repository: tuple[Path, str]) -> None
         "hashmarks/codemap/verification_ownership.py",
         "hashmarks/codemap/evidence_verification.py",
         "hashmarks/codemap/engine.py",
+        "scripts/ci_full_shards.py",
         "scripts/release_contract.py",
         "scripts/host_qualification/mcp_gate.py",
     ],
