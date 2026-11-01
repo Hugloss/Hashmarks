@@ -13,6 +13,7 @@ from typing import TypedDict
 
 from hashmarks.paths import normalize_relative_path
 
+from .make_shell_static_bindings import add_static_binding_observations
 from .repository_declaration_contract import MAX_GROUPS
 from .repository_declaration_provider import (
     RepositoryDeclarationProviderContext,
@@ -642,7 +643,7 @@ def _group(
                 },
                 "producer": {
                     "provider": provider,
-                    "parser": "bounded-make-shell-syntax.v1",
+                    "parser": "bounded-make-shell-syntax.v2",
                 },
                 "evidence": [
                     {
@@ -709,6 +710,7 @@ class MakeShellDeclarations:
             reader = _MakeReader() if language == "make" else _ShellReader()
             for line in _logical_lines(raw.decode("utf-8"), language=language):
                 reader.read(line)
+            add_static_binding_observations(reader.facts)
             groups.extend(
                 _group(path, fact, ordinal, reader.facts, provider=self.name)
                 for ordinal, fact in enumerate(reader.facts)
@@ -719,7 +721,7 @@ class MakeShellDeclarations:
             groups=tuple(groups),
             provenance={
                 "provider": self.name,
-                "semantics": "hashmarks.make-shell-syntax.v1",
+                "semantics": "hashmarks.make-shell-syntax.v2",
                 "make_paths": sorted(self.make_paths),
                 "shell_paths": sorted(self.shell_paths),
                 "missing_selected_paths": missing,

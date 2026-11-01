@@ -332,3 +332,121 @@ def test_bounds_and_unsupported_quoting_fail_without_partial_evidence(
 def test_selected_scope_is_explicit_canonical_and_bounded(options: dict) -> None:
     with pytest.raises(ValueError):
         MakeShellDeclarations(**options)
+
+
+def test_make_indirection_is_conditional_static_words_not_execution(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path,
+        "Makefile",
+        (
+            "RUNNER := python # comment\n"
+            "TOOL = $(RUNNER)\n"
+            "check: fixture.txt\n"
+            '\t@MODE="sample" $(TOOL) -m demo\n'
+        ),
+    )
+    packet = _observe(tmp_path, MakeShellDeclarations(make_paths=("Makefile",)))
+    command = _values(packet, "shell-command-expression")[0]
+    observation = command["static_binding_observation"]
+    assert command["literal_argv"] is None
+    assert command["make_targets"] == ["check"]
+    assert observation["state"] == "conditional-static"
+    assert observation["words"] == ["python", "-m", "demo"]
+    assert [row["name"] for row in observation["supporting_declarations"]] == [
+        "RUNNER",
+        "TOOL",
+    ]
+    assert [row["start_line"] for row in observation["supporting_declarations"]] == [
+        1,
+        2,
+    ]
+    assert command["command_local_environment"][0]["value_expression"]["literal"] == (
+        "sample"
+    )
+    assert observation["effective_command"] == "not-established"
+    assert command["execution"] == "not-established"
+    assert observation["negative_evidence_admissible"] is False
+    assert packet["providers"][0]["provenance"]["semantics"] == (
+        "hashmarks.make-shell-syntax.v2"
+    )
+
+
+def test_shell_indirection_uses_only_prior_top_level_single_atoms(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path,
+        "demo.sh",
+        ("RUNNER=python\nTOOL=\"$RUNNER\"\n\"$TOOL\" -m demo\nprintf '%s' '$RUNNER'\n"),
+    )
+    packet = _observe(tmp_path, MakeShellDeclarations(shell_paths=("demo.sh",)))
+    commands = _values(packet, "shell-command-expression")
+    conditional = commands[0]["static_binding_observation"]
+    assert conditional["state"] == "conditional-static"
+    assert conditional["words"] == ["python", "-m", "demo"]
+    assert commands[0]["literal_argv"] is None
+    assert commands[1]["literal_argv"] == ["printf", "%s", "$RUNNER"]
+    assert commands[1]["static_binding_observation"]["state"] == "not-needed"
+
+
+@pytest.mark.parametrize(
+    ("source", "make"),
+    [
+        ('RUNNER=first\nRUNNER=second\n"$RUNNER" arg\n', False),
+        ('A=$B\nB=$A\n"$A" arg\n', False),
+        ('RUNNER=python\nsource external.sh\n"$RUNNER" arg\n', False),
+        (
+            'RUNNER=python\nif condition; then\n  RUNNER=other\nfi\n"$RUNNER" arg\n',
+            False,
+        ),
+        ("RUNNER := python\nRUNNER := other\nall:\n\t$(RUNNER) arg\n", True),
+        ("A = $(B)\nB = $(A)\nall:\n\t$(A) arg\n", True),
+        ("RUNNER := python\ninclude override.mk\nall:\n\t$(RUNNER) arg\n", True),
+        (
+            "RUNNER := python\nSIDE := $(eval RUNNER := evil)\nall:\n\t$(RUNNER) arg\n",
+            True,
+        ),
+        (
+            'RUNNER=python\nmutate() { RUNNER=evil; }\n"$RUNNER" arg\n',
+            False,
+        ),
+        ("RUNNER ?= python\nall:\n\t$(RUNNER) arg\n", True),
+        ("RUNNER := python\nall: RUNNER=other\n\t$(RUNNER) arg\n", True),
+    ],
+)
+def test_static_binding_unknown_with_ambiguous_or_dynamic_source(
+    tmp_path: Path, source: str, make: bool
+) -> None:
+    path = "Makefile" if make else "demo.sh"
+    _write(tmp_path, path, source)
+    provider = (
+        MakeShellDeclarations(make_paths=(path,))
+        if make
+        else MakeShellDeclarations(shell_paths=(path,))
+    )
+    packet = _observe(tmp_path, provider)
+    commands = _values(packet, "shell-command-expression")
+    if commands:
+        assert all(
+            row["static_binding_observation"]["state"] != "conditional-static"
+            for row in commands
+        )
+
+
+def test_static_binding_does_not_treat_unsafe_expansion_as_simple_word(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path,
+        "Makefile",
+        "TOOL = python -m unsafe\nall:\n\t$(TOOL) demo\n",
+    )
+    packet = _observe(tmp_path, MakeShellDeclarations(make_paths=("Makefile",)))
+    command = _values(packet, "shell-command-expression")[0]
+    assert command["static_binding_observation"] == {
+        "state": "unclassified",
+        "reason": "unresolved-word-or-binding",
+    }
+    assert command["literal_argv"] is None
