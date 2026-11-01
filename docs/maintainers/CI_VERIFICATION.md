@@ -89,8 +89,11 @@ records the candidate Git SHA, native collection identity, every shard's
 membership, and a deterministic identity.
 
 Every runner re-collects native pytest before execution and rejects any
-mismatch with the artifact. No missing, duplicate or unknown collected item
-can be accepted as green. GitHub Actions groups workers and starts ordinary
+mismatch with the artifact. Each actual native pytest process also loads a
+collection-only assertion plugin that checks its selected **process-local
+collection** against the exact ordinary or singleton membership assigned to
+that worker. Drift between the recheck and execution now fails before tests
+run. No missing, duplicate or unknown collected item can be accepted as green. GitHub Actions groups workers and starts ordinary
 `python -m pytest` executions; Hashmarks has no worker or result authority.
 All four runners must pass for `Qualification convergence` to succeed.
 If the initial native collection cannot be qualified, the development gate

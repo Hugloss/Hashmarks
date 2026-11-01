@@ -161,21 +161,25 @@ jobs:
           uv run --frozen --offline --no-sync --group test python scripts/ci_full_shards.py emit \
             --manifest "$RUNNER_TEMP/full-shard-plan/hashmarks-full-shards.json" \
             --shard "$SHARD_INDEX" --normal-output "$RUNNER_TEMP/normal-tests.nul" \
-            --isolated-output "$RUNNER_TEMP/isolated-tests.nul"
+            --isolated-output "$RUNNER_TEMP/isolated-tests.nul" \
+            --expected-output "$RUNNER_TEMP/expected-normal.nul"
       - name: Execute native ordinary pytest membership
         shell: bash
+        env:
+          HASHMARKS_CI_EXPECTED_NUL: ${{ runner.temp }}/expected-normal.nul
         run: |
           set -euo pipefail
           xargs -0 -r uv run --frozen --offline --no-sync --group test \
-            python -m pytest -q --maxfail=1 --durations=10 \
+            python -m pytest -p scripts.ci_full_shards -q --maxfail=1 --durations=10 \
             < "$RUNNER_TEMP/normal-tests.nul"
       - name: Run process-sensitive tests in singleton native pytest processes
         shell: bash
         run: |
           set -euo pipefail
           while IFS= read -r -d '' nodeid; do
-            uv run --frozen --offline --no-sync --group test \
-              python -m pytest -q --maxfail=1 "$nodeid"
+            HASHMARKS_CI_EXPECTED_NODEID="$nodeid" \
+              uv run --frozen --offline --no-sync --group test \
+              python -m pytest -p scripts.ci_full_shards -q --maxfail=1 "$nodeid"
           done < "$RUNNER_TEMP/isolated-tests.nul"
 
   qualification-convergence:
