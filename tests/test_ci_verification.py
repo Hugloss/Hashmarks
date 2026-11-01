@@ -123,6 +123,27 @@ def test_shared_policy_requires_full_suite(repository: tuple[Path, str]) -> None
     assert "broad-authority:pyproject.toml" in plan["reasons"]
 
 
+@pytest.mark.parametrize(
+    "path",
+    [
+        "hashmarks/codemap/verification_ownership.py",
+        "hashmarks/codemap/evidence_verification.py",
+        "hashmarks/codemap/engine.py",
+        "scripts/release_contract.py",
+        "scripts/host_qualification/mcp_gate.py",
+    ],
+)
+def test_verification_and_release_internals_force_full_suite(
+    repository: tuple[Path, str], path: str
+) -> None:
+    root, base = repository
+    _change(root, path, "def changed():\n    pass\n")
+    plan = module.select(root, base, links=_unreachable)
+    assert plan["mode"] == "full"
+    assert plan["pytest_paths"] == ["tests"]
+    assert f"broad-authority:{path}" in plan["reasons"]
+
+
 def test_rename_requires_full_suite(repository: tuple[Path, str]) -> None:
     root, base = repository
     _git(root, "mv", "hashmarks/worker.py", "hashmarks/renamed.py")

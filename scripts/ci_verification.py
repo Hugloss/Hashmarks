@@ -36,11 +36,24 @@ BROAD_PATHS = frozenset(
         ".pre-commit-config.yaml",
         "tests/conftest.py",
         "scripts/ci_verification.py",
+        "scripts/release_contract.py",
+        "scripts/ruff_debt.py",
+        "scripts/standalone_build.py",
+        "scripts/test_shards.py",
+        "hashmarks/codemap/engine.py",
+        "hashmarks/codemap/evidence_verification.py",
+        "hashmarks/codemap/decision_session.py",
+        "hashmarks/verification_nomination_validation.py",
         "hashmarks/qualification_classification.py",
         "hashmarks/qualification_units.py",
         "hashmarks/verification_selection.py",
         "hashmarks/_development/test_shards.py",
     }
+)
+BROAD_PREFIXES = (
+    ".github/",
+    "hashmarks/codemap/verification_",
+    "scripts/host_qualification/",
 )
 
 
@@ -206,7 +219,7 @@ def _classify_changes(
     tests: set[str] = set(BASELINE)
     sources: list[str] = []
     for path in changed:
-        if path in BROAD_PATHS or path.startswith(".github/"):
+        if path in BROAD_PATHS or path.startswith(BROAD_PREFIXES):
             full_reasons.append(f"broad-authority:{path}")
         elif _documentation(path):
             continue
