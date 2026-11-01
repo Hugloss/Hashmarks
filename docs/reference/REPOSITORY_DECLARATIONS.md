@@ -10,6 +10,43 @@ The governing boundary is:
 
 This capability is intentionally not a universal service/configuration ontology. Hashmarks core does not define concepts such as \`service.owner\`, \`service.lifecycle\`, \`runtime.python\`, or organization-specific source-of-truth precedence.
 
+## Qualified static Make/shell binding candidates
+
+`MakeShellDeclarations` observes explicitly selected Makefiles and shell sources
+through the existing bounded lexical declaration owner. Its
+`hashmarks.make-shell-syntax.v2` producer retains raw expressions, assignment
+operators, source order, declaration references, Make target/recipe associations,
+canonical member revisions, provenance and incomplete semantic coverage.
+
+A `shell-command-expression` may include `static_binding_observation`.
+`state=conditional-static` means its `words` follow from unique, earlier,
+top-level, single-atom authored declarations in the **selected file**, with each
+supporting declaration's line, raw expression and assignment operator in
+`supporting_declarations`. For example, `RUNNER := python`,
+`TOOL = $(RUNNER)`, and a recipe `MODE="sample" $(TOOL) -m demo`
+produce conditional candidate words `["python", "-m", "demo"]`.
+Command-local assignments remain separately reported as lexical source values.
+Shell single-quoted variable spellings remain literal; double-quoted simple
+references can qualify when their input is unique and already authored.
+
+This is **not Make expansion or shell execution**. Assumptions include no
+environment/command-line overrides, no externally supplied include/source
+state and no native expansion that changes word boundaries. Only safe
+single-word literals or directly referenced names with at most eight hops
+are included. Cyclic, missing, later, duplicate, conditional, dynamic,
+unsupported-operator and non-atom bindings stay `unclassified`. Includes,
+source/eval, unresolved syntax and control constructs invalidate the
+closed-source derivation. `state=not-needed` means existing literal argv
+already describes the selected text.
+
+Every qualified result retains `effective_command=not-established`,
+`execution=not-established`, `semantic_coverage=incomplete` and
+`negative_evidence_admissible=false`. The existing `literal_argv`,
+`variable_references`, declaration candidates and raw source remain
+unchanged. Consumers must not use candidate words to assert executable
+identity, runtime environment, success, policy compliance or qualified
+absence. OH-Goon owns policy, admission, execution and its own migration.
+
 ## Selected backend schema and environment syntax
 
 An explicitly nominated `StaticPythonBackendDeclarations` provider can now
