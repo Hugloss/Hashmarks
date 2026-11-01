@@ -37,8 +37,6 @@ from .specs import (
 
 if TYPE_CHECKING:
     from .client import RepositoryIdentityMode as RepositoryIdentityMode
-    from .identity import RepositoryIdentity as RepositoryIdentity
-
     from .codemap import (
         CodeMap as CodeMap,
     )
@@ -63,6 +61,7 @@ if TYPE_CHECKING:
     from .consumer_conformance import (
         validate_native_consumer_bundle as validate_native_consumer_bundle,
     )
+    from .identity import RepositoryIdentity as RepositoryIdentity
     from .producer_identity import (
         native_producer_implementation_identity as native_producer_implementation_identity,
     )
@@ -113,18 +112,15 @@ __all__ = [
 
 def __getattr__(name: str) -> object:
     """Lazily expose component APIs without loading unrelated engines eagerly."""
-    if name == "RepositoryIdentity":
-        from .identity import RepositoryIdentity
+    if name in {"CodeMap", "RepositoryIdentity", "RepositoryIdentityMode"}:
+        from importlib import import_module
 
-        return RepositoryIdentity
-    if name == "RepositoryIdentityMode":
-        from .client import RepositoryIdentityMode
-
-        return RepositoryIdentityMode
-    if name == "CodeMap":
-        from .codemap import CodeMap
-
-        return CodeMap
+        owner = {
+            "CodeMap": ".codemap",
+            "RepositoryIdentity": ".identity",
+            "RepositoryIdentityMode": ".client",
+        }[name]
+        return getattr(import_module(owner, __name__), name)
     if name == "native_producer_implementation_identity":
         from .producer_identity import native_producer_implementation_identity
 
