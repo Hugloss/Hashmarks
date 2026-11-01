@@ -21,6 +21,7 @@ from hashmarks.mcp_contract import McpToolContract, tool_contract
 from hashmarks.mcp_server import (
     _DependencyCodemapResultMode,
     _RepositoryDeclarationsResultMode,
+    _SourceObservationResultMode,
 )
 from hashmarks.mcp_surface import HashmarksMcpSurface
 from hashmarks.operation_contract import (
@@ -71,6 +72,7 @@ _EXPECTED = {
         "literals": "hashmarks.scoped-source-literal-set.v1",
         "range": "hashmarks.source-range-receipt.v1",
         "ecmascript": "hashmarks.ecmascript-source-observation.v1",
+        "bindings": "hashmarks.source-bindings.v1",
     },
     "repository_evidence": {
         "observation": "hashmarks.repository-evidence-bindings.v1",
@@ -79,6 +81,7 @@ _EXPECTED = {
     },
     "source_range_receipt": {"default": "hashmarks.source-range-receipt.v1"},
     "source_ecmascript": {"default": "hashmarks.ecmascript-source-observation.v1"},
+    "source_bindings": {"default": "hashmarks.source-bindings.v1"},
     "verification_membership": {
         "default": "hashmarks.verification-membership-observation.v1"
     },
@@ -334,6 +337,9 @@ def test_mcp_mode_types_derive_from_operation_contract() -> None:
     assert get_args(_RepositoryDeclarationsResultMode) == tuple(
         operation_modes("repository_declarations")
     )
+    assert get_args(_SourceObservationResultMode) == tuple(
+        operation_modes("source_observation")
+    )
 
 
 def test_multimode_public_defaults_consume_canonical_operation_authority() -> None:
@@ -405,6 +411,10 @@ _FIXED_MODE_CORE_BOUNDARIES = {
     "source_ecmascript": (
         "hashmarks/codemap/source_ecmascript.py",
         "ecmascript",
+    ),
+    "source_bindings": (
+        "hashmarks/codemap/source_bindings.py",
+        "bindings",
     ),
     "verification_membership": (
         "hashmarks/codemap/verification_membership.py",

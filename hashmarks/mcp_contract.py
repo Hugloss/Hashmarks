@@ -286,9 +286,10 @@ MCP_TOOL_CONTRACTS = (
     McpToolContract(
         "source_observation",
         (
-            "Observe literals (not regex) in up to 32 paths. For one path, range "
-            "returns byte_range bytes; ecmascript observes JS/TS alias/property/call "
-            "syntax. Preserve scoped revisions; never infer repository-wide absence."
+            "Observe literals (not regex) in up to 32 paths; never infer "
+            "repository-wide absence. One path also supports range bytes, "
+            "ecmascript syntax, or qualified Python/JS/TS bindings. "
+            "Runtime targets remain unknown."
         ),
         "source_observation",
     ),

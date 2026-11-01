@@ -202,6 +202,90 @@ def test_source_composition_may_construct_the_configured_provider_only() -> None
     )
 
 
+def _python_module_parse_bypasses(tree: ast.Module) -> list[int]:
+    bindings = dict(
+        pair
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.Import, ast.ImportFrom))
+        for pair in _syntax_import_bindings(node, "hashmarks.codemap")
+    )
+    return [
+        node.lineno
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and _syntax_call_target(node.func, bindings) == "ast.parse"
+        and not any(
+            keyword.arg == "mode"
+            and isinstance(keyword.value, ast.Constant)
+            and keyword.value.value == "eval"
+            for keyword in node.keywords
+        )
+    ]
+
+
+def test_python_member_parsing_uses_the_existing_ast_owner() -> None:
+    violations = [
+        f"{path.relative_to(CODEMAP)}:{line}"
+        for path in sorted(CODEMAP.rglob("*.py"))
+        for line in _python_module_parse_bypasses(_tree(path))
+    ]
+    assert violations == [], (
+        "whole-member Python parsers bypass their owner: " + ", ".join(violations)
+    )
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "import ast as syntax\nsyntax.parse(raw)\n",
+        "from ast import parse as another\nanother(raw)\n",
+        "import ast\nast.parse(raw, mode='exec')\n",
+    ],
+)
+def test_python_member_guard_detects_renamed_parser_calls(source: str) -> None:
+    assert _python_module_parse_bypasses(ast.parse(source))
+
+
+def test_annotation_expression_parse_is_distinct_from_member_parsing() -> None:
+    assert (
+        _python_module_parse_bypasses(
+            ast.parse("import ast\nast.parse(annotation, mode='eval')\n")
+        )
+        == []
+    )
+
+
+def test_binding_interpreters_consume_supplied_syntax_without_source_io() -> None:
+    forbidden = {
+        "open",
+        "read_text",
+        "read_bytes",
+        "parse",
+        "parse_python_ast",
+        "syntax_tree",
+        "tokenize",
+    }
+    paths = [
+        *CODEMAP.glob("python_binding*.py"),
+        *CODEMAP.glob("ecmascript_binding*.py"),
+    ]
+    violations = [
+        f"{path.name}:{node.lineno}"
+        for path in paths
+        for node in ast.walk(_tree(path))
+        if isinstance(node, ast.Call)
+        and (
+            isinstance(node.func, ast.Attribute)
+            and node.func.attr in forbidden
+            or isinstance(node.func, ast.Name)
+            and node.func.id in forbidden
+        )
+    ]
+    assert violations == [], (
+        "binding projectors must use admitted syntax: " + ", ".join(violations)
+    )
+
+
 def _relationship_cache_writers(tree: ast.Module) -> list[tuple[str, str, int]]:
     writers = []
     for cls in (node for node in tree.body if isinstance(node, ast.ClassDef)):

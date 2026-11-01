@@ -23,6 +23,7 @@ from .python_ast import estimate_tokens
 from .query_primitives import _WORD_RE
 from .repository_observation import evidence_identity, packet_digest
 from .scoped_source_literals import ScopedSourceLiteralsMixin
+from .source_bindings import SourceBindingsMixin
 from .source_content import source_content_observation
 from .source_ecmascript import SourceEcmascriptMixin
 from .source_line_correspondence import (
@@ -129,7 +130,10 @@ class _ScopedSourceAggregation:
 
 
 class RepositorySource(
-    ScopedSourceLiteralsMixin, SourceEcmascriptMixin, ReadScopeOwner
+    ScopedSourceLiteralsMixin,
+    SourceEcmascriptMixin,
+    SourceBindingsMixin,
+    ReadScopeOwner,
 ):
     """Own admitted member bytes, revisions, ranges and source disclosure.
 

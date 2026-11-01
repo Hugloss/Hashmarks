@@ -7,6 +7,11 @@ native syntax provider and Source's canonical stable byte capture. This operatio
 does not resolve an alias chain, identify a runtime object, or resolve a call
 target.
 
+For bounded source-local alias and string interpretation, use the separate
+[`source.bindings()`](SOURCE_BINDINGS.md) operation. It returns qualified,
+conditional or unknown source relationships while preserving unestablished
+runtime targets. The syntax-only operation described here remains unchanged.
+
 ```python
 from hashmarks import CodeMap
 

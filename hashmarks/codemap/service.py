@@ -168,6 +168,11 @@ _SERVICE_ROUTES = {
         operation="source_ecmascript",
         response_key="source_ecmascript",
     ),
+    "source_bindings": _canonical_service_route(
+        "_source_bindings_response",
+        operation="source_bindings",
+        response_key="source_bindings",
+    ),
     "verification_membership": _canonical_service_route(
         "_verification_membership_response",
         operation="verification_membership",
@@ -491,6 +496,13 @@ class CodeMapService:
         return {
             "ok": True,
             "source_ecmascript": self._map().source.ecmascript(path, **options),
+        }
+
+    def _source_bindings_response(self, request: dict[str, Any]) -> dict[str, Any]:
+        path, options = _source_request(request, ("limit", "max_bytes"))
+        return {
+            "ok": True,
+            "source_bindings": self._map().source.bindings(path, **options),
         }
 
     def _verification_membership_response(
@@ -1086,6 +1098,21 @@ class CodeMapServiceClient:
             if value is not None
         }
         return self._canonical_payload("source_ecmascript", path=path, **options)
+
+    def source_bindings(
+        self,
+        path: str,
+        *,
+        limit: int | None = None,
+        max_bytes: int | None = None,
+    ) -> dict[str, object]:
+        """Transport qualified source bindings without interpreting them again."""
+        options = {
+            name: value
+            for name, value in {"limit": limit, "max_bytes": max_bytes}.items()
+            if value is not None
+        }
+        return self._canonical_payload("source_bindings", path=path, **options)
 
     def verification_membership(self, report: object) -> dict[str, object]:
         """Bind a supplied collection report without running its producer."""

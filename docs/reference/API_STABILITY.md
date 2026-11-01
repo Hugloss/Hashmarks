@@ -46,7 +46,7 @@ calls therefore remain separate measurements. These labels and timings describe
 runtime diagnostics only and carry no repository or execution authority.
 
 Source operations use `CodeMap.source.outline()`, `.symbol()`, `.read()`, `.grep()`,
-`.observe()`, `.range_receipt()`, `.ecmascript()`, `.scoped_occurrences()` and
+`.observe()`, `.range_receipt()`, `.ecmascript()`, `.bindings()`, `.scoped_occurrences()` and
 `.scoped_literals()`. The source component
 owns qualified member/range reads and returns detached public outline symbols.
 Its instruction-scope primitive consumes explicit paths. Query-based instruction
@@ -78,6 +78,15 @@ parsers and bounded/incomplete evidence retain explicit unknown qualifications.
 Its schema is `hashmarks.ecmascript-source-observation.v1`; CLI/MCP use the
 `ecmascript` source-observation mode and the service client exposes
 `source_ecmascript(...)`. See [ECMAScript source observations](ECMASCRIPT_SOURCE_OBSERVATIONS.md).
+
+`CodeMap.source.bindings()` is the supported bounded Python/JavaScript/TypeScript
+binding observation. It reuses Source's exact member and native syntax owners to
+qualify declarations, references, authored import/alias origins, string values
+and explicitly conditional default/argument relationships. Parameter calls and
+runtime targets remain unknown; imported implementations are never followed.
+Its schema is `hashmarks.source-bindings.v1`; CLI/MCP use the `bindings`
+source-observation mode, and the service client exposes `source_bindings(...)`.
+See [Qualified source binding observations](SOURCE_BINDINGS.md).
 
 Native publication uses `CodeMap.native.import_scip()` and `.enrich_projects()`.
 `CodeMap.native.status()` reports native evidence qualification. Repository

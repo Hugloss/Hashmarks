@@ -10,6 +10,8 @@ import ast
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from hashmarks.python_ast_cache import parse_python_ast
+
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
@@ -159,7 +161,7 @@ def _ownership_tree(source: str, tree: ast.Module | None) -> ast.Module | None:
     if tree is not None:
         return tree
     try:
-        return ast.parse(source)
+        return parse_python_ast(source)
     except (SyntaxError, ValueError):
         return None
 

@@ -12,6 +12,8 @@ from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING, cast
 
+from hashmarks.python_ast_cache import parse_python_ast
+
 from .repository_domains import is_test_path
 
 if TYPE_CHECKING:
@@ -454,7 +456,7 @@ def analyze_python_import_ownership(
 
     if tree is None:
         try:
-            tree = ast.parse(source)
+            tree = parse_python_ast(source)
         except (SyntaxError, ValueError):
             return ()
     paths = set(repository_paths)

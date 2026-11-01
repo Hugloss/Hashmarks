@@ -8,7 +8,13 @@ from typing import TYPE_CHECKING
 
 from .model import CODEMAP_SCHEMA, EdgeRecord, ParsedArtifact, SymbolRecord
 from .providers import ECMASCRIPT_GRAMMARS, source_grammar
-from .python_ast import PYTHON_PARSER, estimate_tokens, lexical_records, parse_python
+from .python_ast import (
+    PYTHON_PARSER,
+    estimate_tokens,
+    lexical_records,
+    parse_python,
+    python_parser_signature,
+)
 
 if TYPE_CHECKING:
     from .providers import SourceRangeProvider
@@ -37,7 +43,7 @@ def parser_signature(
     *,
     path: str | None = None,
 ) -> str:
-    base = parser_id(language)
+    base = python_parser_signature() if language == "python" else parser_id(language)
     if range_provider is None:
         return base
     extra = range_provider.signature(
@@ -287,7 +293,7 @@ def parse_source(
         else source
     )
     if language == "python":
-        artifact = parse_python(text, file_digest=file_digest)
+        artifact = parse_python(source, file_digest=file_digest)
     elif language == "go":
         artifact = _go_outline(text, file_digest=file_digest)
     elif language == "rust":
@@ -297,17 +303,17 @@ def parse_source(
 
     if range_provider is not None:
         artifact = range_provider.enrich(artifact, source, grammar)
-        if (
-            language in ECMASCRIPT_GRAMMARS
-            and parser_signature(language, range_provider, path=path) != expected_parser
-        ):
-            artifact = replace(
-                artifact,
-                symbols=(),
-                edges=(),
-                outline="",
-                parse_error="native-syntax-provider-changed",
-            )
+    if (
+        language in ECMASCRIPT_GRAMMARS | {"python"}
+        and parser_signature(language, range_provider, path=path) != expected_parser
+    ):
+        artifact = replace(
+            artifact,
+            symbols=(),
+            edges=(),
+            outline="",
+            parse_error="native-syntax-provider-changed",
+        )
     unique_symbols = _unique_symbol_occurrences(artifact.symbols)
     if unique_symbols != artifact.symbols:
         artifact = replace(artifact, symbols=unique_symbols)

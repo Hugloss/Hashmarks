@@ -10,6 +10,8 @@ import ast
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from hashmarks.python_ast_cache import parse_python_ast
+
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping
 
@@ -252,7 +254,7 @@ def analyze_python_cache_invalidators(
 ) -> tuple[CacheInvalidator, ...]:
     if tree is None:
         try:
-            tree = ast.parse(source)
+            tree = parse_python_ast(source)
         except (SyntaxError, ValueError):
             return ()
     owner_keys = {

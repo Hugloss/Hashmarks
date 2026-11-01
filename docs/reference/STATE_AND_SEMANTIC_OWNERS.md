@@ -72,6 +72,8 @@ introduce a dispatcher, interface registry or additional repository authority.
 | Generation-bound read scope | `decision_session.py::DecisionScope.session` and `.observe`, exposed by `CodeMap.reads` | Owns primitive query reuse and diagnostics for one existing store generation and atomic identity observation. Nested scopes share an immutable `ReadScope` value. `.observe` recomputes only the read stage after member drift, preserving the caller's original before snapshot and sync facts. Index reconciliation atomically checks the expected generation and returns the exact publication adopted by the next read. Nested observations propagate refresh requests to their outer owner; another writer or repeated drift fails closed. Task-evidence preparation uses `reconcile_decision` around its staged read. Ended scopes cannot supply another scope's final task/snapshot/impact/ownership memo; those paired memo values remain domain-owned. The static `ReadScopeOwner` port has no state, registry or runtime policy. |
 | Parsed artifact | `parsers.py::parse_source`, `artifact_key_for` | Interprets supplied source under the supplied content revision and parser signature. File-backed ingestion must bind the supplied digest to the bytes actually parsed. Mechanisms do not own repository admission or generation. |
 | Native source syntax | `providers.py::TreeSitterRangeProvider.syntax_tree`, `source_grammar`; projections in `ecmascript_syntax.py` | The configured provider owns parsing and rejection of malformed/recovered syntax. Grammar selection distinguishes JavaScript/JSX, TypeScript and TSX. Indexing, public Source, verification and TypeScript resolver inputs share admitted syntax and its module declarations. Source bytes/revision and provider/grammar identity remain binding; operation-local tree reuse adds no repository observer or persistent cache. |
+| Python module syntax | `python_ast_cache.py::parse_python_ast`, `read_python_ast` | Full-module parsing uses the native Python grammar through one owner. File-backed tooling retains stable-read qualification; source observers pass already admitted UTF-8 bytes. `python_ast_session()` permits bounded operation-local reuse keyed by exact source and grammar signature. Shared trees are immutable to consumers; reuse establishes neither member identity nor freshness. |
+| Qualified source-local bindings | `source_bindings.py::SourceBindingsMixin.bindings`, exposed by `CodeMap.source.bindings` | Extends Source with bounded Python/ECMAScript declaration, reference, alias, string and conditional default/argument facts over admitted syntax. Full bounded lexical scope is qualified before result clipping. Source owns revision/freshness; native parsers own syntax; language interpreters own supported source-form qualification. Runtime targets and imported implementations remain unestablished, semantic coverage incomplete, and negative evidence inadmissible. No persistent binding graph or import-resolution dependency is introduced. |
 | Index publication | `indexing_lifecycle.py::RepositoryIndex.sync` and `repository_index_store.py::publication_transaction` | The independently constructed Index owns ingestion/reconciliation and import-root projection. The store owns atomic derived writes. Consumers call `CodeMap.index`; the old root sync/preflight/clean/watch entry points are removed. Index has no source/read-scope/relationship-cache dependency. |
 | Qualified import identity | `import_resolution.py::RepositoryImports` | Produces bounded repository import/re-export identity. Retrieval, relationship, and verification consumers preserve unresolved/ambiguous results rather than resolve again by short name. |
 | Native evidence | `native_evidence.py::RepositoryNativeEvidence`, exposed by `CodeMap.native` | Owns producer import/enrichment, repository admission before publication, and source/provenance freshness qualification through its internal `EvidenceFreshnessMixin`. It consumes Files, Source, DecisionScope and the existing store publication transaction directly; it has no CodeMap or relationship-owner back-reference. Producer translation stays in native adapters. |
@@ -144,14 +146,50 @@ semantics. Its resolver consumes canonical source import declarations rather
 than rediscovering occurrences with a second source preprocessor. Compiler
 resolution provenance remains separate from source syntax and cannot repair an
 unknown syntax observation. Python's native AST/token facilities remain
-language-specific. Lexical retrieval terms and approximate model-token budgets
-are separate projections and never establish structural source facts.
+language-specific. Full-module AST creation goes through
+`python_ast_cache.parse_python_ast`; the existing `read_python_ast` file reader
+delegates to it after its stable read. An existing read/observation scope can
+reuse exact UTF-8 input under the native Python grammar signature through
+`python_ast_session()`, bounded to 32 trees and 8 MiB of source. Nested scopes
+share this operation-local reuse, exit and exceptions clear it, and eviction
+may require another parse. File metadata remains only the existing tooling
+cache's acceleration key; Source still supplies canonical member bytes and
+revision, and no Python cache supplies repository freshness. Lexical retrieval
+terms and approximate model-token budgets are separate projections and never
+establish structural source facts.
 
 The ownership guard in `tests/test_semantic_ownership_architecture.py` resolves
 absolute/relative imports and aliases, rejects consumer access to native parser
 construction, and exercises renamed bypass controls. Behavioral source and
 verification regressions separately prove that parser unavailability and
 comment/string decoys cannot revive the retired structural fallbacks.
+
+### Qualified source binding interpretation
+
+[`source.bindings()`](SOURCE_BINDINGS.md) extends Source's admitted-member
+observation with source-local lexical qualification. Python and ECMAScript
+interpreters consume full supplied bytes and syntax from their existing native
+owners. They do not construct parsers, tokenize another source copy, read files
+independently, or infer source facts from display previews. Scope and binding
+tables live only for that bounded interpretation; they are not repository
+graphs or persistent indexes.
+
+Source owns the common packet, member/provider recheck, generation and identity.
+The versioned language interpreter owns the meaning of supported expression
+forms and explicit unknown reasons. The operation/schema registry identifies
+the public response, while service, CLI and MCP only validate and transport it.
+These adapters cannot strengthen a conditional fact, unknown target, incomplete
+semantic coverage or stale observation.
+
+The operation qualifies all required bounded lexical scope before projecting
+facts. It carries neutral source targets, exact scopes and ranges, supporting
+evidence, conditions and reasons. Defaults and one-edge local argument
+relationships remain separate conditional facts; a parameter call stays
+unknown. Mutable global names do not become runtime call targets.
+`RepositoryImports` remains the import-resolution owner and already depends on
+Source. Source bindings therefore do not call back into Imports or chase any
+imported implementation. There is no new semantic registry, parser, generation,
+consumer-policy owner or execution authority.
 
 ### Status observations during publication
 

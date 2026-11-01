@@ -280,6 +280,7 @@ def test_service_routes_are_exhaustively_classified() -> None:
         "repository_declarations",
         "source_range_receipt",
         "source_ecmascript",
+        "source_bindings",
         "verification_membership",
         "repository_findings",
         "import_ownership",
@@ -318,6 +319,7 @@ def test_service_routes_are_exhaustively_classified() -> None:
         ),
         "source_range_receipt": ("source_range_receipt", "source_range_receipt"),
         "source_ecmascript": ("source_ecmascript", "source_ecmascript"),
+        "source_bindings": ("source_bindings", "source_bindings"),
         "verification_membership": (
             "verification_membership",
             "verification_membership",
