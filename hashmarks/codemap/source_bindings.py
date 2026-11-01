@@ -23,8 +23,10 @@ from .source_binding_contract import (
     BINDING_FACT_KINDS,
     BINDING_INTERPRETER_SIGNATURE,
     MAX_ALIAS_DEPTH,
+    MAX_BINDING_DETAILS,
     MAX_BINDING_EXPRESSION_DEPTH,
     MAX_BINDING_NODES,
+    MAX_BINDING_RESULTS,
     MAX_BINDING_SUPPORTING_RANGES,
     MAX_HELPER_EDGES,
     MAX_LITERAL_BYTES,
@@ -117,6 +119,7 @@ def _binding_packet(
             "max_alias_depth": MAX_ALIAS_DEPTH,
             "max_expression_depth": MAX_BINDING_EXPRESSION_DEPTH,
             "max_supporting_ranges": MAX_BINDING_SUPPORTING_RANGES,
+            "max_nested_details": MAX_BINDING_DETAILS,
             "max_import_hops": 0,
             "max_helper_edges": MAX_HELPER_EDGES,
             "max_literal_bytes": MAX_LITERAL_BYTES,
@@ -254,8 +257,8 @@ class SourceBindingsMixin:
         """Observe bounded source origins, preserving unknown runtime targets."""
         if TYPE_CHECKING:
             self = cast("RepositorySource", self)
-        if type(limit) is not int or not 1 <= limit <= 500:
-            raise ValueError("limit must be between 1 and 500")
+        if type(limit) is not int or not 1 <= limit <= MAX_BINDING_RESULTS:
+            raise ValueError(f"limit must be between 1 and {MAX_BINDING_RESULTS}")
         if type(max_bytes) is not int or not 1 <= max_bytes <= 8_388_608:
             raise ValueError("max_bytes must be between 1 and 8388608")
         with (

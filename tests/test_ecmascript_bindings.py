@@ -8,8 +8,9 @@ import pytest
 from contract_assertions import assert_array, assert_integer, assert_object, assert_text
 
 from hashmarks.codemap import ecmascript_binding_scope
+from hashmarks.codemap import ecmascript_bindings as ecmascript_binding_module
 from hashmarks.codemap.ecmascript_bindings import ecmascript_bindings
-from hashmarks.codemap.providers import TreeSitterRangeProvider
+from hashmarks.codemap.providers import SourceSyntaxError, TreeSitterRangeProvider
 from hashmarks.codemap.source_binding_contract import BindingObservationBound
 
 if TYPE_CHECKING:
@@ -545,3 +546,459 @@ def test_direct_eval_and_with_keep_lexical_identity_unknown(
     call = _calls(native, "function f(){eval(source); fetch();}")[-1]
     assert call["qualification"] == "unknown"
     assert call["reasons"] == ["dynamic-lexical-scope"]
+
+
+def test_computed_property_write_preserves_address_without_qualifying_reads(
+    native: TreeSitterRangeProvider,
+) -> None:
+    source = "const d=document; const key='coo'+'kie'; d[key]='x'; d[key]();"
+    rows, _ = _observe(native, source)
+    write = _kind(rows, "property-write")[0]
+    assert write["qualification"] == "qualified"
+    assert write["target"] == _global("document", "cookie")
+    assert write["property"] == "cookie"
+    assert write["access_kind"] == "subscript"
+    assert write["context"] == "store"
+    assert write["write_kind"] == "assignment"
+    assert write["operator"] == "="
+    assert write["reads_previous_value"] is False
+    assert _slice(source, write["range"]) == "d[key]='x'"
+    assert _slice(source, assert_object(write["destination"])["range"]) == "d[key]"
+    assert assert_object(write["receiver"])["target"] == _global("document")
+    call = _kind(rows, "call-site")[0]
+    assert call["qualification"] == "unknown"
+    assert call["target"] is None
+    assert call["reasons"] == ["source-property-reassigned"]
+
+
+def test_nested_write_address_retains_normal_receiver_mutation_guards(
+    native: TreeSitterRangeProvider,
+) -> None:
+    rows, _ = _observe(
+        native, "globalThis.document=other; globalThis.document.cookie='x';"
+    )
+    first, nested = _kind(rows, "property-write")
+    assert first["target"] == _global("globalThis", "document")
+    assert first["qualification"] == "qualified"
+    assert nested["qualification"] == "unknown"
+    assert nested["target"] is None
+    assert nested["reasons"] == ["source-property-reassigned"]
+    assert nested["property"] == "cookie"
+    receiver = assert_object(nested["receiver"])
+    assert receiver["qualification"] == "unknown"
+    assert receiver["target"] is None
+    assert receiver["reasons"] == ["source-property-reassigned"]
+
+
+def test_property_write_operators_preserve_authored_read_and_delete_context(
+    native: TreeSitterRangeProvider,
+) -> None:
+    rows, _ = _observe(
+        native,
+        "document.cookie+='x'; ++document.cookie; delete document.cookie; "
+        "for(document.cookie of values){}",
+    )
+    writes = _kind(rows, "property-write")
+    assert [row["operator"] for row in writes] == ["+=", "++", "delete", "of"]
+    assert [row["write_kind"] for row in writes] == [
+        "assignment",
+        "update",
+        "delete",
+        "iteration",
+    ]
+    assert [row["reads_previous_value"] for row in writes] == [True, True, False, False]
+    assert [row["context"] for row in writes] == ["store", "store", "delete", "store"]
+    assert all(row["target"] == _global("document", "cookie") for row in writes)
+    assert all(row["runtime_target"] == "not-established" for row in writes)
+
+
+def test_call_arguments_are_ordered_native_slots_with_independent_proof(
+    native: TreeSitterRangeProvider,
+) -> None:
+    source = (
+        "const moduleName='cl'+'ient'; "
+        "send(moduleName, /* decoy */ other('inside'), ...items, {'k':'v'}, moduleName);"
+    )
+    calls = _calls(native, source)
+    outer, inner = calls
+    arguments = [assert_object(row) for row in assert_array(outer["arguments"])]
+    assert outer["argument_count"] == 5
+    assert outer["arguments_completeness"] == "complete"
+    assert outer["arguments_truncation"] == "not-truncated"
+    assert [row["index"] for row in arguments] == list(range(5))
+    assert [row["kind"] for row in arguments] == [
+        "positional",
+        "positional",
+        "spread",
+        "positional",
+        "positional",
+    ]
+    assert [_slice(source, row["range"]) for row in arguments] == [
+        "moduleName",
+        "other('inside')",
+        "...items",
+        "{'k':'v'}",
+        "moduleName",
+    ]
+    assert [row["literal"] for row in arguments] == [
+        "client",
+        None,
+        None,
+        None,
+        "client",
+    ]
+    assert [row["qualification"] for row in arguments] == [
+        "qualified",
+        "unknown",
+        "unknown",
+        "unknown",
+        "qualified",
+    ]
+    assert assert_object(arguments[0]["expression"])["name"] == "moduleName"
+    inner_argument = assert_object(assert_array(inner["arguments"])[0])
+    assert inner_argument["literal"] == "inside"
+    assert inner_argument["range"] != arguments[1]["range"]
+
+
+def test_call_argument_detail_limit_reports_incomplete_projection(
+    native: TreeSitterRangeProvider, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(ecmascript_binding_module, "MAX_BINDING_DETAILS", 2)
+    call = _calls(native, "send('first','second','third');")[0]
+    assert call["argument_count"] == 3
+    assert call["arguments_completeness"] == "incomplete"
+    assert call["arguments_truncation"] == "truncated"
+    assert len(assert_array(call["arguments"])) == 2
+
+
+def test_literal_expressions_keep_native_unknowns_and_do_not_parse_string_contents(
+    native: TreeSitterRangeProvider,
+) -> None:
+    rows, _ = _observe(
+        native,
+        "const endpoint='https://'+'example.test'; "
+        "send(endpoint, `https://template`, '\\x68ttps://escaped'); "
+        "const decoy=\"fetch('outside')\";",
+    )
+    expressions = {
+        assert_text(assert_object(row["expression"])["text"]): row
+        for row in _kind(rows, "literal-expression")
+    }
+    assert expressions["'https://'+'example.test'"]["literal"] == "https://example.test"
+    for text in ("`https://template`", "'\\x68ttps://escaped'"):
+        assert expressions[text]["qualification"] == "unknown"
+        assert expressions[text]["literal"] is None
+        assert expressions[text]["reasons"] == ["literal-syntax-unqualified"]
+    assert len(_kind(rows, "call-site")) == 1
+
+
+def test_module_declarations_cover_native_import_export_and_type_only_sources(
+    native: TreeSitterRangeProvider,
+) -> None:
+    rows, _ = _observe(
+        native,
+        "import value from 'one'; import 'two'; export {value} from 'three'; "
+        "export * from 'four'; import type {Type} from 'five'; "
+        "export {type A} from 'six'; export {type B, value} from 'seven'; "
+        "type T=import('eight').Type;",
+    )
+    modules = _kind(rows, "module-declaration")
+    assert [row["module_specifier"] for row in modules] == [
+        "one",
+        "two",
+        "three",
+        "four",
+        "five",
+        "six",
+        "seven",
+        "eight",
+    ]
+    assert [row["declaration_kind"] for row in modules] == [
+        "import",
+        "import",
+        "export",
+        "export",
+        "import",
+        "export",
+        "export",
+        "import-call",
+    ]
+    assert [row["type_only"] for row in modules] == [
+        False,
+        False,
+        False,
+        False,
+        True,
+        True,
+        False,
+        True,
+    ]
+    assert all(row["qualification"] == "qualified" for row in modules)
+    assert all(row["module_resolution"] == "not-performed" for row in modules)
+    assert _kind(rows, "call-site") == []
+    imported = next(
+        row for row in _kind(rows, "import-binding") if row["name"] == "Type"
+    )
+    assert imported["qualification"] == "unknown"
+    assert imported["target"] is None
+    assert imported["import_syntax"] == {
+        "module": "five",
+        "name": "Type",
+        "level": 0,
+        "local_name": "Type",
+    }
+
+
+def test_dynamic_module_sources_qualify_native_loader_and_literal_separately(
+    native: TreeSitterRangeProvider,
+) -> None:
+    rows, _ = _observe(
+        native,
+        "const moduleName='pkg'+'/client'; const load=require; "
+        "import(moduleName); load(moduleName); function f(require){require('fake');}",
+    )
+    modules = _kind(rows, "module-declaration")
+    assert [row["declaration_kind"] for row in modules] == [
+        "import-call",
+        "require-call",
+        "require-call",
+    ]
+    assert [row["module_specifier"] for row in modules] == [
+        "pkg/client",
+        "pkg/client",
+        None,
+    ]
+    assert [row["qualification"] for row in modules] == [
+        "qualified",
+        "qualified",
+        "unknown",
+    ]
+    assert modules[-1]["reasons"] == ["module-loader-callee-unqualified"]
+    assert all(row["runtime_target"] == "not-established" for row in modules)
+
+
+@pytest.mark.parametrize(
+    ("source", "reason"),
+    [
+        ("import(dynamic);", "module-specifier-unqualified"),
+        ("import(`pkg`);", "module-specifier-unqualified"),
+        ("require('\\x70kg');", "module-specifier-unqualified"),
+        ("require(...values);", "module-source-argument-unqualified"),
+        ("require();", "module-source-argument-unqualified"),
+        ("const require=other; require('pkg');", "module-loader-callee-unqualified"),
+        (
+            "import require from 'loader'; require('pkg');",
+            "module-loader-callee-unqualified",
+        ),
+    ],
+)
+def test_unqualified_module_requests_keep_explicit_unknown_evidence(
+    native: TreeSitterRangeProvider, source: str, reason: str
+) -> None:
+    modules = _kind(_observe(native, source)[0], "module-declaration")
+    module = modules[-1]
+    assert module["qualification"] == "unknown"
+    assert module["module_specifier"] is None
+    assert module["reasons"] == [reason]
+
+
+def test_unsupported_import_equals_remains_unknown_and_constructor_is_not_a_loader(
+    native: TreeSitterRangeProvider,
+) -> None:
+    rows, _ = _observe(native, "import imported=require('pkg'); new require('other');")
+    modules = _kind(rows, "module-declaration")
+    assert len(modules) == 1
+    assert modules[0]["qualification"] == "unknown"
+    assert modules[0]["module_specifier"] is None
+
+
+def test_parameter_property_aliases_have_scoped_source_paths_and_unknown_values(
+    native: TreeSitterRangeProvider,
+) -> None:
+    calls = _calls(
+        native,
+        "function first(context){const key='send'; "
+        "const invoke=context.client[key]; invoke('/first');} "
+        "function second(context){context.client.send('/second');}",
+    )
+    symbolic = [assert_object(call["symbolic_reference"]) for call in calls]
+    assert all(call["qualification"] == "unknown" for call in calls)
+    assert all(call["target"] is None for call in calls)
+    assert all(call["reasons"] == ["parameter-value-unknown"] for call in calls)
+    assert all(row["properties"] == ["client", "send"] for row in symbolic)
+    assert all(row["qualification"] == "qualified" for row in symbolic)
+    roots = [assert_object(row["root"]) for row in symbolic]
+    assert all(root["kind"] == "parameter" for root in roots)
+    assert all(root["name"] == "context" for root in roots)
+    assert roots[0]["range"] != roots[1]["range"]
+    assert roots[0]["scope"] != roots[1]["scope"]
+
+
+def test_parameter_default_and_helper_argument_do_not_specialize_symbolic_runtime_target(
+    native: TreeSitterRangeProvider,
+) -> None:
+    rows, _ = _observe(
+        native, "function f(fetch=globalThis.fetch){fetch();} f(globalThis.fetch);"
+    )
+    call = _kind(rows, "call-site")[0]
+    assert call["qualification"] == "unknown"
+    assert call["target"] is None
+    assert call["runtime_target"] == "not-established"
+    symbolic = assert_object(call["symbolic_reference"])
+    assert assert_object(symbolic["root"])["name"] == "fetch"
+    assert symbolic["properties"] == []
+    assert symbolic["qualification"] == "qualified"
+    assert _kind(rows, "default-binding")[0]["qualification"] == "conditional"
+    assert _kind(rows, "argument-binding")[0]["qualification"] == "conditional"
+
+
+def test_parameter_mutation_and_mutated_ancestor_invalidate_source_paths(
+    native: TreeSitterRangeProvider,
+) -> None:
+    rows, _ = _observe(
+        native,
+        "function first(context){context.document=other; context.document.cookie='x'; "
+        "context.document.cookie();} "
+        "function second(context){const invoke=context.send; context=other; invoke();}",
+    )
+    first, nested = _kind(rows, "property-write")
+    assert assert_object(first["symbolic_reference"])["qualification"] == "qualified"
+    assert assert_object(nested["symbolic_reference"])["qualification"] == "unknown"
+    first_call, second_call = _kind(rows, "call-site")
+    assert assert_object(first_call["symbolic_reference"])["qualification"] == "unknown"
+    assert first_call["reasons"] == ["source-property-reassigned"]
+    assert second_call["symbolic_reference"] is None
+    assert second_call["reasons"] == ["binding-reassigned"]
+
+
+@pytest.mark.parametrize(
+    "names", [("resource", "epoch", "generation"), ("a", "b", "c")]
+)
+def test_native_interface_signatures_preserve_policy_type_positions_after_renames(
+    native: TreeSitterRangeProvider, names: tuple[str, str, str]
+) -> None:
+    expected = {
+        "removeLocation": ["string", "string"],
+        "cancelQueuedAdmission": ["string", "number"],
+        "drainExecutor": ["string", "number", "number"],
+        "activateExecutor": ["string", "number", "number"],
+        "revokeExecutorTrust": ["string", "number", "number"],
+        "restoreExecutorTrust": ["string", "number", "number"],
+        "reconcileEffect": ["string", "number"],
+        "acknowledgeEffect": ["string", "string", "number"],
+    }
+    members = [
+        f"{method}({','.join(f'{names[i]}:{kind}' for i, kind in enumerate(types))}):void;"
+        for method, types in expected.items()
+    ]
+    rows, _ = _observe(native, "interface ApiClient {" + "".join(members) + "}")
+    signatures = _kind(rows, "callable-signature")
+    actual = {
+        row["name"]: [
+            assert_object(assert_object(parameter)["type"])["name"]
+            for parameter in assert_array(row["parameters"])
+        ]
+        for row in signatures
+    }
+    assert actual == expected
+    assert all(row["qualification"] == "qualified" for row in signatures)
+    assert all(
+        assert_object(row["container"])["name"] == "ApiClient" for row in signatures
+    )
+    assert all(row["parameters_completeness"] == "complete" for row in signatures)
+
+
+def test_nested_object_methods_do_not_acquire_enclosing_interface_ownership(
+    native: TreeSitterRangeProvider,
+) -> None:
+    rows, _ = _observe(
+        native,
+        "// removeLocation(fake:string,proof:string):void;\n"
+        "const decoy='removeLocation(fake:string,proof:string):void'; "
+        "interface ApiClient { direct(a:string):void; "
+        "child:{ removeLocation(a:string,b:string):void }; } "
+        "interface Other { removeLocation(a:number):void; }",
+    )
+    direct, nested, other = _kind(rows, "callable-signature")
+    assert direct["name"] == "direct"
+    assert direct["qualification"] == "qualified"
+    assert assert_object(direct["container"])["name"] == "ApiClient"
+    assert nested["name"] == "removeLocation"
+    assert nested["container"] is None
+    assert nested["qualification"] == "unknown"
+    assert nested["reasons"] == ["callable-container-unqualified"]
+    assert assert_object(other["container"])["name"] == "Other"
+
+
+@pytest.mark.parametrize(
+    "annotation", ["Alias", "string|number", "Array<string>", "{x:string}", "(string)"]
+)
+def test_complex_parameter_annotations_remain_native_unknowns(
+    native: TreeSitterRangeProvider, annotation: str
+) -> None:
+    rows, _ = _observe(native, f"interface A {{method(value:{annotation}):void;}}")
+    signature = _kind(rows, "callable-signature")[0]
+    parameter = assert_object(assert_array(signature["parameters"])[0])
+    native_type = assert_object(parameter["type"])
+    assert signature["qualification"] == "unknown"
+    assert native_type["qualification"] == "unknown"
+    assert native_type["name"] is None
+    assert native_type["reasons"] == ["type-resolution-not-performed"]
+    assert assert_object(native_type["expression"])["text"] == annotation
+
+
+def test_signature_parameters_preserve_optional_rest_and_missing_annotation(
+    native: TreeSitterRangeProvider,
+) -> None:
+    rows, _ = _observe(
+        native,
+        "interface A { method(value?:string,...tail:number[]):void; other(value):void; }",
+    )
+    method, other = _kind(rows, "callable-signature")
+    parameters = [assert_object(row) for row in assert_array(method["parameters"])]
+    assert [row["name"] for row in parameters] == ["value", "tail"]
+    assert [row["optional"] for row in parameters] == [True, False]
+    assert [row["rest"] for row in parameters] == [False, True]
+    assert assert_object(parameters[0]["type"])["name"] == "string"
+    assert assert_object(parameters[1]["type"])["qualification"] == "unknown"
+    missing = assert_object(assert_array(other["parameters"])[0])
+    assert assert_object(missing["type"])["range"] is None
+    assert other["qualification"] == "unknown"
+
+
+def test_signature_detail_limit_never_claims_a_complete_parameter_list(
+    native: TreeSitterRangeProvider, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(ecmascript_binding_module, "MAX_BINDING_DETAILS", 2)
+    rows, _ = _observe(
+        native, "interface A { method(a:string,b:number,c:number):void; }"
+    )
+    signature = _kind(rows, "callable-signature")[0]
+    assert signature["parameter_count"] == 3
+    assert signature["parameters_completeness"] == "incomplete"
+    assert signature["parameters_truncation"] == "truncated"
+    assert signature["qualification"] == "unknown"
+    assert signature["reasons"] == ["callable-parameter-projection-bound"]
+    assert len(assert_array(signature["parameters"])) == 2
+
+
+@pytest.mark.parametrize(
+    "source", ["const value=;", "interface A { method(value:string }"]
+)
+def test_native_recovery_errors_do_not_acquire_binding_evidence(
+    native: TreeSitterRangeProvider, source: str
+) -> None:
+    with pytest.raises(SourceSyntaxError, match="native-syntax-parse-failed"):
+        _observe(native, source)
+
+
+def test_bounded_write_alias_proof_cannot_silently_preserve_property_qualification(
+    native: TreeSitterRangeProvider,
+) -> None:
+    source = (
+        "document.cookie(); const alias0=document;"
+        + "".join(f"const alias{i}=alias{i - 1};" for i in range(1, 12))
+        + "alias11.cookie='x';"
+    )
+    with pytest.raises(BindingObservationBound, match="property-write-depth-bound"):
+        _observe(native, source, limit=1)

@@ -32,6 +32,11 @@ contract. Its syntax facts do not gain the qualification of this operation.
 
 Schema: `hashmarks.source-bindings.v1`.
 
+The additive consumer-evidence fields below are produced by
+`hashmarks.source-binding-interpreter.v2`. Consumers bind the actual producer
+identity and supported interpreter contract; the schema name alone does not
+prove that a released installation supplies these fields.
+
 ```python
 source.bindings(
     relpath: str,
@@ -57,8 +62,20 @@ packet without interpreting its source again.
 
 Binding mode requires exactly one path. Literal selectors, byte-range selectors
 and line-context selectors belong to the other source-observation modes and
-are rejected. MCP retains its existing result limit of 50; the Python, CLI and
-service surfaces use the core default of 200 and maximum of 500.
+are rejected. MCP retains its existing result limit of 50. Python, CLI and
+service calls share the core default of 200 and an explicit maximum of 100,000.
+The larger ceiling lets a consumer request all observed facts from a bounded
+member without a second source scan or a page-stitching protocol. It does not
+increase the byte, syntax-node, expression or alias bounds.
+
+A consumer that needs the whole observed sequence must check `availability`,
+`completeness`, `truncation` and both fact counts before applying its policy.
+For example, it can request `limit=100_000` and require
+`returned_fact_count == observed_fact_count` with `truncation="not-truncated"`.
+Even that complete sequence retains incomplete semantic coverage, explicit
+unknown facts and `negative_evidence="not-admissible"`. It cannot certify the
+absence of forbidden runtime behavior. Unknown repository freshness also
+remains unknown; a matching immediate member revision cannot strengthen it.
 
 ## What qualification means
 
@@ -127,6 +144,18 @@ use of that parameter, infer all callers, or traverse a call graph. At most one
 local helper edge is interpreted. Mutable globals, rebinding and unsupported
 call shapes cannot be promoted into runtime target certainty.
 
+A parameter can still have an independently qualified authored property path.
+For example, in `def publish(journal): finish = journal.finish_detail; finish()`,
+the call's `target` remains null and its main `qualification` remains unknown.
+Its `symbolic_reference` can identify the exact parameter declaration and
+`properties=["finish_detail"]`. That descriptor carries its own qualification,
+conditions, reasons and supporting ranges, plus
+`runtime_identity="not-established"`. It describes how the source refers to a
+supplied value, without establishing what value a caller supplies. Mutation,
+shadowing, unsupported forms or an interpretation bound can withdraw that
+independent qualification. Consumers must not replace the main unknown target
+with this symbolic path or a default/helper argument fact.
+
 ### Strings and computed properties
 
 The interpreters may qualify bounded supported string expressions and use a
@@ -149,6 +178,70 @@ establish builtin runtime identity or exclude external callers.
 A property named `fetch`, `send`, `run` or any other spelling remains a neutral
 source property. Hashmarks does not classify it as a browser API, approve a
 consumer architecture rule or determine what implementation will execute.
+
+### Structured syntax for consumer policies
+
+`call-site.arguments` preserves the authored argument slots in source order.
+Each detail has an `index`, `kind`, optional keyword `name`, exact whole-argument
+`range`, `expression` and the normal evidence qualifiers. Kinds are
+`positional`, `keyword`, `spread` and `keyword-spread`, as supported by the
+language. An index is a source slot, not an inferred runtime parameter position.
+Python records the underlying value expression separately from its keyword or
+spread wrapper. ECMAScript keeps its native spread expression unknown. Numeric,
+boolean, collection and other unsupported values stay unknown rather than being
+converted into a new general expression evaluator. The callee's qualification
+does not strengthen any argument.
+
+Each call retains `argument_count`, `arguments_completeness` and
+`arguments_truncation`. Python class declarations similarly carry ordered
+`bases` with independent evidence, `base_count`, `bases_completeness` and
+`bases_truncation`. `declaration_kind` distinguishes Python classes, functions
+and parameters. These nested lists have their own 256-detail bound; a complete
+outer fact sequence does not imply a complete nested list.
+
+Python `import-binding.import_syntax` preserves the authored `module`, `name`,
+relative-import `level` and `local_name` even when binding qualification is
+unknown. Star imports retain their authored spelling with an unknown target.
+ECMAScript `module-declaration` rows reuse the existing native static module
+projection for imports, side-effect imports and re-exports. They also observe
+native dynamic imports and supported calls to an unshadowed lexical `require`,
+including supported aliases. Each row retains its `declaration_kind`, `source`,
+`module_specifier`, `type_only` and `module_resolution="not-performed"`.
+Unsupported specifiers or shadowed loaders stay unknown. Type-only imports do
+not become runtime call or reference facts.
+
+`literal-expression` identifies native string occurrences and supported string
+expressions. Unsupported interpolated strings remain unknown. Python suppresses
+the native AST's internal f-string text fragments so they cannot masquerade as
+complete strings. Python literals inside call arguments may carry
+`call_argument={call_range, range, kind, name}` for their nearest argument source
+container. This is containment evidence, not the runtime value of that argument.
+ECMAScript retains its existing conservative escape and template handling.
+
+`property-write` records authored destinations with `access_kind`, `property`,
+`context` (`store` or `delete`) and independent `receiver` evidence. Python
+currently emits native attribute stores and deletes; its ordinary outer target
+resolution stays unknown when the member's own mutation prevents qualification.
+ECMAScript additionally records a `destination`, `write_kind`, `operator`,
+`reads_previous_value` and optional value expression. It qualifies a write
+address from the normally qualified receiver and property key without reading
+the previous value of the final property. Thus `d[key] = value` can identify an
+authored `document.cookie` destination while ordinary reads of that property
+remain unknown. Mutation of a receiver or an ancestor property still blocks
+that address qualification. A write fact does not prove that the write runs or
+that a runtime object is a browser, network or filesystem API.
+
+ECMAScript `callable-signature` rows preserve native method signatures, their
+direct interface or class `container`, `syntax_context`, method name and ordered
+`parameters`. Each parameter records its native name, range, optional/rest flags
+and an independent `type` descriptor. Only a native predefined type token can
+have a qualified type name; aliases, unions and unsupported annotations remain
+unknown because type resolution is not performed. Parameter collections retain
+`parameter_count`, `parameters_completeness` and `parameters_truncation`.
+Nested object-type methods are not attributed to an enclosing interface, and
+overloads or merged declarations remain separate source observations. Consumers
+must select the exact container and handle multiplicity themselves; these rows
+do not establish a unique effective interface or runtime callable.
 
 ## Result and evidence contract
 
@@ -176,7 +269,10 @@ addresses the exact original UTF-8 bytes. CRLF and multibyte characters are
 not normalized. A scope locator has `kind`, exact `range` and optional `name`;
 it distinguishes identical names in different containers. Language-specific
 scope rules determine qualification. An expression descriptor has `syntax_type`,
-exact `range`, preview `text` and `text_truncated`. The fact's range, bound-name
+exact `range`, preview `text`, `text_truncated` and native `name` when available.
+The name is syntax only: Python supplies it for native names and attributes;
+ECMAScript supplies complete, unescaped native identifier tokens. It is never
+recovered by parsing the preview. The fact's range, bound-name
 range and expression range can differ, so consumers must use the requested
 locator rather than infer coordinates from preview text.
 
@@ -201,6 +297,10 @@ projection. Evidence ranges refer to the packet's full-member revision.
 | `argument-binding` | A separate conditional relationship between an argument and a parameter on one admitted local helper call. |
 | `reference` | A source expression's qualified, conditional or unknown relationship to its lexical binding. |
 | `call-site` | A call expression and the source qualification of its callee; its runtime target remains unestablished. |
+| `literal-expression` | An authored string occurrence or supported string expression, with unknowns retained. |
+| `property-write` | An authored property destination and separately qualified receiver evidence. |
+| `module-declaration` | ECMAScript static, re-export, side-effect or supported dynamic module syntax, without module resolution. |
+| `callable-signature` | Native ECMAScript method-signature syntax, direct container and bounded ordered parameter/type details. |
 
 Default and argument facts may additionally contain
 `parameter={name, range, scope}` and `call={range, callee_range}`. A conditional
@@ -213,12 +313,13 @@ than borrowing certainty from nearby text.
 
 | Bound | Value |
 | --- | --- |
-| Returned facts | Default 200, range 1–500; MCP maximum 50. |
+| Returned facts | Default 200, range 1–100,000; MCP maximum 50. |
 | Complete member bytes | Default 1 MiB, range 1 byte–8 MiB. |
 | Syntax nodes | At most 100,000. |
 | Alias depth | At most eight. |
 | Nested expression depth | At most 32. |
 | Supporting source ranges per fact | At most 64. |
+| Nested source details | At most 256 per call-argument, class-base or method-parameter list, with explicit collection counts and clipping qualifiers. |
 | Local helper edges | At most one. |
 | Import hops | Zero. |
 | Interpreted string value | At most 256 UTF-8 bytes. |
