@@ -181,7 +181,7 @@ class CodeMap:
         self._bindings = RepositoryBindings(self.source)
         self._correlation = RepositoryCorrelation(self.bindings)
         self._verification = RepositoryVerification(
-            self._imports, correlation=self.correlation
+            self._imports, correlation=self.correlation, native=self.native
         )
         self._declarations = RepositoryDeclarations(self.bindings)
         self._tasks = RepositoryTasks(

@@ -22,6 +22,10 @@ from hashmarks.evidence_presentation_task import (
     project_task,
 )
 from hashmarks.evidence_presentation_text import evidence_projection_text
+from hashmarks.evidence_presentation_verification import (
+    project_changed_set,
+    project_nomination,
+)
 from hashmarks.operation_contract import (
     operation_default_mode,
     operation_schema,
@@ -93,6 +97,7 @@ _CONTEXT_KEYS = frozenset(
         "coverage",
         "source_coverage",
         "negative_evidence",
+        "negative_evidence_admissible",
         "bounds",
         "limits",
         "claims",
@@ -1385,6 +1390,8 @@ def _projectors() -> dict[str, Any]:
         operation_schema("dependency_codemap", "explain"): _dependency,
         operation_schema("dependency_codemap", "compare"): _dependency,
         operation_schema("correlate_evidence"): _correlation,
+        operation_schema("changed_set_verification"): project_changed_set,
+        operation_schema("verification_nomination"): project_nomination,
         operation_schema("repository_declarations", "observation"): _declarations,
         operation_schema("repository_declarations", "explain"): _declarations,
         operation_schema(

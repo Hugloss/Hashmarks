@@ -11,6 +11,7 @@ This is the single catalog for the current maintained documentation in `docs/`.
 - [`reference/AGENT_NATIVE_EVIDENCE.md`](reference/AGENT_NATIVE_EVIDENCE.md) — agent-facing typed evidence and bounded MCP exposure.
 - [`reference/ARCHITECTURE.md`](reference/ARCHITECTURE.md) — architecture and authority model.
 - [`reference/API_STABILITY.md`](reference/API_STABILITY.md) — supported Python/CLI surface and pre-1.0 compatibility policy.
+- [`reference/CHANGED_SET_VERIFICATION.md`](reference/CHANGED_SET_VERIFICATION.md) — changed source/test/support evidence, workspace context, logical membership, runtime correlation and external execution authority.
 - [`reference/EVIDENCE_CORRELATION.md`](reference/EVIDENCE_CORRELATION.md) — bounded external-observation correlation and authority limits.
 - [`reference/ECMASCRIPT_SOURCE_OBSERVATIONS.md`](reference/ECMASCRIPT_SOURCE_OBSERVATIONS.md) — native JavaScript/TypeScript alias, binding, property, and call syntax over canonical Source bytes.
 - [`reference/FILESYSTEM_LIFECYCLE_EVIDENCE.md`](reference/FILESYSTEM_LIFECYCLE_EVIDENCE.md) — qualified Python filesystem checks, source-reference flow, protection syntax and uncertainty.

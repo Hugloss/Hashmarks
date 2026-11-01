@@ -82,6 +82,7 @@ _EXPECTED = {
         "default": "hashmarks.verification-membership-observation.v1"
     },
     "verification_nomination": {"default": "hashmarks.verification-nomination.v1"},
+    "changed_set_verification": {"default": "hashmarks.changed-set-verification.v1"},
     "verification_nomination_binding": {
         "default": "hashmarks.verification-nomination-binding.v1"
     },
@@ -407,6 +408,10 @@ _FIXED_MODE_CORE_BOUNDARIES = {
     "verification_nomination": (
         "hashmarks/codemap/verification_plan.py",
         "nomination",
+    ),
+    "changed_set_verification": (
+        "hashmarks/codemap/verification_changes.py",
+        "changed_set",
     ),
     "verification_nomination_binding": (
         "hashmarks/codemap/verification_membership.py",

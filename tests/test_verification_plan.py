@@ -147,6 +147,10 @@ def test_verification_nomination_excludes_native_command_for_python(
                 "member_revision": member["member_revision"],
             },
             {
+                "path": "tests/pyproject.toml",
+                "state": "known-absent",
+            },
+            {
                 "path": "pyproject.toml",
                 "state": "known-present",
                 "member_revision": config["member_revision"],
@@ -540,10 +544,10 @@ def test_nomination_qualifies_missing_metadata_as_observed_absence(
         codemap.index.sync()
         nomination = codemap.verification.nomination("tests/test_demo.py")
     assert nomination["available"] is True
-    assert assert_records(nomination["supporting_source_members"])[1] == {
-        "path": "pyproject.toml",
-        "state": "known-absent",
-    }
+    assert assert_records(nomination["supporting_source_members"])[1:] == [
+        {"path": "tests/pyproject.toml", "state": "known-absent"},
+        {"path": "pyproject.toml", "state": "known-absent"},
+    ]
     assert nomination["confidence"] == "medium"
 
 
@@ -649,7 +653,7 @@ def test_nomination_qualifies_pytest_declaration_from_parsed_toml(
     assert nomination["confidence"] == expected_confidence
     assert nomination["source_evidence"] == expected_evidence
     assert (
-        assert_records(nomination["supporting_source_members"])[1]["path"]
+        assert_records(nomination["supporting_source_members"])[-1]["path"]
         == "pyproject.toml"
     )
     assert {"argv", "executable", "working_directory"}.isdisjoint(nomination)
@@ -747,7 +751,7 @@ def test_nomination_qualifies_declared_vitest_spec_not_package_mentions(
     assert nominated["runner_evidence"] == expected_runner
     assert nominated["source_evidence"] == expected_source
     assert (
-        assert_records(nominated["supporting_source_members"])[1]["path"]
+        assert_records(nominated["supporting_source_members"])[-1]["path"]
         == "package.json"
     )
     assert nominated["execution_authority"] == "external"
@@ -809,7 +813,7 @@ def test_nomination_vitest_manifest_repair_changes_only_support_revision(
         == "tests/widget.test.js"
     )
     assert (
-        assert_records(after["supporting_source_members"])[1]["path"] == "package.json"
+        assert_records(after["supporting_source_members"])[-1]["path"] == "package.json"
     )
     assert after["nomination_identity"] != before["nomination_identity"]
 

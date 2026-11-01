@@ -51,8 +51,10 @@ def test_live_binding_matches_qualified_source_members(tmp_path: Path) -> None:
     assert [r["correspondence"] for r in checked_members] == [
         "matched",
         "matched",
+        "matched",
     ]
     assert [r["recheck"] for r in checked_members] == [
+        "stable",
         "stable",
         "stable",
     ]
@@ -157,7 +159,11 @@ def test_denied_source_cannot_be_claimed_as_absent(tmp_path: Path) -> None:
     assert observed["packet_valid"] is True
     assert observed["source_binding_state"] == "unknown"
     assert "source-unknown:pyproject.toml" in assert_array(observed["reasons"])
-    row = assert_records(observed["checked_source_members"])[1]
+    row = next(
+        item
+        for item in assert_records(observed["checked_source_members"])
+        if item["path"] == "pyproject.toml"
+    )
     assert assert_object(row["observed_member"])["state"] == "unsupported"
     assert row["recheck"] == "stable"
 

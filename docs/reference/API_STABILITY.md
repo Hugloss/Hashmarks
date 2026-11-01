@@ -97,6 +97,14 @@ store's canonical workspace binding. Multi-owner compositions require the same
 read-scope authority. Independent, internally consistent readers of one shared
 durable store remain supported; their read scopes cannot be mixed in one packet.
 
+`CodeMap.verification.changed_set(paths, ...)` is the supported command-free
+changed-set producer, with schema `hashmarks.changed-set-verification.v1`.
+It composes qualified verification relationships, source revisions, nested
+workspace context, exact returned logical membership and optional native
+collection/runtime correlation observations. It preserves unknown consumer
+coverage and external execution authority. See
+[Changed-set verification evidence](CHANGED_SET_VERIFICATION.md).
+
 Structural operations use `CodeMap.structure.search()` and `.locality()`, with
 their existing evidence schemas and bounds. The old root methods are removed.
 Pure packet comparisons are imported from their defining modules:

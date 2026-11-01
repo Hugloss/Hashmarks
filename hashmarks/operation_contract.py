@@ -139,6 +139,10 @@ OPERATION_CONTRACTS = (
         (("default", "hashmarks.verification-nomination.v1"),),
     ),
     OperationContract(
+        "changed_set_verification",
+        (("default", "hashmarks.changed-set-verification.v1"),),
+    ),
+    OperationContract(
         "verification_nomination_binding",
         (("default", "hashmarks.verification-nomination-binding.v1"),),
     ),

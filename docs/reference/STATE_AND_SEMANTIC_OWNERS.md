@@ -33,6 +33,15 @@ authority.
 
 ## Cross-owner operations
 
+The [changed-set verification contract](CHANGED_SET_VERIFICATION.md) is owned by
+`RepositoryVerification.changed_set`. Its source/test/support classification,
+bounded relationships and logical target projection reuse the existing
+verification owner. Imports retains bounded import-walk contributors; Source
+owns their revisions and rechecks. Index owns Python roots, Native owns retained
+project qualification, and Correlation owns runtime/source correspondence.
+Conftest/configuration applicability never becomes proof of fixture consumption.
+The projection adds no persistent graph, generation, execution or history owner.
+
 A canonical owner is a responsibility, not necessarily one class or file.
 `CodeMap` constructs resources and named components; it inherits no domain
 implementation. Internal domain traits belong to their actual component and
