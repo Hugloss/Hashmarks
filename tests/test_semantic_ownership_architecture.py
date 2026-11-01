@@ -4,6 +4,8 @@ import ast
 import importlib.util
 from pathlib import Path
 
+import pytest
+
 from hashmarks.codemap import CodeMap
 from hashmarks.python_ast_cache import read_python_ast
 
@@ -13,6 +15,191 @@ CODEMAP = ROOT / "hashmarks" / "codemap"
 
 def _tree(path: Path) -> ast.Module:
     return read_python_ast(path).tree
+
+
+def _syntax_import_bindings(
+    node: ast.Import | ast.ImportFrom, package: str
+) -> list[tuple[str, str]]:
+    if isinstance(node, ast.Import):
+        return [
+            (
+                alias.asname or alias.name.split(".")[0],
+                alias.name if alias.asname else alias.name.split(".")[0],
+            )
+            for alias in node.names
+        ]
+    module = node.module or ""
+    if node.level:
+        module = importlib.util.resolve_name("." * node.level + module, package)
+    return [
+        (alias.asname or alias.name, f"{module}.{alias.name}") for alias in node.names
+    ]
+
+
+def _owns_raw_source_parser(target: str) -> bool:
+    root = target.split(".")[0]
+    return (
+        root == "tree_sitter"
+        or root.startswith("tree_sitter_")
+        or root == "esprima"
+        or target == "hashmarks.codemap.providers.StructuralParser"
+    )
+
+
+def _syntax_call_target(node: ast.AST, bindings: dict[str, str]) -> str:
+    if isinstance(node, ast.Name):
+        return bindings.get(node.id, node.id)
+    if isinstance(node, ast.Attribute):
+        return f"{_syntax_call_target(node.value, bindings)}.{node.attr}"
+    return ""
+
+
+def _source_parser_call(
+    node: ast.Call,
+    bindings: dict[str, str],
+    package: str,
+    allow_provider_construction: bool,
+) -> str | None:
+    target = _syntax_call_target(node.func, bindings)
+    if not allow_provider_construction and target == (
+        "hashmarks.codemap.providers.TreeSitterRangeProvider"
+    ):
+        return target
+    if target not in {"importlib.import_module", "__import__", "builtins.__import__"}:
+        return None
+    if not node.args or not isinstance(node.args[0], ast.Constant):
+        return None
+    value = node.args[0].value
+    if not isinstance(value, str):
+        return None
+    if value.startswith("."):
+        value = importlib.util.resolve_name(value, package)
+    return value if _owns_raw_source_parser(value) else None
+
+
+def _source_syntax_bypasses(
+    tree: ast.Module,
+    package: str = "hashmarks.codemap",
+    *,
+    allow_provider_construction: bool = False,
+) -> list[tuple[int, str]]:
+    bindings: dict[str, str] = {}
+    violations: set[tuple[int, str]] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Import, ast.ImportFrom)):
+            imports = _syntax_import_bindings(node, package)
+            bindings.update(imports)
+            violations.update(
+                (node.lineno, target)
+                for _, target in imports
+                if _owns_raw_source_parser(target)
+            )
+    for node in ast.walk(tree):
+        target = _syntax_call_target(node, bindings)
+        if isinstance(node, (ast.Name, ast.Attribute)) and (
+            _owns_raw_source_parser(target)
+            or (
+                not allow_provider_construction
+                and target == "hashmarks.codemap.providers.TreeSitterRangeProvider.auto"
+            )
+        ):
+            violations.add((node.lineno, target))
+        if isinstance(node, ast.Call):
+            target = _source_parser_call(
+                node, bindings, package, allow_provider_construction
+            )
+            if target is not None:
+                violations.add((node.lineno, target))
+        if isinstance(node, ast.Attribute) and node.attr in {
+            "_parser",
+            "_parser_factory",
+            "_syntax_reuse",
+        }:
+            violations.add((node.lineno, f"provider-private:{node.attr}"))
+    return sorted(violations)
+
+
+def test_native_source_parser_construction_stays_with_its_owner() -> None:
+    violations = []
+    for path in sorted(CODEMAP.rglob("*.py")):
+        if path == CODEMAP / "providers.py":
+            continue
+        package = ".".join(path.relative_to(ROOT).parent.parts)
+        violations.extend(
+            f"{path.relative_to(CODEMAP)}:{line}:{target}"
+            for line, target in _source_syntax_bypasses(
+                _tree(path),
+                package,
+                allow_provider_construction=path == CODEMAP / "engine.py",
+            )
+        )
+    assert violations == [], (
+        "source consumers must use the configured syntax provider, not acquire "
+        "another parser: " + ", ".join(violations)
+    )
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "import tree_sitter as alternate\nalternate.Parser()\n",
+        "from tree_sitter_language_pack import get_parser as renamed\n"
+        "renamed('typescript').parse(raw)\n",
+        "from tree_sitter_typescript import language_typescript as grammar\n",
+        "from esprima import tokenize as lexical_observer\n",
+        "from .providers import StructuralParser as OtherOwner\n",
+        "from ..codemap.providers import StructuralParser as OtherOwner\n",
+        "from . import providers as native\nnative.StructuralParser()\n",
+        "from .providers import TreeSitterRangeProvider as Other\nOther()\n",
+        "from .providers import TreeSitterRangeProvider as Other\nOther.auto()\n",
+        "from . import providers as native\n"
+        "factory = native.TreeSitterRangeProvider.auto\nfactory()\n",
+        "import importlib as modules\nmodules.import_module('tree_sitter')\n",
+        "import importlib.util\nimportlib.import_module('tree_sitter')\n",
+        "from importlib import import_module as load\n"
+        "load('tree_sitter_language_pack')\n",
+        "from builtins import __import__ as load\nload('tree_sitter')\n",
+        "__import__('tree_sitter_languages')\n",
+        "def observe(configured, raw):\n"
+        "    return configured._parser('javascript').parse(raw)\n",
+        "def observe(configured, raw):\n"
+        "    factory = configured._parser_factory\n"
+        "    return factory('tsx').parse(raw)\n",
+        "def observe(configured):\n    configured._syntax_reuse.set(None)\n",
+    ],
+)
+def test_native_source_parser_guard_detects_renamed_and_relative_bypasses(
+    source: str,
+) -> None:
+    assert _source_syntax_bypasses(ast.parse(source))
+
+
+def test_native_source_parser_guard_preserves_qualified_projections() -> None:
+    source = (
+        "from .providers import SourceSyntaxProvider, StructuralTree, source_grammar\n"
+        "from .ecmascript_syntax import module_declarations\n"
+        "from .python_ast import identifier_terms, estimate_tokens\n"
+        "def observe(provider, raw, path):\n"
+        "    tree = provider.syntax_tree(raw, source_grammar(path))\n"
+        "    return module_declarations(tree, raw)\n"
+    )
+    assert _source_syntax_bypasses(ast.parse(source)) == []
+
+
+def test_source_composition_may_construct_the_configured_provider_only() -> None:
+    source = (
+        "from .providers import TreeSitterRangeProvider as Native\n"
+        "provider = Native.auto()\n"
+    )
+    assert (
+        _source_syntax_bypasses(ast.parse(source), allow_provider_construction=True)
+        == []
+    )
+    assert _source_syntax_bypasses(ast.parse(source))
+    assert _source_syntax_bypasses(
+        ast.parse("from tree_sitter_language_pack import get_parser as alternative\n"),
+        allow_provider_construction=True,
+    )
 
 
 def _relationship_cache_writers(tree: ast.Module) -> list[tuple[str, str, int]]:

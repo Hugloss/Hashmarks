@@ -1,17 +1,28 @@
 from __future__ import annotations
 
 import json
+from collections import OrderedDict
+from contextlib import contextmanager, nullcontext
+from contextvars import ContextVar
 from dataclasses import dataclass, replace
 from importlib import metadata
-from typing import TYPE_CHECKING, Literal, Protocol, runtime_checkable
+from pathlib import PurePath
+from typing import TYPE_CHECKING, Literal, Protocol, cast, runtime_checkable
 
-from .model import ParsedArtifact, SymbolRecord
+from .ecmascript_syntax import SyntaxObservationBound, module_declarations
+from .model import EdgeRecord, ParsedArtifact, SymbolRecord
 from .python_ast import estimate_tokens
+from .source_languages import SOURCE_LANGUAGES
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Sequence
+    from collections.abc import Callable, Iterator, Sequence
+    from contextlib import AbstractContextManager
 
-TREE_SITTER_RANGE_SCHEMA = "hashmarks.tree-sitter-ranges.v2"
+TREE_SITTER_RANGE_SCHEMA = "hashmarks.tree-sitter-ranges.v3"
+ECMASCRIPT_GRAMMARS = frozenset({"javascript", "typescript", "tsx"})
+SYNTAX_SESSION_MAX_TREES = 32
+SYNTAX_SESSION_MAX_SOURCE_BYTES = 8_388_608
+_SyntaxKey = tuple[str, str, bytes]
 _LanguageName = Literal[
     "python",
     "javascript",
@@ -67,6 +78,53 @@ class StructuralParser(Protocol):
     def parse(self, source: bytes, /) -> StructuralTree: ...
 
 
+class SourceSyntaxError(ValueError):
+    """The canonical parser could not admit the supplied source bytes."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(reason)
+        self.reason = reason
+
+
+class _SyntaxReuse:
+    """Disposable, bounded trees over exact inputs; never source authority."""
+
+    def __init__(self) -> None:
+        self.entries: OrderedDict[_SyntaxKey, StructuralTree | str] = OrderedDict()
+        self.source_bytes = 0
+        self.active = True
+
+    def get(self, key: _SyntaxKey) -> StructuralTree | str | None:
+        value = self.entries.get(key) if self.active else None
+        if value is not None:
+            self.entries.move_to_end(key)
+        return value
+
+    def remember(self, key: _SyntaxKey, value: StructuralTree | str) -> None:
+        size = len(key[2])
+        if not self.active or size > SYNTAX_SESSION_MAX_SOURCE_BYTES:
+            return
+        self.entries[key] = value
+        self.source_bytes += size
+        while (
+            len(self.entries) > SYNTAX_SESSION_MAX_TREES
+            or self.source_bytes > SYNTAX_SESSION_MAX_SOURCE_BYTES
+        ):
+            evicted, _ = self.entries.popitem(last=False)
+            self.source_bytes -= len(evicted[2])
+
+    def clear(self) -> None:
+        self.entries.clear()
+        self.source_bytes = 0
+        self.active = False
+
+
+def source_grammar(path: str) -> str | None:
+    """Select the native grammar once, independently of the public language family."""
+    suffix = PurePath(path).suffix.lower()
+    return "tsx" if suffix == ".tsx" else SOURCE_LANGUAGES.get(suffix)
+
+
 def _identifier_node_or_child(value: StructuralNode) -> StructuralNode | None:
     if value.type in _IDENTIFIER_TYPES:
         return value
@@ -97,7 +155,7 @@ class SourceRangeProvider(Protocol):
 
     def signature(self, language: str) -> str | None: ...
     def enrich(
-        self, artifact: ParsedArtifact, source: str, language: str
+        self, artifact: ParsedArtifact, source: str | bytes, language: str
     ) -> ParsedArtifact: ...
     def status(self) -> ProviderStatus: ...
 
@@ -117,8 +175,9 @@ class TreeSitterRangeProvider:
     The provider is deliberately optional and lazy. Hashmarks does not depend on
     tree-sitter, and the Identity/Impact import graph never imports this module.
     When ``tree-sitter-language-pack`` is installed, CodeMap can use it to get
-    robust symbol body ranges for supported languages while retaining Hashmarks'
-    existing advisory/native evidence for names/imports/references.
+    robust symbol body ranges for supported languages. ECMAScript declarations
+    and module references come exclusively from this admitted syntax; unavailable
+    native parsing never falls back to a second structural interpreter.
     """
 
     _LANGUAGE_NAMES: dict[str, _LanguageName] = {
@@ -159,6 +218,8 @@ class TreeSitterRangeProvider:
         "internal_module": "namespace",
         "abstract_class_declaration": "class",
         "function_signature": "function",
+        "method_signature": "method",
+        "abstract_method_signature": "method",
         "variable_declarator": "binding",
         "public_field_definition": "method",
     }
@@ -176,6 +237,9 @@ class TreeSitterRangeProvider:
         self.detail = detail
         self._binding_version = binding_version
         self._parsers: dict[str, StructuralParser] = {}
+        self._syntax_reuse: ContextVar[_SyntaxReuse | None] = ContextVar(
+            "hashmarks_native_syntax_reuse", default=None
+        )
 
     @classmethod
     def auto(cls) -> TreeSitterRangeProvider:
@@ -233,17 +297,60 @@ class TreeSitterRangeProvider:
         self._parsers[name] = parser
         return parser
 
-    def syntax_tree(self, source: bytes, language: str) -> StructuralTree | None:
-        """Parse with this provider's grammar, rejecting recovered error trees.
+    @contextmanager
+    def syntax_session(self) -> Iterator[None]:
+        """Reuse syntax only within this context's current observation operation."""
+        existing = self._syntax_reuse.get()
+        if existing is not None and existing.active:
+            yield
+            return
+        reuse = _SyntaxReuse()
+        token = self._syntax_reuse.set(reuse)
+        try:
+            yield
+        finally:
+            self._syntax_reuse.reset(token)
+            reuse.clear()
 
-        Source observations and declaration ranges share one native parser
-        owner. Trees are request-local; this adds no source or artifact cache.
-        """
-        if not self.supports(language):
-            return None
+    def _parse_syntax(self, source: bytes, language: str) -> StructuralTree:
+        if b"\x00" in source:
+            raise SourceSyntaxError("null-byte-text")
+        try:
+            source.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise SourceSyntaxError("invalid-utf8") from exc
         tree = self._parser(language).parse(source)
         if getattr(tree.root_node, "has_error", False):
-            raise ValueError("native syntax tree contains errors")
+            raise SourceSyntaxError("native-syntax-parse-failed")
+        return tree
+
+    def syntax_tree(self, source: bytes, language: str) -> StructuralTree | None:
+        """Parse once per retained exact input in the active bounded operation.
+
+        A tree is reusable only for the same source bytes, grammar and provider
+        signature in this provider instance. Sessions never establish member
+        freshness or persist trees; eviction may require another native parse.
+        """
+        signature = self.signature(language)
+        if signature is None:
+            return None
+        key = (language, signature, source)
+        reuse = self._syntax_reuse.get()
+        cached = reuse.get(key) if reuse is not None else None
+        if isinstance(cached, str):
+            raise SourceSyntaxError(cached)
+        if cached is not None:
+            return cached
+        try:
+            tree = self._parse_syntax(source, language)
+            if self.signature(language) != signature:
+                raise SourceSyntaxError("native-syntax-provider-changed")
+        except SourceSyntaxError as exc:
+            if reuse is not None:
+                reuse.remember(key, exc.reason)
+            raise
+        if reuse is not None:
+            reuse.remember(key, tree)
         return tree
 
     @staticmethod
@@ -322,11 +429,56 @@ class TreeSitterRangeProvider:
             parent=parent,
         )
 
-    def _collect(self, source: str, language: str) -> list[SymbolRecord]:
-        source_bytes = source.encode("utf-8")
-        tree = self.syntax_tree(source_bytes, language)
-        if tree is None:
-            return []
+    @staticmethod
+    def _declaration(node: StructuralNode) -> StructuralNode:
+        if node.type == "export_statement":
+            return node.child_by_field_name("declaration") or node
+        return node
+
+    def _overload_key(
+        self, node: StructuralNode, raw: bytes
+    ) -> tuple[str, str, bool] | None:
+        kinds = {
+            "function_signature": "function",
+            "function_declaration": "function",
+            "method_signature": "method",
+            "method_definition": "method",
+        }
+        kind = kinds.get(node.type)
+        name = node.child_by_field_name("name")
+        return (
+            (
+                kind,
+                self._text(raw, name),
+                any(child.type == "static" for child in node.children),
+            )
+            if kind and name is not None
+            else None
+        )
+
+    def _declaration_children(
+        self, node: StructuralNode, raw: bytes
+    ) -> list[StructuralNode]:
+        """Join adjacent native overload declarations within one lexical scope."""
+        children: list[StructuralNode] = []
+        implementation: tuple[str, str, bool] | None = None
+        for child in reversed(node.named_children):
+            declaration = self._declaration(child)
+            key = self._overload_key(declaration, raw)
+            signature = declaration.type in {"function_signature", "method_signature"}
+            if signature and key is not None and key == implementation:
+                continue
+            children.append(child)
+            if declaration.type == "comment":
+                continue
+            implementation = (
+                key if declaration.child_by_field_name("body") is not None else None
+            )
+        return list(reversed(children))
+
+    def _symbols(
+        self, tree: StructuralTree, source_bytes: bytes, language: str
+    ) -> list[SymbolRecord]:
         found: list[SymbolRecord] = []
 
         def visit(node: StructuralNode, parent: str | None = None) -> None:
@@ -346,11 +498,43 @@ class TreeSitterRangeProvider:
                     "constructor",
                 }:
                     current_parent = symbol.qualname
-            for child in node.named_children:
+            children = (
+                self._declaration_children(node, source_bytes)
+                if language in {"typescript", "tsx"}
+                else node.named_children
+            )
+            for child in children:
                 visit(child, current_parent)
 
         visit(tree.root_node)
         return found
+
+    def _collect(self, source: str, language: str) -> list[SymbolRecord]:
+        source_bytes = source.encode("utf-8")
+        tree = self.syntax_tree(source_bytes, language)
+        return [] if tree is None else self._symbols(tree, source_bytes, language)
+
+    @staticmethod
+    def _module_edges(tree: StructuralTree, raw: bytes) -> tuple[EdgeRecord, ...]:
+        # Native import/export declarations prove source references. Calls named
+        # require/import remain call syntax, not resolved module bindings.
+        return tuple(
+            EdgeRecord(
+                None,
+                "import",
+                str(row["module_specifier"]),
+                cast("int", row["line"]),
+                "native",
+            )
+            for row in module_declarations(tree, raw)
+            if isinstance(row["module_specifier"], str)
+        )
+
+    @staticmethod
+    def _unavailable(artifact: ParsedArtifact, reason: str) -> ParsedArtifact:
+        if artifact.language not in ECMASCRIPT_GRAMMARS:
+            return artifact
+        return replace(artifact, symbols=(), edges=(), outline="", parse_error=reason)
 
     @staticmethod
     def _merge(
@@ -397,25 +581,61 @@ class TreeSitterRangeProvider:
         return tuple(merged)
 
     def enrich(
-        self, artifact: ParsedArtifact, source: str, language: str
+        self, artifact: ParsedArtifact, source: str | bytes, language: str
     ) -> ParsedArtifact:
-        if not self.supports(language):
-            return artifact
-        try:
-            structural = self._collect(source, language)
-        except Exception:
-            # Optional precision may fail closed to the existing parser. A bad
-            # grammar/plugin must never make CodeMap unavailable.
-            return artifact
         signature = self.signature(language)
-        parser = (
-            artifact.parser if signature is None else f"{artifact.parser}+{signature}"
-        )
+        if signature is None:
+            return self._unavailable(artifact, "native-syntax-unavailable")
+        try:
+            raw = source.encode("utf-8") if isinstance(source, str) else source
+            tree = self.syntax_tree(raw, language)
+            if tree is None:
+                return self._unavailable(artifact, "native-syntax-unavailable")
+            edges = (
+                self._module_edges(tree, raw)
+                if language in ECMASCRIPT_GRAMMARS
+                else artifact.edges
+            )
+            structural = self._symbols(tree, raw, language)
+        except SyntaxObservationBound:
+            return self._unavailable(artifact, "native-syntax-node-bound")
+        except Exception as exc:
+            # Isolate optional-provider failure; ECMAScript has no alternate
+            # structural parser that could strengthen unavailable syntax.
+            reason = (
+                exc.reason
+                if isinstance(exc, SourceSyntaxError)
+                else "native-syntax-parse-failed"
+            )
+            return self._unavailable(artifact, reason)
+        if self.signature(language) != signature:
+            return self._unavailable(artifact, "native-syntax-provider-changed")
+        parser = f"{artifact.parser}+{signature}"
         # JS/TS native declarations include lexical scope and binding syntax.
         # Mixing the flat advisory names back in creates false global symbols.
         symbols = (
             tuple(structural)
-            if language in {"javascript", "typescript"}
+            if language in ECMASCRIPT_GRAMMARS
             else self._merge(artifact.symbols, structural)
         )
-        return replace(artifact, parser=parser, symbols=symbols)
+        return replace(
+            artifact,
+            parser=parser,
+            symbols=symbols,
+            edges=edges,
+            outline=(
+                "\n".join(f"{row.signature}  [{row.start_line}]" for row in symbols)
+                if language in ECMASCRIPT_GRAMMARS
+                else artifact.outline
+            ),
+            parse_error=None
+            if language in ECMASCRIPT_GRAMMARS
+            else artifact.parse_error,
+        )
+
+
+def syntax_session(provider: SourceRangeProvider) -> AbstractContextManager[None]:
+    """Share the canonical provider's operation lifecycle when it is available."""
+    if isinstance(provider, TreeSitterRangeProvider):
+        return provider.syntax_session()
+    return nullcontext()

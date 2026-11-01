@@ -12,6 +12,8 @@ from typing import TYPE_CHECKING
 from hashmarks.operation_contract import operation_schema
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from .providers import StructuralNode, StructuralTree
 
 ECMASCRIPT_SOURCE_SCHEMA = operation_schema("source_ecmascript")
@@ -399,24 +401,16 @@ class _SyntaxProjection:
         }
 
 
-def ecmascript_facts(
-    tree: StructuralTree, raw: bytes, limit: int
-) -> tuple[list[dict[str, object]], int]:
-    """Count covered syntax facts and retain a deterministic bounded projection."""
-    projection = _SyntaxProjection(raw)
+def _syntax_visits(tree: StructuralTree) -> Iterator[_Visit]:
+    """One traversal contract for native source projections and their bounds."""
     pending = [_Visit(tree.root_node, tree.root_node)]
-    found: list[dict[str, object]] = []
-    count = visited = 0
+    visited = 0
     while pending:
         visit = pending.pop().entered()
         visited += 1
         if visited > MAX_SYNTAX_NODES:
             raise SyntaxObservationBound("native-syntax-node-bound")
-        fact = projection.fact(visit)
-        if fact is not None:
-            count += 1
-            if len(found) < limit:
-                found.append(fact)
+        yield visit
         children = visit.node.named_children
         if visited + len(pending) + len(children) > MAX_SYNTAX_NODES:
             raise SyntaxObservationBound("native-syntax-node-bound")
@@ -424,4 +418,37 @@ def ecmascript_facts(
             replace(visit, node=child, parent=visit.node)
             for child in reversed(children)
         )
+
+
+def module_declarations(tree: StructuralTree, raw: bytes) -> list[dict[str, object]]:
+    """Project authored module syntax from the already admitted native tree.
+
+    Indexing, Source and verification share literal/type-only qualification.
+    Uninterpreted string escapes and bounded previews never become guessed
+    specifiers. The whole traversal must fit before any rows are returned.
+    """
+    projection = _SyntaxProjection(raw)
+    found: list[dict[str, object]] = []
+    for visit in _syntax_visits(tree):
+        if visit.node.type not in {"import_statement", "export_statement"}:
+            continue
+        fact = projection.fact(visit)
+        if fact is not None:
+            found.append(fact)
+    return found
+
+
+def ecmascript_facts(
+    tree: StructuralTree, raw: bytes, limit: int
+) -> tuple[list[dict[str, object]], int]:
+    """Count covered syntax facts and retain a deterministic bounded projection."""
+    projection = _SyntaxProjection(raw)
+    found: list[dict[str, object]] = []
+    count = 0
+    for visit in _syntax_visits(tree):
+        fact = projection.fact(visit)
+        if fact is not None:
+            count += 1
+            if len(found) < limit:
+                found.append(fact)
     return found, count

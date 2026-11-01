@@ -16,7 +16,12 @@ from .ecmascript_syntax import (
     SyntaxObservationBound,
     ecmascript_facts,
 )
-from .providers import SourceSyntaxProvider
+from .providers import (
+    SourceSyntaxError,
+    SourceSyntaxProvider,
+    source_grammar,
+    syntax_session,
+)
 from .repository_observation import evidence_identity
 from .source_languages import SOURCE_LANGUAGES
 
@@ -31,12 +36,6 @@ def _syntax_evidence(
     limit: int,
 ) -> dict[str, object]:
     """Unsupported capability and recovered syntax never become empty evidence."""
-    if b"\x00" in raw:
-        return {"reason": "null-byte-text"}
-    try:
-        raw.decode("utf-8")
-    except UnicodeDecodeError:
-        return {"reason": "invalid-utf8"}
     try:
         tree = provider.syntax_tree(raw, grammar)
         if tree is None:
@@ -44,6 +43,8 @@ def _syntax_evidence(
         facts, count = ecmascript_facts(tree, raw, limit)
     except SyntaxObservationBound:
         return {"reason": "native-syntax-node-bound"}
+    except SourceSyntaxError as exc:
+        return {"reason": exc.reason}
     except (ImportError, LookupError, OSError, RuntimeError, TypeError, ValueError):
         return {"reason": "native-syntax-parse-failed"}
     clipped = count > len(facts)
@@ -102,7 +103,7 @@ class SourceEcmascriptMixin:
         suffix = Path(str(member["path"])).suffix.lower()
         language = SOURCE_LANGUAGES.get(suffix)
         grammar = (
-            ("tsx" if suffix == ".tsx" else language)
+            source_grammar(str(member["path"]))
             if language in {"javascript", "typescript"}
             else None
         )
@@ -148,6 +149,55 @@ class SourceEcmascriptMixin:
             },
         )
 
+    def _ecmascript_recheck(self, packet: dict[str, object]) -> bool:
+        """Revalidate captured source and provider identity before exposing facts."""
+        if TYPE_CHECKING:
+            self = cast("RepositorySource", self)
+        if packet["availability"] != "observed":
+            return False
+        member = cast("dict[str, object]", packet["member"])
+        limits = cast("dict[str, int]", packet["limits"])
+        current, _ = self._bounded_source_observation(
+            str(member["path"]), limits["max_bytes"]
+        )
+        parser = cast("dict[str, object]", packet["parser"])
+        provider = self.index.range_provider
+        reason = (
+            "source-changed-during-observation"
+            if current != member
+            else "native-syntax-provider-changed"
+            if provider.signature(str(parser["grammar"])) != parser["signature"]
+            else None
+        )
+        if reason is None:
+            return False
+        packet.update(
+            self._ecmascript_packet(member, limits["results"], limits["max_bytes"])
+        )
+        packet["reason"] = reason
+        return True
+
+    def _ecmascript_observation(
+        self, relpath: str, limit: int, max_bytes: int
+    ) -> dict[str, object]:
+        if TYPE_CHECKING:
+            self = cast("RepositorySource", self)
+        generation_before = self.store.generation()
+        member, raw = self._bounded_source_observation(relpath, max_bytes)
+        packet = self._ecmascript_packet(member, limit, max_bytes)
+        self._ecmascript_observe(packet, raw)
+        changed = self._ecmascript_recheck(packet)
+        generation, identity_generation, stale = self.reads.generation_status()
+        packet.update(
+            generation=generation,
+            identity_generation=identity_generation,
+            freshness="stale"
+            if changed or generation != generation_before
+            else freshness_state(stale),
+        )
+        self._ecmascript_identities(packet)
+        return packet
+
     @operation_response("source_ecmascript")
     def ecmascript(
         self,
@@ -168,17 +218,5 @@ class SourceEcmascriptMixin:
             raise ValueError("limit must be between 1 and 500")
         if type(max_bytes) is not int or not 1 <= max_bytes <= 8_388_608:
             raise ValueError("max_bytes must be between 1 and 8388608")
-        generation_before = self.store.generation()
-        member, raw = self._bounded_source_observation(relpath, max_bytes)
-        packet = self._ecmascript_packet(member, limit, max_bytes)
-        self._ecmascript_observe(packet, raw)
-        generation, identity_generation, stale = self.reads.generation_status()
-        packet.update(
-            generation=generation,
-            identity_generation=identity_generation,
-            freshness="stale"
-            if generation != generation_before
-            else freshness_state(stale),
-        )
-        self._ecmascript_identities(packet)
-        return packet
+        with syntax_session(self.index.range_provider):
+            return self._ecmascript_observation(relpath, limit, max_bytes)

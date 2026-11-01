@@ -7,12 +7,13 @@ from dataclasses import replace
 from typing import TYPE_CHECKING
 
 from .model import CODEMAP_SCHEMA, EdgeRecord, ParsedArtifact, SymbolRecord
+from .providers import ECMASCRIPT_GRAMMARS, source_grammar
 from .python_ast import PYTHON_PARSER, estimate_tokens, lexical_records, parse_python
 
 if TYPE_CHECKING:
     from .providers import SourceRangeProvider
 
-NODE_PARSER = "hashmarks.ecmascript-outline.v6"
+NODE_PARSER = "hashmarks.ecmascript-syntax.v7"
 GO_PARSER = "hashmarks.go-outline.v4"
 RUST_PARSER = "hashmarks.rust-outline.v4"
 PATH_ONLY_PARSER = "hashmarks.path-only.v4"
@@ -21,7 +22,7 @@ PATH_ONLY_PARSER = "hashmarks.path-only.v4"
 def parser_id(language: str) -> str:
     if language == "python":
         return PYTHON_PARSER
-    if language in {"javascript", "typescript"}:
+    if language in ECMASCRIPT_GRAMMARS:
         return NODE_PARSER
     if language == "go":
         return GO_PARSER
@@ -31,12 +32,17 @@ def parser_id(language: str) -> str:
 
 
 def parser_signature(
-    language: str, range_provider: SourceRangeProvider | None = None
+    language: str,
+    range_provider: SourceRangeProvider | None = None,
+    *,
+    path: str | None = None,
 ) -> str:
     base = parser_id(language)
     if range_provider is None:
         return base
-    extra = range_provider.signature(language)
+    extra = range_provider.signature(
+        source_grammar(path) or language if path is not None else language
+    )
     return base if extra is None else f"{base}+{extra}"
 
 
@@ -45,11 +51,23 @@ def artifact_key_for(
     language: str,
     *,
     range_provider: SourceRangeProvider | None = None,
+    path: str | None = None,
 ) -> str:
+    grammar = source_grammar(path) or language if path is not None else language
+    return _artifact_key(
+        file_digest,
+        language,
+        grammar,
+        parser_signature(language, range_provider, path=path),
+    )
+
+
+def _artifact_key(file_digest: str, language: str, grammar: str, parser: str) -> str:
     payload = json.dumps(
         {
             "schema": CODEMAP_SCHEMA,
-            "parser": parser_signature(language, range_provider),
+            "parser": parser,
+            "grammar": grammar,
             "file_digest": file_digest,
             "language": language,
         },
@@ -79,154 +97,6 @@ def _symbol(
         signature_tokens=estimate_tokens(signature),
         body_tokens=estimate_tokens(signature),
         parent=parent,
-    )
-
-
-def _node_declaration(stripped: str, line_no: int) -> SymbolRecord | None:
-    """Classify one advisory JS/TS declaration without inferring its RHS."""
-    match = re.match(
-        r"^(?:export\s+)?(?:default\s+)?(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\s*(?:<[^()\n]*>\s*)?\(",
-        stripped,
-    )
-    if match:
-        return _symbol(
-            name=match.group(1),
-            kind="function",
-            signature=stripped.split("{")[0].rstrip(),
-            line=line_no,
-        )
-    match = re.match(
-        r"^(?:export\s+)?(?:default\s+)?class\s+([A-Za-z_$][\w$]*)\b", stripped
-    )
-    if match:
-        return _symbol(
-            name=match.group(1),
-            kind="class",
-            signature=stripped.split("{")[0].rstrip(),
-            line=line_no,
-        )
-    match = re.match(
-        r"^(?:export\s+)?(?:interface|type|enum)\s+([A-Za-z_$][\w$]*)\b", stripped
-    )
-    if match:
-        keyword = (
-            stripped.split(None, 2)[1]
-            if stripped.startswith("export ")
-            else stripped.split(None, 1)[0]
-        )
-        return _symbol(
-            name=match.group(1),
-            kind=keyword,
-            signature=stripped.split("{")[0].rstrip(),
-            line=line_no,
-        )
-    match = re.match(
-        r"^(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?\([^)]*\)\s*=>",
-        stripped,
-    )
-    if match:
-        return _symbol(
-            name=match.group(1),
-            kind="function",
-            signature=stripped.split("=>", 1)[0].rstrip() + " =>",
-            line=line_no,
-        )
-    # React/hooks and modern TypeScript expose code landmarks as const
-    # bindings. Keep them as advisory structure without inferring the RHS.
-    match = re.match(
-        r"^(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=", stripped
-    )
-    if match:
-        prefix = stripped.split("=", 1)[0].rstrip()
-        return _symbol(
-            name=match.group(1),
-            kind="binding",
-            signature=prefix + " = …",
-            line=line_no,
-        )
-    return None
-
-
-def _node_outline(source: str, *, file_digest: str, language: str) -> ParsedArtifact:
-    symbols: list[SymbolRecord] = []
-    edges: list[EdgeRecord] = []
-    for line_no, raw in enumerate(source.split("\n"), 1):
-        stripped = raw.strip()
-        if not stripped:
-            continue
-        for pattern in (
-            r"\bfrom\s+['\"]([^'\"]+)['\"]",
-            r"^import\s+['\"]([^'\"]+)['\"]",
-            r"\brequire\(\s*['\"]([^'\"]+)['\"]\s*\)",
-        ):
-            for match in re.finditer(pattern, stripped):
-                edges.append(
-                    EdgeRecord(None, "import", match.group(1), line_no, "lexical")
-                )
-        symbol = _node_declaration(stripped, line_no)
-        if symbol is not None:
-            symbols.append(symbol)
-
-    outline = "\n".join(
-        f"{symbol.signature}  [{symbol.start_line}]" for symbol in symbols
-    )
-    return ParsedArtifact(
-        artifact_key=artifact_key_for(file_digest, language),
-        file_digest=file_digest,
-        language=language,
-        parser=NODE_PARSER,
-        full_tokens=estimate_tokens(source),
-        outline=outline,
-        symbols=tuple(symbols),
-        edges=tuple(edges),
-        lexical=lexical_records(source),
-    )
-
-
-def _typescript_implementation_symbols(
-    symbols: tuple[SymbolRecord, ...], source: str
-) -> tuple[SymbolRecord, ...]:
-    """Join only adjacent same-scope overload signatures to their implementation."""
-    lines = source.split("\n")
-
-    def is_signature(symbol: SymbolRecord) -> bool:
-        if symbol.kind != "function" or not 1 <= symbol.start_line <= len(lines):
-            return False
-        line = lines[symbol.start_line - 1].strip()
-        return line.endswith(";") and "{" not in line
-
-    by_line = {symbol.start_line: symbol for symbol in symbols}
-
-    def has_adjacent_implementation(signature: SymbolRecord) -> bool:
-        for line_number in range(signature.start_line + 1, len(lines) + 1):
-            if not lines[line_number - 1].strip():
-                continue
-            following = by_line.get(line_number)
-            if following is None or (
-                following.qualname,
-                following.parent,
-                following.kind,
-            ) != (signature.qualname, signature.parent, "function"):
-                return False
-            if not is_signature(following):
-                return True
-        return False
-
-    return tuple(
-        symbol
-        for symbol in symbols
-        if not is_signature(symbol) or not has_adjacent_implementation(symbol)
-    )
-
-
-def _normalize_node_symbols(
-    artifact: ParsedArtifact, source: str, language: str
-) -> ParsedArtifact:
-    if language != "typescript":
-        return artifact
-    return replace(
-        artifact,
-        symbols=_typescript_implementation_symbols(artifact.symbols, source),
     )
 
 
@@ -385,43 +255,62 @@ def _unique_symbol_occurrences(
 
 
 def _path_only(source: str, *, file_digest: str, language: str) -> ParsedArtifact:
+    """Retain retrieval text without claiming source structure or its absence."""
     return ParsedArtifact(
         artifact_key=artifact_key_for(file_digest, language),
         file_digest=file_digest,
         language=language,
-        parser=PATH_ONLY_PARSER,
+        parser=NODE_PARSER if language in ECMASCRIPT_GRAMMARS else PATH_ONLY_PARSER,
         full_tokens=estimate_tokens(source),
         outline="",
         lexical=lexical_records(source),
+        parse_error="native-syntax-unavailable"
+        if language in ECMASCRIPT_GRAMMARS
+        else None,
     )
 
 
 def parse_source(
-    source: str,
+    source: str | bytes,
     *,
     file_digest: str,
     language: str,
     range_provider: SourceRangeProvider | None = None,
+    path: str | None = None,
 ) -> ParsedArtifact:
+    grammar = source_grammar(path) or language if path is not None else language
+    expected_parser = parser_signature(language, range_provider, path=path)
+    expected = _artifact_key(file_digest, language, grammar, expected_parser)
+    text = (
+        source.decode("utf-8", errors="replace")
+        if isinstance(source, bytes)
+        else source
+    )
     if language == "python":
-        artifact = parse_python(source, file_digest=file_digest)
-    elif language in {"javascript", "typescript"}:
-        artifact = _node_outline(source, file_digest=file_digest, language=language)
+        artifact = parse_python(text, file_digest=file_digest)
     elif language == "go":
-        artifact = _go_outline(source, file_digest=file_digest)
+        artifact = _go_outline(text, file_digest=file_digest)
     elif language == "rust":
-        artifact = _rust_outline(source, file_digest=file_digest)
+        artifact = _rust_outline(text, file_digest=file_digest)
     else:
-        artifact = _path_only(source, file_digest=file_digest, language=language)
+        artifact = _path_only(text, file_digest=file_digest, language=language)
 
     if range_provider is not None:
-        artifact = range_provider.enrich(artifact, source, language)
-    artifact = _normalize_node_symbols(artifact, source, language)
+        artifact = range_provider.enrich(artifact, source, grammar)
+        if (
+            language in ECMASCRIPT_GRAMMARS
+            and parser_signature(language, range_provider, path=path) != expected_parser
+        ):
+            artifact = replace(
+                artifact,
+                symbols=(),
+                edges=(),
+                outline="",
+                parse_error="native-syntax-provider-changed",
+            )
     unique_symbols = _unique_symbol_occurrences(artifact.symbols)
     if unique_symbols != artifact.symbols:
         artifact = replace(artifact, symbols=unique_symbols)
-    expected = artifact_key_for(file_digest, language, range_provider=range_provider)
-    expected_parser = parser_signature(language, range_provider)
     if artifact.artifact_key != expected or artifact.parser != expected_parser:
         artifact = ParsedArtifact(
             artifact_key=expected,

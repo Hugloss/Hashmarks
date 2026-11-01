@@ -4,8 +4,9 @@ import json
 import os
 import shutil
 import subprocess
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -40,17 +41,15 @@ if (!fs.existsSync(configPath)) { console.error('HASHMARKS_TSCONFIG_MISSING'); p
 const read = ts.readConfigFile(configPath, ts.sys.readFile);
 if (read.error) { console.error(ts.flattenDiagnosticMessageText(read.error.messageText, '\n')); process.exit(5); }
 const parsed = ts.parseJsonConfigFileContent(read.config, ts.sys, path.dirname(configPath));
+const imports = JSON.parse(fs.readFileSync(0, 'utf8'));
 const root = process.cwd();
 const out = [];
 function rel(p) { return path.relative(root, p).split(path.sep).join('/'); }
 for (const file of parsed.fileNames) {
   const abs = path.resolve(file);
   if (!abs.startsWith(root + path.sep) && abs !== root) continue;
-  let text;
-  try { text = fs.readFileSync(abs, 'utf8'); } catch (_) { continue; }
-  const info = ts.preProcessFile(text, true, true);
-  for (const item of info.importedFiles || []) {
-    const specifier = item.fileName;
+  // Hashmarks' admitted syntax owns occurrences; TypeScript owns resolution.
+  for (const specifier of imports[rel(abs)] || []) {
     const resolved = ts.resolveModuleName(specifier, abs, parsed.options, ts.sys).resolvedModule;
     if (!resolved || !resolved.resolvedFileName) continue;
     let target = path.resolve(resolved.resolvedFileName);
@@ -76,18 +75,24 @@ class TypeScriptResolverProvider:
         return local.exists()
 
     def collect(
-        self, workspace: Path, *, timeout: float = 20.0
+        self,
+        workspace: Path,
+        imports: Mapping[str, Sequence[str]] | None = None,
+        *,
+        timeout: float = 20.0,
     ) -> TypeScriptResolution:
-        if self.node is None:
-            return TypeScriptResolution(self.name, (), ("node executable unavailable",))
-        if not (workspace / "tsconfig.json").is_file():
-            return TypeScriptResolution(self.name, (), ("tsconfig.json unavailable",))
+        """Resolve supplied canonical imports without discovering source syntax."""
+        unavailable = self._unavailable_reason(workspace, imports)
+        if unavailable is not None:
+            return TypeScriptResolution(self.name, (), (unavailable,))
+        assert imports is not None and self.node is not None
         try:
             completed = subprocess.run(
                 [self.node, "-e", _NODE_SCRIPT, "tsconfig.json"],
                 cwd=workspace,
                 capture_output=True,
                 text=True,
+                input=json.dumps(imports, sort_keys=True),
                 timeout=timeout,
                 check=False,
                 env=os.environ.copy(),
@@ -106,20 +111,51 @@ class TypeScriptResolverProvider:
                 self.name, (), (f"TypeScript resolver unavailable: {detail}",)
             )
         try:
-            value: dict[str, Any] = json.loads(completed.stdout)
+            value = json.loads(completed.stdout)
         except json.JSONDecodeError:
             return TypeScriptResolution(
                 self.name, (), ("TypeScript resolver returned invalid JSON",)
             )
+        return self._resolution(value, imports)
+
+    def _unavailable_reason(
+        self, workspace: Path, imports: Mapping[str, Sequence[str]] | None
+    ) -> str | None:
+        if imports is None:
+            return "canonical source imports unavailable"
+        if self.node is None:
+            return "node executable unavailable"
+        if not (workspace / "tsconfig.json").is_file():
+            return "tsconfig.json unavailable"
+        return None
+
+    @staticmethod
+    def _resolution(
+        value: object, imports: Mapping[str, Sequence[str]]
+    ) -> TypeScriptResolution:
+        if not isinstance(value, dict):
+            return TypeScriptResolution(
+                TypeScriptResolverProvider.name, (), ("invalid resolver response",)
+            )
         version = str(value.get("version") or "unknown")
-        producer = f"typescript-resolver:{version}"
+        producer = f"typescript-resolver:{version}:canonical-syntax.v1"
+        rows = value.get("edges")
+        if not isinstance(rows, list):
+            return TypeScriptResolution(
+                producer, (), ("TypeScript resolver edges unavailable: expected array",)
+            )
         edges: list[NativeFileEdge] = []
-        for row in value.get("edges") or ():
+        rejected = 0
+        for row in rows:
             if (
                 not isinstance(row, dict)
                 or not row.get("source")
                 or not row.get("target")
             ):
+                rejected += 1
+                continue
+            if row.get("specifier") not in imports.get(str(row["source"]), ()):
+                rejected += 1
                 continue
             edges.append(
                 NativeFileEdge(
@@ -128,9 +164,12 @@ class TypeScriptResolverProvider:
                     kind="module-resolution",
                     confidence="native",
                     producer=producer,
-                    specifier=None
-                    if row.get("specifier") is None
-                    else str(row["specifier"]),
+                    specifier=str(row["specifier"]),
                 )
             )
-        return TypeScriptResolution(producer, tuple(edges))
+        warnings = (
+            (f"TypeScript resolver discarded {rejected} unqualified source edges",)
+            if rejected
+            else ()
+        )
+        return TypeScriptResolution(producer, tuple(edges), warnings)
