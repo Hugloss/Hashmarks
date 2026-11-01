@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import ast
 import os
-from collections.abc import Mapping
-from dataclasses import dataclass
+import sys
+from collections import OrderedDict
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
+from contextvars import ContextVar
+from dataclasses import dataclass, field
 from functools import cached_property, lru_cache
 from pathlib import Path
 from types import MappingProxyType
@@ -13,6 +17,84 @@ if TYPE_CHECKING:
     from functools import _CacheInfo
 
 _FileIdentity = tuple[int, int, int, int, int]
+_MAX_SOURCE_TREES = 32
+_MAX_SOURCE_BYTES = 8 * 1024 * 1024
+
+
+@dataclass(slots=True)
+class _SourceTrees:
+    entries: OrderedDict[tuple[str, str], ast.Module] = field(
+        default_factory=OrderedDict
+    )
+    size: int = 0
+    active: bool = True
+
+    def get(self, key: tuple[str, str]) -> ast.Module | None:
+        if not self.active or key not in self.entries:
+            return None
+        self.entries.move_to_end(key)
+        return self.entries[key]
+
+    def retain(self, key: tuple[str, str], tree: ast.Module) -> None:
+        size = len(key[1].encode("utf-8"))
+        if not self.active or size > _MAX_SOURCE_BYTES:
+            return
+        self.entries[key] = tree
+        self.size += size
+        while len(self.entries) > _MAX_SOURCE_TREES or self.size > _MAX_SOURCE_BYTES:
+            old, _ = self.entries.popitem(last=False)
+            self.size -= len(old[1].encode("utf-8"))
+
+    def clear(self) -> None:
+        self.entries.clear()
+        self.size = 0
+        self.active = False
+
+
+_source_trees: ContextVar[_SourceTrees | None] = ContextVar(
+    "hashmarks_python_source_trees", default=None
+)
+
+
+def python_ast_signature() -> str:
+    """Identify the canonical Python grammar and source parsing implementation."""
+    version = ".".join(str(part) for part in sys.version_info[:3])
+    return f"hashmarks.python-source.v1:{sys.implementation.name}:{version}"
+
+
+def parse_python_ast(source: str | bytes, *, filename: str = "<unknown>") -> ast.Module:
+    """Parse admitted UTF-8 source, reusing exact input within one observation.
+
+    Consumers must treat returned trees as immutable. Filenames affect syntax
+    diagnostics only; successful AST nodes contain coordinates in this source.
+    Reuse never establishes repository identity or freshness.
+    """
+    text = source.decode("utf-8") if isinstance(source, bytes) else source
+    key = (python_ast_signature(), text)
+    trees = _source_trees.get()
+    cached = trees.get(key) if trees is not None else None
+    if cached is not None:
+        return cached
+    tree = ast.parse(text, filename=filename)
+    if trees is not None:
+        trees.retain(key, tree)
+    return tree
+
+
+@contextmanager
+def python_ast_session() -> Iterator[None]:
+    """Bound source-tree reuse to the existing outer observation lifetime."""
+    existing = _source_trees.get()
+    if existing is not None and existing.active:
+        yield
+        return
+    trees = _SourceTrees()
+    token = _source_trees.set(trees)
+    try:
+        yield
+    finally:
+        trees.clear()
+        _source_trees.reset(token)
 
 
 class UnstablePythonSourceError(OSError):
@@ -94,7 +176,7 @@ def _cached_snapshot(
     source = path.read_text(encoding=encoding, errors=errors)
     if _metadata(path) != identity:
         raise UnstablePythonSourceError(f"Python source changed while reading: {path}")
-    tree = ast.parse(source, filename=absolute_path)
+    tree = parse_python_ast(source, filename=absolute_path)
     return PythonAstSnapshot(source=source, tree=tree, identity=identity)
 
 
@@ -139,5 +221,8 @@ __all__ = [
     "UnstablePythonSourceError",
     "ast_cache_info",
     "clear_ast_cache",
+    "parse_python_ast",
+    "python_ast_session",
+    "python_ast_signature",
     "read_python_ast",
 ]

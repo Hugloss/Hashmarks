@@ -1320,6 +1320,7 @@ def _projectors() -> dict[str, Any]:
         operation_schema("source_observation", "literals"): _source,
         operation_schema("source_observation", "range"): _source,
         operation_schema("source_observation", "ecmascript"): _source,
+        operation_schema("source_observation", "bindings"): _source,
         operation_schema("repository_evidence", "observation"): _bindings,
         operation_schema("repository_evidence", "coverage"): _bindings,
         operation_schema("repository_evidence", "membership"): _verification,
@@ -1353,6 +1354,7 @@ def _require_fields(packet: Mapping[str, object], schema: str) -> None:
         operation_schema("source_observation", "member"): ("member", "occurrences"),
         operation_schema("source_observation", "range"): ("member", "range"),
         operation_schema("source_observation", "ecmascript"): ("member", "facts"),
+        operation_schema("source_observation", "bindings"): ("member", "facts"),
         operation_schema("repository_evidence", "membership"): ("membership",),
         operation_schema("source_observation", "scope"): (
             "member_observations",

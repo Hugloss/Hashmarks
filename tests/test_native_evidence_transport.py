@@ -789,6 +789,7 @@ def _assert_literal_wire_schema(tool: Tool) -> None:
         "literals",
         "range",
         "ecmascript",
+        "bindings",
     ]
     assert {
         row["type"]

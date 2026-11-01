@@ -6,13 +6,14 @@ or evidence that other asset consumers do not exist.
 
 from __future__ import annotations
 
-import ast
 import posixpath
 import re
 from collections.abc import Iterator
 from pathlib import PurePosixPath
 from typing import cast
 from urllib.parse import unquote, urlsplit
+
+from hashmarks.python_ast_cache import parse_python_ast
 
 from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
 from .verification_file_reads import literal_repository_file_reads
@@ -208,7 +209,7 @@ def asset_references(
         syntax = "markdown-inline-local-destinations"
     elif suffix == ".py" and python_import_qualified:
         try:
-            tree = ast.parse(text, filename=reader)
+            tree = parse_python_ast(text, filename=reader)
         except (SyntaxError, ValueError):
             rows = []
             syntax = "python-syntax-unavailable"

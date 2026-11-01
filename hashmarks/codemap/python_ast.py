@@ -6,6 +6,8 @@ import json
 from collections.abc import Iterable
 from dataclasses import dataclass
 
+from hashmarks import python_ast_cache
+
 from .model import (
     CODEMAP_SCHEMA,
     PYTHON_PARSER,
@@ -242,9 +244,18 @@ class _Collector(ast.NodeVisitor):
         self.generic_visit(node)
 
 
+def python_parser_signature() -> str:
+    """Bind structural artifacts to both projection and native Python grammar."""
+    return f"{PYTHON_PARSER}+{python_ast_cache.python_ast_signature()}"
+
+
 def artifact_key(file_digest: str) -> str:
     payload = json.dumps(
-        {"schema": CODEMAP_SCHEMA, "parser": PYTHON_PARSER, "file_digest": file_digest},
+        {
+            "schema": CODEMAP_SCHEMA,
+            "parser": python_parser_signature(),
+            "file_digest": file_digest,
+        },
         sort_keys=True,
         separators=(",", ":"),
     ).encode("utf-8")
@@ -293,22 +304,28 @@ def lexical_records(source: str) -> tuple[LexicalRecord, ...]:
     return tuple(records)
 
 
-def parse_python(source: str, *, file_digest: str) -> ParsedArtifact:
+def parse_python(source: str | bytes, *, file_digest: str) -> ParsedArtifact:
     key = artifact_key(file_digest)
+    signature = python_parser_signature()
+    text = (
+        source.decode("utf-8", errors="replace")
+        if isinstance(source, bytes)
+        else source
+    )
     try:
-        tree = ast.parse(source)
+        tree = python_ast_cache.parse_python_ast(source)
     except (SyntaxError, ValueError) as exc:
         return ParsedArtifact(
             artifact_key=key,
             file_digest=file_digest,
             language="python",
-            parser=PYTHON_PARSER,
-            full_tokens=estimate_tokens(source),
+            parser=signature,
+            full_tokens=estimate_tokens(text),
             outline="",
-            lexical=lexical_records(source),
+            lexical=lexical_records(text),
             parse_error=f"{type(exc).__name__}: {exc}",
         )
-    collector = _Collector(source)
+    collector = _Collector(text)
     collector.visit(tree)
     outline_lines: list[str] = []
     for symbol in collector.symbols:
@@ -320,10 +337,10 @@ def parse_python(source: str, *, file_digest: str) -> ParsedArtifact:
         artifact_key=key,
         file_digest=file_digest,
         language="python",
-        parser=PYTHON_PARSER,
-        full_tokens=estimate_tokens(source),
+        parser=signature,
+        full_tokens=estimate_tokens(text),
         outline="\n".join(outline_lines),
         symbols=tuple(collector.symbols),
         edges=tuple(collector.edges),
-        lexical=lexical_records(source),
+        lexical=lexical_records(text),
     )

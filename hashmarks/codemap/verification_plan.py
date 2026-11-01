@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, cast
 from hashmarks.native_vitest import local_vitest
 from hashmarks.operation_contract import operation_response, operation_schema
 from hashmarks.paths import normalize_relative_path
+from hashmarks.python_ast_cache import parse_python_ast
 
 from .decision_session import ReadScopeOwner, decision_scoped, reconcile_decision
 from .ecmascript_syntax import module_declarations
@@ -340,7 +341,7 @@ class VerificationPlanMixin:
         file::function target; a caller must not promote one to test-node.
         """
         try:
-            tree = ast.parse(source)
+            tree = parse_python_ast(source)
         except (SyntaxError, ValueError, UnicodeError) as exc:
             raise _UnqualifiedNominationMember("python-test-syntax") from exc
         matches = sum(

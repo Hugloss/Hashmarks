@@ -10,6 +10,7 @@ import ast
 from dataclasses import dataclass
 
 from hashmarks.paths import normalize_relative_path
+from hashmarks.python_ast_cache import parse_python_ast
 
 from .backend_evidence_navigation import backend_evidence_navigation
 from .handler_input_syntax import _annotation, _callee, _default
@@ -470,7 +471,7 @@ class StaticPythonBackendDeclarations:
     def _source_groups(self, path: str, source: str) -> list[dict[str, object]]:
         if len(source.encode("utf-8")) > MAX_BACKEND_SOURCE_BYTES:
             raise ValueError("backend source exceeds bounded syntax input")
-        tree = ast.parse(source, filename=path)
+        tree = parse_python_ast(source, filename=path)
         groups: list[dict[str, object]] = []
         if self.include_model_fields or self.include_class_fields:
             classes = sorted(

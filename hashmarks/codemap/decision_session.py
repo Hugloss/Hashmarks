@@ -11,6 +11,8 @@ from functools import wraps
 from pathlib import Path
 from typing import TYPE_CHECKING, Concatenate, ParamSpec, Protocol, TypeVar
 
+from hashmarks.python_ast_cache import python_ast_session
+
 from .providers import syntax_session
 from .repository_index_store import git_base_identity
 from .store_queries import MAX_REFERENCE_QUERY_ROWS
@@ -98,7 +100,7 @@ def reconcile_decision(
         if owner._depth > 0:
             return method(self, *args, **kwargs)
 
-        with syntax_session(owner.index.range_provider):
+        with python_ast_session(), syntax_session(owner.index.range_provider):
             refreshed: set[str] = set()
             while True:
                 try:
@@ -397,7 +399,7 @@ class DecisionScope:
         The session is read-only and generation-bound. It never caches final
         decisions and raises if the CodeMap generation changes while active.
         """
-        with syntax_session(self._index.range_provider):
+        with python_ast_session(), syntax_session(self._index.range_provider):
             generation = self._decision_session_entry_generation(
                 diagnostics=diagnostics,
                 allow_incomplete=_allow_incomplete,
@@ -442,7 +444,7 @@ class DecisionScope:
         publication may become the next expected generation; another writer
         invalidates the observation rather than being silently adopted.
         """
-        with syntax_session(self._index.range_provider):
+        with python_ast_session(), syntax_session(self._index.range_provider):
             refreshed: set[str] = set()
             while True:
                 try:

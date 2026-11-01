@@ -10,6 +10,10 @@ member authority and preserves bytes without display-oriented text normalization
 For bounded native JavaScript/TypeScript alias, binding, property, and call facts,
 use [`source.ecmascript()`](ECMASCRIPT_SOURCE_OBSERVATIONS.md). Its facts retain
 exact byte ranges and unresolved semantic targets.
+For qualified source-local declarations, references, aliases, strings and
+conditional default/argument relationships in Python or ECMAScript, use
+[`source.bindings()`](SOURCE_BINDINGS.md). It preserves unknown runtime targets
+and incomplete semantic coverage over the same canonical member authority.
 
 ## Exact source occurrence and physical source shape (H1 + H3)
 

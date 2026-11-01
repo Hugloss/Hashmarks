@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from typing import TypedDict
 
 from hashmarks.paths import normalize_relative_path
+from hashmarks.python_ast_cache import parse_python_ast
 
 from .handler_input_syntax import handler_input_syntax
 from .pair_key_site_projection import project_pair_key_sites
@@ -426,7 +427,7 @@ def _source_groups(
 ) -> tuple[list[dict[str, object]], ast.Module]:
     syntax_options = syntax_options or SOURCE_SYNTAX_DEFAULT_OPTIONS
     groups: list[dict[str, object]] = []
-    tree = ast.parse(source, filename=path)
+    tree = parse_python_ast(source, filename=path)
     for declaration in tree.body:
         if not isinstance(declaration, (ast.FunctionDef, ast.AsyncFunctionDef)):
             continue

@@ -5,6 +5,8 @@ from __future__ import annotations
 import ast
 from dataclasses import dataclass
 
+from hashmarks.python_ast_cache import parse_python_ast
+
 _READ_NAMES = {
     "get",
     "read",
@@ -467,7 +469,7 @@ def analyze_python_concurrency_risk(
 ) -> tuple[Risk, ...]:
     if tree is None:
         try:
-            tree = ast.parse(source)
+            tree = parse_python_ast(source)
         except (SyntaxError, ValueError):
             return ()
     v = V(path, _os_aliases(tree), _scoped_state_owners(tree))

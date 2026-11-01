@@ -12,6 +12,8 @@ import ast
 from collections.abc import Mapping
 from typing import Protocol
 
+from hashmarks.python_ast_cache import parse_python_ast
+
 from .handler_input_syntax import handler_input_syntax
 from .static_python_interface_declarations import _handler_body_syntax
 
@@ -249,7 +251,7 @@ def _decorator_hits(
     ]
 ]:
     if tree is None:
-        tree = ast.parse(source, filename=path)
+        tree = parse_python_ast(source, filename=path)
     hits: list[
         tuple[
             int,

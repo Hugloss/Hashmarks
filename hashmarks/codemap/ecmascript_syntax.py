@@ -29,7 +29,7 @@ FACT_KINDS = (
     "property-access",
     "call-site",
 )
-_CALLABLE_SCOPES = frozenset(
+CALLABLE_SCOPES = frozenset(
     {
         "function_declaration",
         "function_expression",
@@ -39,7 +39,7 @@ _CALLABLE_SCOPES = frozenset(
         "method_definition",
     }
 )
-_SCOPE_TYPES = _CALLABLE_SCOPES | frozenset(
+_SCOPE_TYPES = CALLABLE_SCOPES | frozenset(
     {
         "program",
         "statement_block",
@@ -60,6 +60,13 @@ _TYPE_CONTEXTS = frozenset(
         "interface_declaration",
         "implements_clause",
         "extends_type_clause",
+        "function_signature",
+        "method_signature",
+        "abstract_method_signature",
+        "function_type",
+        "constructor_type",
+        "call_signature",
+        "construct_signature",
     }
 )
 _NAME_TYPES = frozenset(
@@ -67,6 +74,7 @@ _NAME_TYPES = frozenset(
         "identifier",
         "property_identifier",
         "private_property_identifier",
+        "shorthand_property_identifier",
         "shorthand_property_identifier_pattern",
         "type_identifier",
     }
@@ -86,7 +94,7 @@ def syntax_range(node: StructuralNode) -> dict[str, object]:
 
 
 @dataclass(frozen=True, slots=True)
-class _Visit:
+class SyntaxVisit:
     node: StructuralNode
     scope: StructuralNode
     parent: StructuralNode | None = None
@@ -94,7 +102,7 @@ class _Visit:
     module: StructuralNode | None = None
     declaration: StructuralNode | None = None
 
-    def entered(self) -> _Visit:
+    def entered(self) -> SyntaxVisit:
         context = self.context
         if self.node.type in _TYPE_CONTEXTS:
             context = "type-syntax"
@@ -113,14 +121,14 @@ class _Visit:
                 self.node
                 if self.node.type == "variable_declarator"
                 else None
-                if self.node.type in _CALLABLE_SCOPES
+                if self.node.type in CALLABLE_SCOPES
                 or self.node.type == "formal_parameters"
                 else self.declaration
             ),
         )
 
 
-class _SyntaxProjection:
+class SyntaxProjection:
     """One byte capture's bounded display and native-field projection."""
 
     def __init__(self, raw: bytes) -> None:
@@ -158,24 +166,28 @@ class _SyntaxProjection:
         return {
             "expression": self.expression(node),
             "name": None if computed else self.name(node),
-            "literal_text": self._literal_text(node),
+            "literal_text": self.literal_text(node),
         }
 
-    def _literal_text(self, node: StructuralNode | None) -> str | None:
+    def literal_text(self, node: StructuralNode | None) -> str | None:
         """Unescaped native string contents only; no evaluation or escape decoding."""
         if node is None or node.type != "string":
             return None
-        expression = self.expression(node)
-        assert expression is not None
-        if expression["text_truncated"]:
+        start, end = node.start_byte + 1, node.end_byte - 1
+        if end - start > EXPRESSION_PREVIEW_BYTES:
             return None
         if any(child.type != "string_fragment" for child in node.named_children):
             return None
-        return str(expression["text"])[1:-1]
+        return self.raw[start:end].decode("utf-8")
 
     @staticmethod
     def _has_token(node: StructuralNode | None, token: str) -> bool:
         return node is not None and any(child.type == token for child in node.children)
+
+    @staticmethod
+    def optional(node: StructuralNode) -> bool:
+        """JS and TS grammars represent the optional-call token differently."""
+        return any(child.type in {"?.", "optional_chain"} for child in node.children)
 
     def _module_type_only(self, node: StructuralNode) -> bool:
         if self._has_token(node, "type"):
@@ -200,7 +212,7 @@ class _SyntaxProjection:
             for child in bindings
         )
 
-    def _module_declaration(self, visit: _Visit) -> dict[str, object] | None:
+    def _module_declaration(self, visit: SyntaxVisit) -> dict[str, object] | None:
         source = visit.node.child_by_field_name("source")
         if source is None and visit.node.type == "export_statement":
             return None
@@ -210,12 +222,12 @@ class _SyntaxProjection:
             if visit.node.type == "import_statement"
             else "export",
             "source": self.expression(source),
-            "module_specifier": self._literal_text(source),
+            "module_specifier": self.literal_text(source),
             "type_only": self._module_type_only(visit.node),
             "line": visit.node.start_point[0] + 1,
         }
 
-    def _module_binding(self, visit: _Visit) -> dict[str, object] | None:
+    def _module_binding(self, visit: SyntaxVisit) -> dict[str, object] | None:
         if visit.module is None:
             return None
         node = visit.node
@@ -234,7 +246,7 @@ class _SyntaxProjection:
             or self._has_token(visit.module, "type"),
         }
 
-    def _namespace_binding(self, visit: _Visit) -> dict[str, object] | None:
+    def _namespace_binding(self, visit: SyntaxVisit) -> dict[str, object] | None:
         if visit.module is None:
             return None
         binding = next(iter(visit.node.named_children), None)
@@ -248,7 +260,7 @@ class _SyntaxProjection:
             "type_only": self._has_token(visit.module, "type"),
         }
 
-    def _default_binding(self, visit: _Visit) -> dict[str, object] | None:
+    def _default_binding(self, visit: SyntaxVisit) -> dict[str, object] | None:
         if visit.parent is None or visit.parent.type != "import_clause":
             return None
         if visit.module is None:
@@ -263,7 +275,7 @@ class _SyntaxProjection:
             "type_only": self._has_token(visit.module, "type"),
         }
 
-    def _binding(self, visit: _Visit) -> dict[str, object]:
+    def _binding(self, visit: SyntaxVisit) -> dict[str, object]:
         declaration_kind = None
         if visit.parent is not None:
             declaration_kind = next(
@@ -281,7 +293,7 @@ class _SyntaxProjection:
             "initializer": self.expression(visit.node.child_by_field_name("value")),
         }
 
-    def _destructuring(self, visit: _Visit) -> dict[str, object] | None:
+    def _destructuring(self, visit: SyntaxVisit) -> dict[str, object] | None:
         node = visit.node
         key = node.child_by_field_name("key")
         binding = node.child_by_field_name("value")
@@ -301,7 +313,7 @@ class _SyntaxProjection:
 
     def _destructured_record(
         self,
-        visit: _Visit,
+        visit: SyntaxVisit,
         key: StructuralNode | None,
         binding: StructuralNode | None,
         default: StructuralNode | None,
@@ -322,7 +334,7 @@ class _SyntaxProjection:
             else None,
         }
 
-    def _assignment(self, visit: _Visit) -> dict[str, object]:
+    def _assignment(self, visit: SyntaxVisit) -> dict[str, object]:
         operator = visit.node.child_by_field_name("operator")
         if operator is None:
             operator = next(
@@ -335,7 +347,7 @@ class _SyntaxProjection:
             "operator": self.expression(operator),
         }
 
-    def _property_access(self, visit: _Visit) -> dict[str, object]:
+    def _property_access(self, visit: SyntaxVisit) -> dict[str, object]:
         computed = visit.node.type == "subscript_expression"
         return {
             "kind": "property-access",
@@ -345,10 +357,10 @@ class _SyntaxProjection:
                 computed=computed,
             ),
             "computed": computed,
-            "optional": self._has_token(visit.node, "optional_chain"),
+            "optional": self.optional(visit.node),
         }
 
-    def _call(self, visit: _Visit) -> dict[str, object]:
+    def _call(self, visit: SyntaxVisit) -> dict[str, object]:
         construct = visit.node.type == "new_expression"
         arguments = visit.node.child_by_field_name("arguments")
         return {
@@ -360,12 +372,11 @@ class _SyntaxProjection:
                 )
             ),
             "arguments": self.expression(arguments),
-            "optional": self._has_token(visit.node, "?.")
-            or self._has_token(visit.node, "optional_chain"),
+            "optional": self.optional(visit.node),
             "resolved_target": None,
         }
 
-    def fact(self, visit: _Visit) -> dict[str, object] | None:
+    def fact(self, visit: SyntaxVisit) -> dict[str, object] | None:
         builder = {
             "import_statement": self._module_declaration,
             "export_statement": self._module_declaration,
@@ -401,9 +412,9 @@ class _SyntaxProjection:
         }
 
 
-def _syntax_visits(tree: StructuralTree) -> Iterator[_Visit]:
+def syntax_visits(tree: StructuralTree) -> Iterator[SyntaxVisit]:
     """One traversal contract for native source projections and their bounds."""
-    pending = [_Visit(tree.root_node, tree.root_node)]
+    pending = [SyntaxVisit(tree.root_node, tree.root_node)]
     visited = 0
     while pending:
         visit = pending.pop().entered()
@@ -427,9 +438,9 @@ def module_declarations(tree: StructuralTree, raw: bytes) -> list[dict[str, obje
     Uninterpreted string escapes and bounded previews never become guessed
     specifiers. The whole traversal must fit before any rows are returned.
     """
-    projection = _SyntaxProjection(raw)
+    projection = SyntaxProjection(raw)
     found: list[dict[str, object]] = []
-    for visit in _syntax_visits(tree):
+    for visit in syntax_visits(tree):
         if visit.node.type not in {"import_statement", "export_statement"}:
             continue
         fact = projection.fact(visit)
@@ -442,10 +453,10 @@ def ecmascript_facts(
     tree: StructuralTree, raw: bytes, limit: int
 ) -> tuple[list[dict[str, object]], int]:
     """Count covered syntax facts and retain a deterministic bounded projection."""
-    projection = _SyntaxProjection(raw)
+    projection = SyntaxProjection(raw)
     found: list[dict[str, object]] = []
     count = 0
-    for visit in _syntax_visits(tree):
+    for visit in syntax_visits(tree):
         fact = projection.fact(visit)
         if fact is not None:
             count += 1

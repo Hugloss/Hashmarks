@@ -117,6 +117,7 @@ OPERATION_CONTRACTS = (
             ("literals", "hashmarks.scoped-source-literal-set.v1"),
             ("range", "hashmarks.source-range-receipt.v1"),
             ("ecmascript", "hashmarks.ecmascript-source-observation.v1"),
+            ("bindings", "hashmarks.source-bindings.v1"),
         ),
     ),
     OperationContract(
@@ -133,6 +134,10 @@ OPERATION_CONTRACTS = (
     OperationContract(
         "source_ecmascript",
         (("default", "hashmarks.ecmascript-source-observation.v1"),),
+    ),
+    OperationContract(
+        "source_bindings",
+        (("default", "hashmarks.source-bindings.v1"),),
     ),
     OperationContract(
         "verification_membership",

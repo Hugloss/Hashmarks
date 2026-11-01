@@ -620,7 +620,7 @@ class HashmarksMcpSurface:
                 "result_mode must be one of: "
                 + ", ".join(operation_modes("source_observation"))
             )
-        if result_mode in {"range", "ecmascript"}:
+        if result_mode in {"range", "ecmascript", "bindings"}:
             return
         if result_mode == "literals":
             if literal is not None:
@@ -650,7 +650,7 @@ class HashmarksMcpSurface:
         HashmarksMcpSurface._validate_source_mode(
             result_mode, literal, literals, len(paths)
         )
-        if result_mode in {"range", "ecmascript"} and (
+        if result_mode in {"range", "ecmascript", "bindings"} and (
             len(paths) != 1 or literal is not None or literals is not None
         ):
             raise McpSurfaceError(
@@ -693,10 +693,12 @@ class HashmarksMcpSurface:
                         end_byte=coordinates[1],
                         max_bytes=max_bytes,
                     )
-                if result_mode == "ecmascript":
-                    return self._map.source.ecmascript(
-                        paths[0], limit=limit, max_bytes=max_bytes
-                    )
+                if result_mode in {"ecmascript", "bindings"}:
+                    source_facts = {
+                        "ecmascript": self._map.source.ecmascript,
+                        "bindings": self._map.source.bindings,
+                    }[result_mode]
+                    return source_facts(paths[0], limit=limit, max_bytes=max_bytes)
                 if result_mode == "member":
                     return self._map.source.observe(
                         paths[0],
@@ -728,8 +730,10 @@ class HashmarksMcpSurface:
         if result_mode != "range":
             if byte_range is not None:
                 raise McpSurfaceError("byte_range requires range mode")
-            if result_mode != "ecmascript" and max_bytes != 1_048_576:
-                raise McpSurfaceError("max_bytes requires range or ecmascript mode")
+            if result_mode not in {"ecmascript", "bindings"} and max_bytes != 1_048_576:
+                raise McpSurfaceError(
+                    "max_bytes requires range, ecmascript or bindings mode"
+                )
             return None
         if not isinstance(byte_range, dict) or set(byte_range) != {
             "start_byte",

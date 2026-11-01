@@ -13,6 +13,7 @@ from pathlib import PurePosixPath
 from typing import TYPE_CHECKING, cast
 
 from hashmarks.paths import normalize_relative_path
+from hashmarks.python_ast_cache import parse_python_ast
 
 from .repository_domains import RepositoryDomain, classify_repository_path
 from .repository_observation import evidence_identity
@@ -57,7 +58,7 @@ def _pytest_dynamic_features(tree: ast.Module) -> list[str]:
 
 def _python_path_details(raw: bytes, *, conftest: bool) -> _PathDetails:
     try:
-        tree = ast.parse(raw)
+        tree = parse_python_ast(raw)
     except (SyntaxError, ValueError, UnicodeError):
         return "unknown", "python-source-syntax-unqualified", []
     unsupported = _pytest_dynamic_features(tree)

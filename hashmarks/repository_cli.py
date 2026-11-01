@@ -724,6 +724,8 @@ def _source_observation_code(args: Namespace) -> int:
             )
         if mode == "ecmascript":
             return codemap.source.ecmascript(args.path, **options)
+        if mode == "bindings":
+            return codemap.source.bindings(args.path, **options)
         return codemap.source.observe(
             args.path,
             lines=requested,
@@ -745,10 +747,12 @@ def _source_observation_options(args: Namespace) -> dict[str, int]:
             raise RepositoryCliError("range mode requires --start-byte and --end-byte")
     elif args.start_byte is not None or args.end_byte is not None:
         raise RepositoryCliError("byte coordinates require range mode")
-    if args.limit is not None and args.result_mode != "ecmascript":
-        raise RepositoryCliError("--limit requires ecmascript mode")
+    if args.limit is not None and args.result_mode not in {"ecmascript", "bindings"}:
+        raise RepositoryCliError("--limit requires ecmascript or bindings mode")
     if args.max_bytes is not None and args.result_mode == "member":
-        raise RepositoryCliError("--max-bytes requires range or ecmascript mode")
+        raise RepositoryCliError(
+            "--max-bytes requires range, ecmascript or bindings mode"
+        )
     return {
         name: value
         for name, value in (("max_bytes", args.max_bytes), ("limit", args.limit))
@@ -782,13 +786,15 @@ def _add_source_observation_cli(
 ) -> None:
     source = sub.add_parser(
         "source-observation",
-        help="observe one member, exact byte range, or ECMAScript syntax",
+        help="observe one member, byte range, ECMAScript syntax, or source bindings",
     )
     add_common_arguments(source, inherited=True)
     _add_evidence_presentation_cli(source)
     source.add_argument("path")
     source.add_argument(
-        "--result-mode", choices=("member", "range", "ecmascript"), default="member"
+        "--result-mode",
+        choices=("member", "range", "ecmascript", "bindings"),
+        default="member",
     )
     source.add_argument(
         "--start-byte", type=int, help="zero-based inclusive byte start"
@@ -797,7 +803,9 @@ def _add_source_observation_cli(
     source.add_argument(
         "--max-bytes", type=int, help="maximum full source member bytes"
     )
-    source.add_argument("--limit", type=int, help="maximum ECMAScript syntax facts")
+    source.add_argument(
+        "--limit", type=int, help="maximum source syntax or binding facts"
+    )
     source.add_argument(
         "--line", type=int, action="append", help="1-based source line; repeatable"
     )
