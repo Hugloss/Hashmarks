@@ -82,3 +82,21 @@ unused real backend acquisitions. True native capture and transport semantics
 remain covered by the separate genuine backend workflow tests. This is a
 pytest-fixture optimization, not a product cache, test runner, or substitute for
 nightly and exact-source release verification.
+
+## Regrade alternate display oracles from real CLI witness bytes
+
+The two negative display-oracle placements (task-level versus per-revision)
+must both fail, retain correct witness pointers, and independently reject a
+passing claim. One test still runs the **full real CLI workflow** with a
+contradictory top-level oracle, proving live acquisition and gate behavior.
+The alternate stage-level oracle is independently regraded from an immutable
+module-scoped capture produced by that same normal CLI subprocess path,
+including every supported presentation format. It recomputes gates and
+witnesses against the retained source-bound artifacts, with observers and
+transport capture explicitly forbidden. The unchanged positive capture is
+rejected under the newly contradictory oracle.
+
+A new oracle placement does not inherently require re-running identical CLI
+subprocesses when the contract is retained evidence grading rather than
+freshness or transport acquisition. A source change, native transport
+contract, or receipt freshness test still needs independent genuine captures.

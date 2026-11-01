@@ -440,19 +440,11 @@ def test_changed_archive_and_oracle_ranges_fail_before_observation(
         load_corpus(suite_path, sources)
 
 
-@pytest.mark.parametrize("location", ["top", "stage"])
-def test_independent_display_failure_is_a_hard_gate_and_has_exact_oracle_pointers(
-    corpus: tuple[Path, dict[str, Path]], tmp_path: Path, location: str
-) -> None:
+def _contradicted_display_checks() -> dict[str, Any]:
+    """One deliberately false presentation oracle for all genuine CLI formats."""
     from hashmarks.evidence_presentation import FORMATS
-    from scripts.repository_evaluation.backend_regrading import verify_task_summary
-    from scripts.repository_evaluation.fact_grading import pointer_values
 
-    suite_path, sources = corpus
-    grader_path = suite_path.parent / "grader.json"
-    grader = json.loads(grader_path.read_text())
-    rule = grader["cases"]["handler"]
-    checks = {
+    return {
         profile: {
             format: [
                 {
@@ -468,11 +460,34 @@ def test_independent_display_failure_is_a_hard_gate_and_has_exact_oracle_pointer
         }
         for profile in ("default", "initial")
     }
-    if location == "top":
-        rule["display_checks"] = checks
-    else:
-        for stage in ("before", "after"):
-            rule[stage] = {"display_checks": checks}
+
+
+def _assert_failed_display_witnesses(
+    witnesses: list[dict[str, Any]],
+    grader: dict[str, Any],
+) -> None:
+    from scripts.repository_evaluation.fact_grading import pointer_values
+
+    failures = [row for row in witnesses if row["gate"] == "presentation"]
+    assert failures
+    assert {row["stage"] for row in failures} == {"before", "after"}
+    assert all(row["state"] == "FAIL" for row in failures)
+    for witness in failures:
+        (check,) = pointer_values(grader, witness["oracle_pointer"])
+        assert assert_object(check)["id"] == witness["check_id"]
+
+
+def test_top_display_failure_is_a_hard_gate_with_exact_oracle_pointers(
+    corpus: tuple[Path, dict[str, Path]],
+    tmp_path: Path,
+) -> None:
+    """Preserve a real end-to-end CLI acquisition with a failing display rule."""
+    from scripts.repository_evaluation.backend_regrading import verify_task_summary
+
+    suite_path, sources = corpus
+    grader_path = suite_path.parent / "grader.json"
+    grader = json.loads(grader_path.read_text())
+    grader["cases"]["handler"]["display_checks"] = _contradicted_display_checks()
     write_json(grader_path, grader)
     report = run_backend(
         sources=sources,
@@ -484,13 +499,7 @@ def test_independent_display_failure_is_a_hard_gate_and_has_exact_oracle_pointer
     assert outcome["gates"]["facts"] is True
     assert outcome["gates"]["cli"] is False
     assert outcome["gates"]["presentation"] is False
-    witnesses = [
-        row for row in outcome["gate_witnesses"] if row["gate"] == "presentation"
-    ]
-    assert witnesses and all(row["state"] == "FAIL" for row in witnesses)
-    for witness in witnesses:
-        (check,) = pointer_values(grader, witness["oracle_pointer"])
-        assert assert_object(check)["id"] == witness["check_id"]
+    _assert_failed_display_witnesses(outcome["gate_witnesses"], grader)
     suite, frozen = load_corpus(suite_path, sources)
     verify_task_summary(
         tmp_path / "display/handler/observations",
@@ -499,6 +508,69 @@ def test_independent_display_failure_is_a_hard_gate_and_has_exact_oracle_pointer
         sources,
         outcome,
     )
+
+
+def test_stage_display_failure_regrades_retained_real_cli_bytes_without_recapture(
+    observed_cli_workflow: tuple[Path, dict[str, Path], Path, dict[str, Any]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Stage overrides must fail with genuine CLI evidence, not fresh subprocesses."""
+    from scripts.repository_evaluation.backend_regrading import (
+        regrade_task_workflow,
+        verify_task_summary,
+    )
+    from scripts.repository_evaluation.backend_witnesses import (
+        delta_fact_witnesses,
+        freshness_fact_witnesses,
+        stage_fact_witnesses,
+    )
+
+    suite_path, sources, output, report = observed_cli_workflow
+    suite, grader = load_corpus(suite_path, sources)
+    workflow = suite["workflows"][0]
+    rule = grader["cases"]["handler"]
+    observed = output / "handler/observations"
+    verify_task_summary(observed, workflow, rule, sources, report["outcomes"][0])
+    for stage in ("before", "after"):
+        rule[stage] = {"display_checks": _contradicted_display_checks()}
+
+    def forbidden(*_args: object, **_kwargs: object) -> None:
+        pytest.fail("retained CLI regrading must not reobserve the repository")
+
+    monkeypatch.setattr("hashmarks.codemap.engine.CodeMap.__init__", forbidden)
+    monkeypatch.setattr(
+        "scripts.repository_evaluation.backend_workflows.capture_cli", forbidden
+    )
+    monkeypatch.setattr(
+        "scripts.repository_evaluation.backend_workflows.capture_mcp", forbidden
+    )
+    regraded = regrade_task_workflow(observed, workflow, rule, sources)
+    gates = assert_object(regraded["gates"])
+    assert gates["facts"] is True
+    assert gates["cli"] is False
+    assert gates["presentation"] is False
+    witnesses = []
+    for stage in ("before", "after"):
+        witnesses.extend(
+            stage_fact_witnesses(
+                sources[workflow[stage]],
+                observed / stage,
+                workflow,
+                {**rule, **rule[stage], "_stage": stage},
+            )
+        )
+    witnesses.extend(delta_fact_witnesses(sources, observed, workflow, rule))
+    witnesses.extend(freshness_fact_witnesses(sources, observed, workflow, rule))
+    _assert_failed_display_witnesses(witnesses, grader)
+    verify_task_summary(
+        observed,
+        workflow,
+        rule,
+        sources,
+        {**regraded, "gate_witnesses": witnesses},
+    )
+    with pytest.raises(ValueError, match="witnesses differ"):
+        verify_task_summary(observed, workflow, rule, sources, report["outcomes"][0])
 
 
 def _extend_task_source_labels(corpus: tuple[Path, dict[str, Path]]) -> dict:
