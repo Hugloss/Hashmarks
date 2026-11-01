@@ -11,6 +11,7 @@ import argparse
 import hashlib
 import io
 import json
+import os
 import subprocess
 import sys
 from collections.abc import Mapping, Sequence
@@ -67,8 +68,8 @@ def _test_file(root: Path, nodeid: str) -> str:
 
 
 def _test_function(nodeid: str) -> str:
-    """Remove a pytest parameter case suffix, never an arbitrary test level."""
-    return nodeid.split("[", 1)[0]
+    """Strip parameter cases from each level, preserving nested test identity."""
+    return "::".join(part.split("[", 1)[0] for part in nodeid.split("::"))
 
 
 def _weight(root: Path, path: str, count: int) -> int:
@@ -214,6 +215,55 @@ def _nul(paths: Sequence[str], destination: Path) -> None:
     destination.write_bytes(b"".join(path.encode("utf-8") + b"\0" for path in paths))
 
 
+def _expected_execution_membership() -> list[str]:
+    """Missing or malformed native pytest execution membership is an error."""
+    normal = os.environ.get("HASHMARKS_CI_EXPECTED_NUL")
+    singleton = os.environ.get("HASHMARKS_CI_EXPECTED_NODEID")
+    if bool(normal) == bool(singleton):
+        raise pytest.UsageError("native shard requires one expected-membership source")
+    if singleton:
+        return [singleton]
+    assert normal is not None
+    try:
+        raw = Path(normal).read_bytes()
+    except OSError as exc:
+        raise pytest.UsageError("native shard expected membership unavailable") from exc
+    if not raw or not raw.endswith(b"\0"):
+        raise pytest.UsageError(
+            "native shard expected membership must be NUL-delimited"
+        )
+    try:
+        expected = [part.decode("utf-8") for part in raw.split(b"\0")[:-1]]
+    except UnicodeDecodeError as exc:
+        raise pytest.UsageError("native shard member is not UTF-8") from exc
+    if not expected or len(expected) != len(set(expected)):
+        raise pytest.UsageError("native shard membership is empty or duplicated")
+    return expected
+
+
+def _assert_executed_collection(
+    expected: Sequence[str], observed: Sequence[str]
+) -> None:
+    """Never accept a green pytest run whose actual collected nodes drifted."""
+    if sorted(expected) == sorted(observed):
+        return
+    missing = sorted(set(expected) - set(observed))
+    additional = sorted(set(observed) - set(expected))
+    raise pytest.UsageError(
+        "native shard collected membership differs from admission: "
+        f"expected={len(expected)} actual={len(observed)} "
+        f"missing={missing[:5]} additional={additional[:5]}"
+    )
+
+
+def pytest_collection_finish(session: pytest.Session) -> None:
+    """CI-only -p plugin validates the actual process's native pytest items."""
+    _assert_executed_collection(
+        _expected_execution_membership(),
+        [item.nodeid for item in session.items],
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=("plan", "emit"))
@@ -222,6 +272,7 @@ def main() -> int:
     parser.add_argument("--shard", type=int)
     parser.add_argument("--normal-output", type=Path)
     parser.add_argument("--isolated-output", type=Path)
+    parser.add_argument("--expected-output", type=Path)
     args = parser.parse_args()
     root = Path.cwd().resolve()
     if args.action == "plan":
@@ -242,18 +293,26 @@ def main() -> int:
             + "\n"
         )
         return 0
-    if (
-        args.shard is None
-        or args.normal_output is None
-        or args.isolated_output is None
-        or args.shard < 0
-        or args.shard >= args.shards
+    if args.shard is None or not 0 <= args.shard < args.shards:
+        parser.error("emit requires a valid shard")
+    if any(
+        path is None
+        for path in (
+            args.normal_output,
+            args.isolated_output,
+            args.expected_output,
+        )
     ):
-        parser.error("emit requires a valid shard and both NUL output paths")
+        parser.error("emit requires all three NUL output paths")
     plan = _bound_plan(root, args.manifest, shard_count=args.shards)
     row = plan["shards"][args.shard]
     _nul(row["normal_args"], args.normal_output)
     _nul(row["isolated_nodeids"], args.isolated_output)
+    isolated = set(row["isolated_nodeids"])
+    _nul(
+        [nodeid for nodeid in row["native_nodeids"] if nodeid not in isolated],
+        args.expected_output,
+    )
     return 0
 
 

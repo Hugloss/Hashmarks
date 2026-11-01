@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -126,6 +128,84 @@ def test_rechecked_native_membership_rejects_drift(
     monkeypatch.setattr(handoff, "_native_collection", lambda: collected[:-1])
     with pytest.raises(ValueError, match="differs"):
         handoff._bound_plan(native_repository, manifest, shard_count=2, isolated=())
+
+
+def test_execution_collection_rejects_missing_and_unplanned_items() -> None:
+    expected = ["tests/test_a.py::test_one", "tests/test_b.py::test_two"]
+    handoff._assert_executed_collection(expected, expected[::-1])
+    with pytest.raises(pytest.UsageError, match="differs"):
+        handoff._assert_executed_collection(expected, expected[:1])
+    with pytest.raises(pytest.UsageError, match="differs"):
+        handoff._assert_executed_collection(expected[:1], expected)
+
+
+def test_expected_worker_membership_requires_valid_nul(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("HASHMARKS_CI_EXPECTED_NUL", raising=False)
+    monkeypatch.delenv("HASHMARKS_CI_EXPECTED_NODEID", raising=False)
+    with pytest.raises(pytest.UsageError, match="requires one"):
+        handoff._expected_execution_membership()
+    path = tmp_path / "expected.nul"
+    monkeypatch.setenv("HASHMARKS_CI_EXPECTED_NUL", str(path))
+    path.write_bytes(b"tests/test_a.py::test_one")
+    with pytest.raises(pytest.UsageError, match="NUL-delimited"):
+        handoff._expected_execution_membership()
+    handoff._nul(["tests/test_a.py::test_one"], path)
+    assert handoff._expected_execution_membership() == ["tests/test_a.py::test_one"]
+    handoff._nul(["tests/test_a.py::test_one"] * 2, path)
+    with pytest.raises(pytest.UsageError, match="duplicated"):
+        handoff._expected_execution_membership()
+
+
+def test_actual_pytest_plugin_enforces_collected_membership(
+    native_repository: Path, tmp_path: Path
+) -> None:
+    """Exercise the actual -p pytest process and reject a mismatched expectation."""
+    root = Path(__file__).resolve().parents[1]
+    expected = tmp_path / "expected.nul"
+    handoff._nul(["tests/test_a.py::test_standard"], expected)
+    environment = {
+        **os.environ,
+        "PYTHONPATH": os.pathsep.join((str(root), os.environ.get("PYTHONPATH", ""))),
+        "HASHMARKS_CI_EXPECTED_NUL": str(expected),
+    }
+    args = [
+        sys.executable,
+        "-m",
+        "pytest",
+        "-p",
+        "scripts.ci_full_shards",
+        "-q",
+        "tests/test_a.py",
+    ]
+    qualified = subprocess.run(
+        args,
+        cwd=native_repository,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=30,
+    )
+    assert qualified.returncode == 0, qualified.stdout + qualified.stderr
+    handoff._nul(["tests/test_a.py::test_unplanned"], expected)
+    rejected = subprocess.run(
+        args,
+        cwd=native_repository,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=30,
+    )
+    assert rejected.returncode != 0
+    assert "differs" in rejected.stdout + rejected.stderr
+
+
+def test_class_parametrization_keeps_full_isolated_function_name() -> None:
+    nodeid = "tests/test_a.py::TestCases[variant]::test_run[one]"
+    assert handoff._test_function(nodeid) == "tests/test_a.py::TestCases::test_run"
 
 
 def test_nul_argv_preserves_exact_nodeids(tmp_path: Path) -> None:

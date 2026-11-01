@@ -494,6 +494,10 @@ def test_fast_ci_remains_a_native_pytest_gate() -> None:
     assert 'test "$FULL_SHARDS" = success' in fast
     assert "scripts/ci_full_shards.py" in fast
     assert "Native full pytest shard" in fast
+    assert "--expected-output" in fast
+    assert "HASHMARKS_CI_EXPECTED_NUL" in fast
+    assert 'HASHMARKS_CI_EXPECTED_NODEID="$nodeid"' in fast
+    assert fast.count("-p scripts.ci_full_shards") == 2
     assert "Recheck all native collected tests" in fast
     assert "Run process-sensitive tests in singleton native pytest processes" in fast
 
