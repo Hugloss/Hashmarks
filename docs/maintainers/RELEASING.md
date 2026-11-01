@@ -28,7 +28,26 @@ PR CI checks a changed normal release request against the package, runtime, READ
 
 ## What pull-request CI proves
 
-Normal PR CI qualifies the release-relevant product surfaces before merge:
+`.github/workflows/ci.yml` runs on Linux for every pull request and checks:
+
+- locked dependencies, formatting, static analysis, and configured typing;
+- a changed normal release request against the candidate and base-branch versions;
+- installed wheel and sdist behavior on Python 3.11, including an installed-wheel MCP SDK smoke;
+- candidate-relevant native pytest membership, with full-suite admission when required.
+
+`.github/workflows/windows-installer.yml` adds the `Native Windows installer` check
+for pull requests changing the Windows installer or its smoke, the canonical
+standalone builder or entrypoint, package metadata or lockfile, or that workflow.
+It builds the native executable with the existing standalone owner and exercises
+fresh installation, changed-byte replacement, identical reinstallation while a
+read handle denies deletion, and preservation of installed bytes when a candidate
+has an incompatible version or checksum. This scoped check does not run the full
+standalone MCP qualification or publication aggregation rehearsal.
+
+## Full qualification
+
+`.github/workflows/full-qualification.yml` runs daily and on demand. It qualifies
+the wider release surfaces:
 
 - supported Python and package artifacts;
 - the standalone Linux x86_64 executable and the public shell installer used by Linux and WSL2;

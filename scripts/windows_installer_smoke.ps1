@@ -43,6 +43,17 @@ try {
     & $installer
     Assert-InstalledVersion
 
+    $qualifiedHash = (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash
+    [IO.File]::WriteAllText($target, "superseded installation bytes")
+    if ((Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash -eq $qualifiedHash) {
+        throw "changed-byte upgrade fixture did not change the installed bytes"
+    }
+    & $installer
+    Assert-InstalledVersion
+    if ((Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash -ne $qualifiedHash) {
+        throw "changed-byte Windows upgrade did not replace the previous bytes"
+    }
+
     $workspace = Join-Path $tempRoot "workspace"
     New-Item -ItemType Directory -Path $workspace | Out-Null
     Set-Content -LiteralPath (Join-Path $workspace "example.py") -Value "ANSWER = 42" -Encoding ascii
@@ -59,13 +70,21 @@ try {
     if ([IO.Path]::GetFullPath($resolved.Source) -ine [IO.Path]::GetFullPath($target)) {
         throw "Windows installer PATH binding mismatch: $($resolved.Source)"
     }
-    $qualifiedHash = (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash
-
-    $env:HASHMARKS_VERSION = "v$Version"
-    & $installer
-    Assert-InstalledVersion
-    if ((Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash -ne $qualifiedHash) {
-        throw "same-version Windows upgrade changed qualified bytes"
+    # Share reads but deny deletion: File.Replace must fail while this handle is
+    # held, so this proves an identical reinstall does not replace the target.
+    $installedReader = [IO.File]::Open(
+        $target, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read
+    )
+    try {
+        $env:HASHMARKS_VERSION = "v$Version"
+        & $installer
+        Assert-InstalledVersion
+        if ((Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash -ne $qualifiedHash) {
+            throw "same-version Windows upgrade changed qualified bytes"
+        }
+    }
+    finally {
+        $installedReader.Dispose()
     }
 
     $env:HASHMARKS_VERSION = "0.0.0"
