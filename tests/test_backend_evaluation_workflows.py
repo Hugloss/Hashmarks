@@ -299,7 +299,7 @@ def test_aggregate_retains_valid_observations_and_rejected_input(
     invalid.write_text("{invalid")
     output = tmp_path / "aggregate"
     report = aggregate_backend(
-        campaign_path=_aggregate_campaign((suite_path, sources), tmp_path),
+        campaign_path=_aggregate_campaign((suite_path, sources), suite_path.parent),
         sources=sources,
         selections={
             "good": {"workflow_report": str(valid_root / "summary.json")},
