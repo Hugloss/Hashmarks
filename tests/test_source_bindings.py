@@ -115,6 +115,49 @@ def test_binding_result_limit_clips_after_qualification(
     assert small["negative_evidence"] == "not-admissible"
 
 
+@pytest.mark.parametrize("path", ["large.py", "large.ts"])
+def test_explicit_large_projection_preserves_late_source_facts(
+    tmp_path: Path, path: str
+) -> None:
+    python = path.endswith(".py")
+    source = (
+        "import example as client\n"
+        if python
+        else 'import * as client from "example";\n'
+    )
+    source += "".join(
+        f"filler_{index} = {index}\n"
+        if python
+        else f"const filler_{index} = {index};\n"
+        for index in range(600)
+    )
+    source += "client.send()\n" if python else "client.send();\n"
+    raw = source.encode("utf-8")
+    (tmp_path / path).write_bytes(raw)
+    with CodeMap(tmp_path, range_provider=_provider(path)) as codemap:
+        codemap.index.sync()
+        prefix = codemap.source.bindings(path, limit=500)
+        full = codemap.source.bindings(path, limit=100_000)
+    assert prefix["truncation"] == "truncated"
+    assert prefix["completeness"] == "incomplete"
+    assert full["availability"] == "observed"
+    assert full["completeness"] == "complete"
+    assert full["truncation"] == "not-truncated"
+    facts = assert_records(full["facts"])
+    assert full["returned_fact_count"] == full["observed_fact_count"] == len(facts)
+    assert len(facts) > 500
+    assert prefix["facts"] == facts[:500]
+    calls = [row for row in facts if row["kind"] == "call-site"]
+    assert len(calls) == 1
+    assert calls[0]["qualification"] == "qualified"
+    assert assert_object(calls[0]["target"])["properties"] == ["send"]
+    assert assert_object(calls[0]["range"])["start_byte"] == raw.index(b"client.send")
+    assert calls[0] not in assert_records(prefix["facts"])
+    assert full["negative_evidence"] == "not-admissible"
+    assert assert_object(full["semantic_coverage"])["state"] == "incomplete"
+    assert full["freshness"] == "unknown"
+
+
 @pytest.mark.parametrize(("path", "source"), SOURCES)
 def test_binding_revisions_edits_deletes_and_reopen(
     tmp_path: Path, path: str, source: str
@@ -253,7 +296,7 @@ def test_provider_drift_withdraws_binding_claims(
 
 @pytest.mark.parametrize(
     ("limit", "max_bytes"),
-    [(False, 1), (0, 1), (501, 1), (1, True), (1, 0), (1, 8_388_609)],
+    [(False, 1), (0, 1), (100_001, 1), (1, True), (1, 0), (1, 8_388_609)],
 )
 def test_binding_limits_are_validated_before_reading(
     tmp_path: Path, limit: int, max_bytes: int

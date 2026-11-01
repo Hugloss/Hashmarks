@@ -21,12 +21,22 @@ from .python_binding_scope import (
 )
 from .source_binding_contract import (
     MAX_ALIAS_DEPTH,
+    MAX_BINDING_DETAILS,
     MAX_BINDING_EXPRESSION_DEPTH,
     MAX_BINDING_SUPPORTING_RANGES,
     MAX_LITERAL_BYTES,
+    BindingObservationBound,
 )
 
 _ImportKey = tuple[str, str | None, int, tuple[str, ...]]
+_SymbolicKey = tuple[ast.AST, tuple[str, ...]]
+
+
+@dataclass(frozen=True)
+class _SymbolicReference:
+    root: PythonBinding
+    properties: tuple[str, ...] = ()
+    reasons: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -38,6 +48,7 @@ class _Value:
     reasons: tuple[str, ...] = ()
     conditions: tuple[str, ...] = ()
     declaration: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef | None = None
+    symbolic: _SymbolicReference | None = None
 
     @property
     def qualification(self) -> str:
@@ -67,6 +78,18 @@ def _import_target(binding: PythonBinding) -> dict[str, object]:
 
 def _position(node: ast.AST) -> tuple[int, int]:
     return (getattr(node, "lineno", 0), getattr(node, "col_offset", 0))
+
+
+def _argument_parts(node: ast.AST) -> tuple[str, str | None, ast.AST]:
+    if isinstance(node, ast.keyword):
+        return (
+            "keyword-spread" if node.arg is None else "keyword",
+            node.arg,
+            node.value,
+        )
+    if isinstance(node, ast.Starred):
+        return "spread", None, node.value
+    return "positional", None, node
 
 
 def _publication_position(binding: PythonBinding) -> tuple[int, int]:
@@ -117,6 +140,7 @@ class _PythonBindings:
         self.syntax = PythonScopes(tree)
         self.rows: list[dict[str, object]] = []
         self._property_mutations: dict[_ImportKey, ast.AST] = {}
+        self._symbolic_mutations: dict[_SymbolicKey, ast.AST] = {}
         self._observe_property_writes()
 
     def range(self, node: ast.AST) -> dict[str, int]:
@@ -137,6 +161,11 @@ class _PythonBindings:
         raw = self.raw[span["start_byte"] : span["end_byte"]]
         return {
             "syntax_type": type(node).__name__,
+            "name": node.id
+            if isinstance(node, ast.Name)
+            else node.attr
+            if isinstance(node, ast.Attribute)
+            else None,
             "range": span,
             "text": raw[:MAX_LITERAL_BYTES].decode("utf-8", errors="replace"),
             "text_truncated": len(raw) > MAX_LITERAL_BYTES,
@@ -185,7 +214,12 @@ class _PythonBindings:
         self, binding: PythonBinding, trail: tuple[PythonBinding, ...], depth: int
     ) -> _Value:
         if binding.kind == "parameter":
-            return self._unknown("parameter-value-unknown", binding)
+            return self._checked_symbolic(
+                replace(
+                    self._unknown("parameter-value-unknown", binding),
+                    symbolic=_SymbolicReference(binding),
+                )
+            )
         if binding.kind == "import":
             return self._checked_property(
                 _Value(
@@ -222,6 +256,16 @@ class _PythonBindings:
         )
 
     def _property(self, base: _Value, name: str) -> _Value:
+        if base.symbolic is not None:
+            base = self._checked_symbolic(
+                replace(
+                    base,
+                    symbolic=replace(
+                        base.symbolic,
+                        properties=(*base.symbolic.properties, name),
+                    ),
+                )
+            )
         if base.target is None:
             return (
                 base
@@ -253,6 +297,34 @@ class _PythonBindings:
                 (mutation,),
             )
         return value
+
+    def _checked_symbolic(self, value: _Value) -> _Value:
+        symbolic = value.symbolic
+        if symbolic is None:
+            return value
+        mutation = next(
+            (
+                self._symbolic_mutations[
+                    symbolic.root.node, symbolic.properties[:depth]
+                ]
+                for depth in range(len(symbolic.properties) + 1)
+                if (symbolic.root.node, symbolic.properties[:depth])
+                in self._symbolic_mutations
+            ),
+            None,
+        )
+        if mutation is None:
+            return value
+        return self._supported(
+            replace(
+                value,
+                symbolic=replace(
+                    symbolic, reasons=("property-binding-may-be-mutated",)
+                ),
+            ),
+            value.support,
+            (mutation,),
+        )
 
     def _literal(self, value: str, node: ast.AST) -> _Value:
         try:
@@ -361,11 +433,102 @@ class _PythonBindings:
 
     def _observe_property_writes(self) -> None:
         mutations: dict[_ImportKey, ast.AST] = {}
+        symbolic: dict[_SymbolicKey, ast.AST] = {}
         for node in self.syntax.nodes:
             key = self._property_write(node)
             if key is not None:
                 mutations[key] = node
+            source_key = self._symbolic_property_write(node)
+            if source_key is not None:
+                symbolic[source_key] = node
         self._property_mutations = mutations
+        self._symbolic_mutations = symbolic
+
+    def _symbolic_mutation_base(
+        self, node: ast.AST, scope: PythonScope, depth: int = 0
+    ) -> _SymbolicKey | None:
+        if depth >= MAX_BINDING_EXPRESSION_DEPTH:
+            raise BindingObservationBound("symbolic-mutation-depth-bound")
+        value = self.resolve(node, scope)
+        if value.symbolic is not None:
+            reference = value.symbolic
+            properties = reference.properties
+            if "__dict__" in properties:
+                properties = properties[: properties.index("__dict__")]
+            return reference.root.node, properties
+        if isinstance(node, (ast.Subscript, ast.Attribute)):
+            return self._symbolic_mutation_base(node.value, scope, depth + 1)
+        if isinstance(node, ast.Name):
+            binding = self.syntax.lookup(node.id, scope)
+            if binding is not None and binding.kind == "alias" and binding.value:
+                return self._symbolic_mutation_base(
+                    binding.value, binding.scope, depth + 1
+                )
+        if isinstance(node, ast.Call):
+            return self._symbolic_namespace_base(node, scope, depth)
+        return None
+
+    def _symbolic_namespace_base(
+        self, node: ast.Call, scope: PythonScope, depth: int
+    ) -> _SymbolicKey | None:
+        if (
+            isinstance(node.func, ast.Name)
+            and node.func.id == "vars"
+            and self.syntax.lookup("vars", scope) is None
+            and len(node.args) == 1
+            and not node.keywords
+        ):
+            return self._symbolic_mutation_base(node.args[0], scope, depth + 1)
+        return None
+
+    def _symbolic_property_write(self, node: ast.AST) -> _SymbolicKey | None:
+        scope = self.syntax.owners[node]
+        if isinstance(node, (ast.Attribute, ast.Subscript)) and isinstance(
+            node.ctx, (ast.Store, ast.Del)
+        ):
+            key = self._symbolic_mutation_base(node.value, scope)
+            reference = self.resolve(node.value, scope).symbolic
+            if (
+                key is None
+                or not isinstance(node, ast.Attribute)
+                or node.attr == "__dict__"
+                or reference is None
+                or "__dict__" in reference.properties
+            ):
+                return key
+            return key[0], (*key[1], node.attr)
+        if not isinstance(node, ast.Call):
+            return None
+        if (
+            isinstance(node.func, ast.Name)
+            and node.func.id in {"setattr", "delattr"}
+            and self.syntax.lookup(node.func.id, scope) is None
+            and len(node.args) >= 2
+        ):
+            key = self._symbolic_mutation_base(node.args[0], scope)
+            name = self.resolve(node.args[1], scope).literal
+            reference = self.resolve(node.args[0], scope).symbolic
+            return (
+                key
+                if key is None
+                or name is None
+                or name == "__dict__"
+                or reference is None
+                or "__dict__" in reference.properties
+                else (key[0], (*key[1], name))
+            )
+        if isinstance(node.func, ast.Attribute) and node.func.attr in {
+            "update",
+            "clear",
+            "pop",
+            "popitem",
+            "setdefault",
+            "__setitem__",
+            "__delitem__",
+            "__ior__",
+        }:
+            return self._symbolic_mutation_base(node.func.value, scope)
+        return None
 
     def _property_write(self, node: ast.AST) -> _ImportKey | None:
         if isinstance(node, ast.Attribute) and isinstance(
@@ -425,15 +588,58 @@ class _PythonBindings:
             "conditions": conditions,
             "reasons": list(value.reasons),
             "runtime_target": "not-established",
+            "symbolic_reference": self._symbolic_reference(value, conditions),
+        }
+
+    def _symbolic_reference(
+        self, value: _Value, conditions: list[str]
+    ) -> dict[str, object] | None:
+        symbolic = value.symbolic
+        if symbolic is None:
+            return None
+        return {
+            "root": {
+                "kind": "parameter",
+                "name": symbolic.root.name,
+                "range": self.range(symbolic.root.node),
+                "scope": self.scope(symbolic.root.scope),
+            },
+            "properties": list(symbolic.properties),
+            "qualification": "unknown"
+            if symbolic.reasons
+            else "conditional"
+            if conditions
+            else "qualified",
+            "conditions": list(conditions),
+            "reasons": list(symbolic.reasons),
+            "supporting_ranges": [
+                {"start_byte": start, "end_byte": end}
+                for start, end in sorted(
+                    {tuple(self.range(item).values()) for item in value.support}
+                )
+            ],
+            "runtime_identity": "not-established",
         }
 
     def _import_rows(self, node: ast.Import | ast.ImportFrom) -> None:
         scope = self.syntax.owners[node]
         for alias in node.names:
+            authored = {
+                "module": node.module or ""
+                if isinstance(node, ast.ImportFrom)
+                else alias.name,
+                "name": alias.name if isinstance(node, ast.ImportFrom) else None,
+                "level": node.level if isinstance(node, ast.ImportFrom) else 0,
+                "local_name": None
+                if alias.name == "*"
+                else alias.asname or alias.name.split(".")[0],
+            }
             if alias.name == "*":
-                self.rows.append(
-                    self.row("import-binding", alias, self._unknown("star-import"), "*")
+                row = self.row(
+                    "import-binding", alias, self._unknown("star-import"), "*"
                 )
+                row["import_syntax"] = authored
+                self.rows.append(row)
                 continue
             name = alias.asname or alias.name.split(".")[0]
             binding = PythonBinding(name, alias, scope, "import", imported=node)
@@ -443,7 +649,9 @@ class _PythonBindings:
             active = self.syntax.lookup(name, scope)
             if active is None or active.node is not alias or active.reason is not None:
                 value = replace(value, conditions=("binding-may-be-overwritten",))
-            self.rows.append(self.row("import-binding", alias, value, name))
+            row = self.row("import-binding", alias, value, name)
+            row["import_syntax"] = authored
+            self.rows.append(row)
 
     def _assignment_rows(self, node: ast.Assign | ast.AnnAssign) -> None:
         if isinstance(node, ast.AnnAssign) and node.value is None:
@@ -466,10 +674,23 @@ class _PythonBindings:
 
     def _reference_row(self, node: ast.Name | ast.Attribute) -> None:
         if not isinstance(node.ctx, ast.Load):
+            if isinstance(node, ast.Attribute):
+                self._property_write_row(node)
             return
         value = self.resolve(node, self.syntax.owners[node])
         name = node.id if isinstance(node, ast.Name) else node.attr
         self.rows.append(self.row("reference", node, value, name))
+
+    def _property_write_row(self, node: ast.Attribute) -> None:
+        scope = self.syntax.owners[node]
+        row = self.row("property-write", node, self.resolve(node, scope), node.attr)
+        row.update(
+            access_kind="attribute",
+            property=node.attr,
+            context="delete" if isinstance(node.ctx, ast.Del) else "store",
+            receiver=self.row("receiver", node.value, self.resolve(node.value, scope)),
+        )
+        self.rows.append(row)
 
     def _call_row(self, node: ast.Call) -> None:
         value = self.resolve(node.func, self.syntax.owners[node])
@@ -477,6 +698,48 @@ class _PythonBindings:
             value = self._unknown("literal-call-target")
         row = self.row("call-site", node, value)
         row["expression"] = self.expression(node.func)
+        arguments = sorted((*node.args, *node.keywords), key=_position)
+        row.update(
+            arguments=[
+                self._argument_detail(argument, index)
+                for index, argument in enumerate(arguments[:MAX_BINDING_DETAILS])
+            ],
+            argument_count=len(arguments),
+            arguments_completeness="incomplete"
+            if len(arguments) > MAX_BINDING_DETAILS
+            else "complete",
+            arguments_truncation="truncated"
+            if len(arguments) > MAX_BINDING_DETAILS
+            else "not-truncated",
+        )
+        self.rows.append(row)
+
+    def _argument_detail(self, argument: ast.AST, index: int) -> dict[str, object]:
+        kind, name, expression = _argument_parts(argument)
+        value = self.resolve(expression, self.syntax.owners[expression])
+        row = self.row(kind, argument, value, name)
+        row.update(index=index, expression=self.expression(expression))
+        return row
+
+    def _literal_row(self, node: ast.Constant | ast.JoinedStr) -> None:
+        if isinstance(node, ast.Constant) and (
+            not isinstance(node.value, str)
+            or node in self.syntax.formatted_string_parts
+        ):
+            return
+        value = self.resolve(node, self.syntax.owners[node])
+        row = self.row("literal-expression", node, value)
+        argument_context = self.syntax.literal_arguments.get(node)
+        row["call_argument"] = None
+        if argument_context is not None:
+            call, argument = argument_context
+            kind, name, _expression = _argument_parts(argument)
+            row["call_argument"] = {
+                "call_range": self.range(call),
+                "range": self.range(argument),
+                "kind": kind,
+                "name": name,
+            }
         self.rows.append(row)
 
     def _declaration_row(
@@ -489,6 +752,27 @@ class _PythonBindings:
         )
         row = self.row("declaration", node, value, node.name)
         row["expression"] = None
+        row["declaration_kind"] = (
+            "class" if isinstance(node, ast.ClassDef) else "function"
+        )
+        if isinstance(node, ast.ClassDef):
+            bases = []
+            for index, base in enumerate(node.bases[:MAX_BINDING_DETAILS]):
+                evidence = self.row(
+                    "base", base, self.resolve(base, self.syntax.owners[base])
+                )
+                evidence["index"] = index
+                bases.append(evidence)
+            row.update(
+                bases=bases,
+                base_count=len(node.bases),
+                bases_completeness="incomplete"
+                if len(node.bases) > MAX_BINDING_DETAILS
+                else "complete",
+                bases_truncation="truncated"
+                if len(node.bases) > MAX_BINDING_DETAILS
+                else "not-truncated",
+            )
         self.rows.append(row)
 
     def _parameter(self, argument: ast.arg, scope: PythonScope) -> dict[str, object]:
@@ -509,6 +793,7 @@ class _PythonBindings:
                 scope=self.scope(scope),
                 parameter=self._parameter(argument, scope),
                 expression=None,
+                declaration_kind="parameter",
             )
             self.rows.append(row)
         for argument, default in function_defaults(node):
@@ -594,6 +879,8 @@ class _PythonBindings:
             self._reference_row(node)
         elif isinstance(node, ast.Call):
             self._call_row(node)
+        elif isinstance(node, (ast.Constant, ast.JoinedStr)):
+            self._literal_row(node)
         elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
             self._declaration_row(node)
 

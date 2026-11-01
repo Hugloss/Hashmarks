@@ -19,6 +19,7 @@ from .ecmascript_binding_scope import (
 from .ecmascript_syntax import CALLABLE_SCOPES, SyntaxVisit, syntax_range
 from .source_binding_contract import (
     MAX_ALIAS_DEPTH,
+    MAX_BINDING_DETAILS,
     MAX_BINDING_EXPRESSION_DEPTH,
     MAX_BINDING_SUPPORTING_RANGES,
     MAX_HELPER_EDGES,
@@ -40,6 +41,78 @@ _WRAPPED_EXPRESSIONS = frozenset(
 )
 
 
+def _qualification(reasons: tuple[str, ...], conditions: tuple[str, ...]) -> str:
+    return "unknown" if reasons else "conditional" if conditions else "qualified"
+
+
+def _supporting_nodes(
+    *nodes: StructuralNode,
+) -> tuple[tuple[StructuralNode, ...], bool]:
+    support = {node_key(node): node for node in nodes}
+    return (
+        tuple(support.values())[:MAX_BINDING_SUPPORTING_RANGES],
+        len(support) > MAX_BINDING_SUPPORTING_RANGES,
+    )
+
+
+@dataclass(frozen=True)
+class _SymbolicPath:
+    """Authored parameter paths retain source identity, never runtime values."""
+
+    parameter: Binding
+    properties: tuple[str, ...] = ()
+    support: tuple[StructuralNode, ...] = ()
+    conditions: tuple[str, ...] = ()
+    reasons: tuple[str, ...] = ()
+
+    def proof(
+        self, *nodes: StructuralNode, conditions: tuple[str, ...] = ()
+    ) -> _SymbolicPath:
+        support, bounded = _supporting_nodes(*self.support, *nodes)
+        return replace(
+            self,
+            support=support,
+            conditions=tuple(sorted(set((*self.conditions, *conditions)))),
+            reasons=tuple(
+                sorted(
+                    set(
+                        (
+                            *self.reasons,
+                            *(("supporting-evidence-bound",) if bounded else ()),
+                        )
+                    )
+                )
+            ),
+        )
+
+    def unknown(self, reason: str) -> _SymbolicPath:
+        return replace(self, reasons=tuple(sorted(set((*self.reasons, reason)))))
+
+    def key(self) -> tuple[str, ...]:
+        return (
+            "parameter",
+            str(self.parameter.node.start_byte),
+            str(self.parameter.node.end_byte),
+            *self.properties,
+        )
+
+    def record(self) -> dict[str, object]:
+        return {
+            "root": {
+                "kind": "parameter",
+                "name": self.parameter.name,
+                "range": syntax_range(self.parameter.node),
+                "scope": self.parameter.scope.record(),
+            },
+            "properties": list(self.properties),
+            "qualification": _qualification(self.reasons, self.conditions),
+            "conditions": list(self.conditions),
+            "reasons": list(self.reasons),
+            "supporting_ranges": [syntax_range(node) for node in self.support],
+            "runtime_identity": "not-established",
+        }
+
+
 @dataclass(frozen=True)
 class _Value:
     target: dict[str, object] | None = None
@@ -47,32 +120,34 @@ class _Value:
     support: tuple[StructuralNode, ...] = ()
     conditions: tuple[str, ...] = ()
     reasons: tuple[str, ...] = ()
+    symbolic: _SymbolicPath | None = None
 
     @property
     def qualification(self) -> str:
-        return (
-            "unknown"
-            if self.reasons
-            else "conditional"
-            if self.conditions
-            else "qualified"
-        )
+        return _qualification(self.reasons, self.conditions)
 
     def proof(self, *nodes: StructuralNode, conditions: tuple[str, ...] = ()) -> _Value:
-        support = {node_key(node): node for node in (*self.support, *nodes)}
-        if len(support) > MAX_BINDING_SUPPORTING_RANGES:
+        support, bounded = _supporting_nodes(*self.support, *nodes)
+        symbolic = (
+            self.symbolic.proof(*nodes, conditions=conditions)
+            if self.symbolic is not None
+            else None
+        )
+        if bounded:
             return replace(
                 self,
                 target=None,
                 literal=None,
-                support=tuple(support.values())[:MAX_BINDING_SUPPORTING_RANGES],
+                support=support,
+                symbolic=symbolic,
                 reasons=tuple(
                     sorted(set((*self.reasons, "supporting-evidence-bound")))
                 ),
             )
         return replace(
             self,
-            support=tuple(support.values()),
+            support=support,
+            symbolic=symbolic,
             conditions=tuple(sorted(set((*self.conditions, *conditions)))),
         )
 
@@ -112,6 +187,14 @@ def _target_key(target: dict[str, object]) -> tuple[str, ...]:
     )
 
 
+def _value_key(value: _Value) -> tuple[str, ...] | None:
+    if value.target is not None:
+        return _target_key(value.target)
+    if value.symbolic is not None and not value.symbolic.reasons:
+        return value.symbolic.key()
+    return None
+
+
 class _Resolver:
     def __init__(self, inventory: BindingInventory) -> None:
         self.inventory = inventory
@@ -121,18 +204,27 @@ class _Resolver:
             context = _Context(scope, node.start_byte, check_properties=False)
             prefix = self._write_prefix(node, context)
             if prefix is not None:
-                self.property_writes.add(_target_key(prefix))
+                self.property_writes.add(prefix)
 
     def _write_prefix(
         self, node: StructuralNode, context: _Context
-    ) -> dict[str, object] | None:
+    ) -> tuple[str, ...] | None:
         current: StructuralNode | None = node
         for _ in range(MAX_BINDING_EXPRESSION_DEPTH + 1):
             if current is None:
                 return None
             value = self.resolve(current, context)
-            if value.target is not None:
-                return value.target
+            key = _value_key(value)
+            if key is not None:
+                return key
+            if set(value.reasons).intersection(
+                {
+                    "alias-cycle-or-depth-bound",
+                    "expression-unavailable-or-depth-bound",
+                    "supporting-evidence-bound",
+                }
+            ):
+                raise BindingObservationBound("property-write-depth-bound")
             current = (
                 self._wrapped_child(current)
                 if current.type in _WRAPPED_EXPRESSIONS
@@ -141,13 +233,18 @@ class _Resolver:
         raise BindingObservationBound("property-write-depth-bound")
 
     def _qualified_property(self, value: _Value, context: _Context) -> _Value:
-        if context.check_properties and value.target is not None:
-            key = _target_key(value.target)
+        key = _value_key(value)
+        if context.check_properties and key is not None:
             if any(
                 key[:length] in self.property_writes
                 for length in range(1, len(key) + 1)
             ):
-                return _unknown("source-property-reassigned", *value.support)
+                return replace(
+                    _unknown("source-property-reassigned", *value.support),
+                    symbolic=value.symbolic.unknown("source-property-reassigned")
+                    if value.symbolic is not None
+                    else None,
+                )
         return value
 
     def _identifier(self, node: StructuralNode, context: _Context) -> _Value:
@@ -188,7 +285,12 @@ class _Resolver:
     def binding(self, binding: Binding, context: _Context) -> _Value:
         reason = self._binding_reason(binding, context)
         if reason is not None:
-            return _unknown(reason, binding.node, *binding.writes)
+            value = _unknown(reason, binding.node, *binding.writes)
+            if reason == "parameter-value-unknown":
+                value = replace(
+                    value, symbolic=_SymbolicPath(binding, support=(binding.node,))
+                )
+            return value
         if binding.kind == "import":
             return _Value(
                 target=binding.import_target,
@@ -272,8 +374,18 @@ class _Resolver:
         return self.resolve(node, context.nested())
 
     def _append(
-        self, base: _Value, key: _Value, node: StructuralNode, context: _Context
+        self,
+        base: _Value,
+        key: _Value,
+        node: StructuralNode,
+        context: _Context,
+        *,
+        write_address: bool = False,
     ) -> _Value:
+        if base.symbolic is not None:
+            return self._append_symbolic(
+                base, key, node, context, write_address=write_address
+            )
         if base.reasons:
             return base
         if key.reasons:
@@ -284,11 +396,34 @@ class _Resolver:
         if len(properties) > MAX_ALIAS_DEPTH:
             return _unknown("property-depth-bound", node)
         value = replace(base, target={**base.target, "properties": properties})
-        return self._qualified_property(
-            value.proof(*key.support, node, conditions=key.conditions), context
-        )
+        value = value.proof(*key.support, node, conditions=key.conditions)
+        return value if write_address else self._qualified_property(value, context)
 
-    def _member(self, node: StructuralNode, context: _Context) -> _Value:
+    def _append_symbolic(
+        self,
+        base: _Value,
+        key: _Value,
+        node: StructuralNode,
+        context: _Context,
+        *,
+        write_address: bool,
+    ) -> _Value:
+        assert base.symbolic is not None
+        symbolic = base.symbolic
+        if key.reasons or key.literal is None:
+            symbolic = symbolic.unknown("symbolic-property-key-unqualified")
+        elif len(symbolic.properties) >= MAX_ALIAS_DEPTH:
+            symbolic = symbolic.unknown("property-depth-bound")
+        else:
+            symbolic = replace(symbolic, properties=(*symbolic.properties, key.literal))
+        value = replace(base, symbolic=symbolic).proof(
+            *key.support, node, conditions=key.conditions
+        )
+        return value if write_address else self._qualified_property(value, context)
+
+    def _member(
+        self, node: StructuralNode, context: _Context, *, write_address: bool = False
+    ) -> _Value:
         base = self.resolve(node.child_by_field_name("object"), context.nested())
         key_node = node.child_by_field_name(
             "index" if node.type == "subscript_expression" else "property"
@@ -298,10 +433,14 @@ class _Resolver:
             if node.type == "subscript_expression"
             else self._property_name(key_node, context)
         )
-        value = self._append(base, key, node, context)
+        value = self._append(base, key, node, context, write_address=write_address)
         return value.proof(
             conditions=("optional-access",) if self.projection.optional(node) else ()
         )
+
+    def write_address(self, node: StructuralNode, context: _Context) -> _Value:
+        """Observe the destination without reading its previous property value."""
+        return self._member(node, context, write_address=True)
 
     def _literal(self, node: StructuralNode) -> _Value:
         literal = self.projection.literal_text(node)
@@ -377,6 +516,9 @@ class _Observations:
         self.resolver = _Resolver(inventory)
         self.projection = inventory.projection
         self.rows: list[dict[str, object]] = []
+        self.parents = {
+            node_key(visit.node): visit.parent for visit in inventory.visits
+        }
         self.helpers = {
             (entry.node.start_byte, entry.node.end_byte): entry
             for entry in inventory.functions.values()
@@ -405,6 +547,7 @@ class _Observations:
             "conditions": list(value.conditions),
             "reasons": list(value.reasons),
             "runtime_target": "not-established",
+            "symbolic_reference": value.symbolic.record() if value.symbolic else None,
         }
 
     def _binding_row(self, binding: Binding) -> None:
@@ -420,7 +563,16 @@ class _Observations:
             else "declaration"
         )
         node = binding.initializer or binding.node
-        self.rows.append(self._row(kind, node, binding.scope, value, binding=binding))
+        row = self._row(kind, node, binding.scope, value, binding=binding)
+        row["declaration_kind"] = self._declaration_kind(binding)
+        if binding.kind == "import" and binding.import_target is not None:
+            row["import_syntax"] = {
+                "module": binding.import_target["module"],
+                "name": binding.import_target["name"],
+                "level": binding.import_target["level"],
+                "local_name": binding.name,
+            }
+        self.rows.append(row)
         if binding.default is not None:
             default = (
                 _unknown(binding.reason, binding.default)
@@ -444,6 +596,22 @@ class _Observations:
                 self._parameter(binding) if binding.kind == "parameter" else None
             )
             self.rows.append(row)
+
+    @staticmethod
+    def _declaration_kind(binding: Binding) -> str:
+        if binding.kind in {"function", "parameter", "import"}:
+            return binding.kind
+        if binding.declaration.type in {
+            "class_declaration",
+            "abstract_class_declaration",
+            "class",
+        }:
+            return "class"
+        return (
+            "variable"
+            if binding.kind in {"const", "let", "var"}
+            else binding.declaration.type
+        )
 
     @staticmethod
     def _parameter(binding: Binding) -> dict[str, object]:
@@ -534,36 +702,373 @@ class _Observations:
         value = self.resolver.resolve(callee, _Context(scope, node.start_byte))
         if self.projection.optional(node):
             value = value.proof(conditions=("optional-call",))
-        self.rows.append(self._row("call-site", node, scope, value))
+        row = self._row("call-site", node, scope, value)
+        entries = self._argument_nodes(node)
+        row.update(self._call_arguments(entries, scope))
+        self.rows.append(row)
         if callee is not None and node.type == "call_expression":
+            self._module_call(visit, callee, value, entries)
             self._helper(node, callee, value)
+
+    @staticmethod
+    def _argument_nodes(node: StructuralNode) -> list[StructuralNode]:
+        arguments = node.child_by_field_name("arguments")
+        return (
+            []
+            if arguments is None
+            else [
+                child for child in arguments.named_children if child.type != "comment"
+            ]
+        )
+
+    def _call_arguments(
+        self, entries: list[StructuralNode], scope: LexicalScope
+    ) -> dict[str, object]:
+        records: list[dict[str, object]] = []
+        for index, argument in enumerate(entries[:MAX_BINDING_DETAILS]):
+            value = self.resolver.resolve(
+                argument, _Context(scope, argument.start_byte)
+            )
+            record = self._row("positional", argument, scope, value)
+            record.update(
+                kind="spread" if argument.type == "spread_element" else "positional",
+                index=index,
+                name=None,
+            )
+            records.append(record)
+        clipped = len(entries) > len(records)
+        return {
+            "arguments": records,
+            "argument_count": len(entries),
+            "arguments_completeness": "incomplete" if clipped else "complete",
+            "arguments_truncation": "truncated" if clipped else "not-truncated",
+        }
+
+    @staticmethod
+    def _is_require(value: _Value) -> bool:
+        return (
+            value.target is not None
+            and value.target["kind"] == "lexical-global"
+            and value.target["name"] == "require"
+            and not value.target["properties"]
+            and not value.reasons
+        )
+
+    def _module_call(
+        self,
+        visit: SyntaxVisit,
+        callee: StructuralNode,
+        callee_value: _Value,
+        arguments: list[StructuralNode],
+    ) -> None:
+        dynamic = callee.type == "import"
+        require = self._is_require(callee_value)
+        if not dynamic and not require and self.projection.name(callee) != "require":
+            return
+        scope = self.inventory.scope(visit.node)
+        argument = arguments[0] if arguments else None
+        value = self.resolver.resolve(argument, _Context(scope, visit.node.start_byte))
+        if not dynamic and not require:
+            value = _unknown("module-loader-callee-unqualified", callee)
+        elif not arguments or arguments[0].type == "spread_element":
+            value = _unknown("module-source-argument-unqualified", visit.node)
+        elif value.literal is None:
+            value = _unknown("module-specifier-unqualified", *value.support)
+        value = value.proof(
+            callee, conditions=() if dynamic else callee_value.conditions
+        )
+        row = self._row("module-declaration", visit.node, scope, value)
+        row.update(
+            declaration_kind="import-call" if dynamic else "require-call",
+            module_specifier=value.literal,
+            source=self.projection.expression(argument),
+            type_only=visit.context != "value-syntax",
+            module_resolution="not-performed",
+        )
+        self.rows.append(row)
+
+    def _module_declaration(self, visit: SyntaxVisit) -> None:
+        syntax = self.projection.fact(visit)
+        if syntax is None:
+            return
+        source = visit.node.child_by_field_name("source")
+        scope = self.inventory.scope(visit.node)
+        value = self.resolver.resolve(source, _Context(scope, visit.node.start_byte))
+        row = self._row("module-declaration", visit.node, scope, value)
+        row.update(
+            declaration_kind=syntax["declaration_kind"],
+            module_specifier=value.literal,
+            source=syntax["source"],
+            type_only=syntax["type_only"],
+            module_resolution="not-performed",
+        )
+        self.rows.append(row)
+
+    def _parent_owner(
+        self, node: StructuralNode, kinds: frozenset[str]
+    ) -> StructuralNode | None:
+        current = self.parents.get(node_key(node))
+        for _ in range(MAX_BINDING_EXPRESSION_DEPTH + 1):
+            if current is None or current.type in kinds:
+                return current
+            current = self.parents.get(node_key(current))
+        return None
+
+    @staticmethod
+    def _write_syntax(owner: StructuralNode) -> dict[str, object]:
+        kinds = {
+            "assignment_expression": "assignment",
+            "augmented_assignment_expression": "assignment",
+            "update_expression": "update",
+            "unary_expression": "delete",
+            "for_in_statement": "iteration",
+        }
+        operator = owner.child_by_field_name("operator")
+        token = (
+            operator.type
+            if operator is not None
+            else next(
+                (
+                    child.type
+                    for child in owner.children
+                    if child.type in {"=", "delete", "in", "of"}
+                ),
+                None,
+            )
+        )
+        return {
+            "write_kind": kinds[owner.type],
+            "operator": token,
+            "reads_previous_value": owner.type
+            in {"augmented_assignment_expression", "update_expression"},
+        }
+
+    def _property_writes(self) -> None:
+        kinds = frozenset(
+            {
+                "assignment_expression",
+                "augmented_assignment_expression",
+                "update_expression",
+                "unary_expression",
+                "for_in_statement",
+            }
+        )
+        for node, scope in self.inventory.property_writes:
+            owner = self._parent_owner(node, kinds)
+            value = self.resolver.write_address(node, _Context(scope, node.start_byte))
+            if owner is None:
+                value = _unknown("property-write-syntax-unqualified", node)
+            row = self._row("property-write", owner or node, scope, value)
+            row["destination"] = self.projection.expression(node)
+            row.update(self._write_parts(node, scope))
+            row["context"] = (
+                "delete"
+                if owner is not None and owner.type == "unary_expression"
+                else "store"
+            )
+            if owner is not None:
+                row.update(self._write_syntax(owner))
+                row["value"] = self.projection.expression(
+                    owner.child_by_field_name("right")
+                )
+            self.rows.append(row)
+
+    def _write_parts(
+        self, node: StructuralNode, scope: LexicalScope
+    ) -> dict[str, object]:
+        computed = node.type == "subscript_expression"
+        receiver = node.child_by_field_name("object")
+        key_node = node.child_by_field_name("index" if computed else "property")
+        key = (
+            self.resolver.resolve(key_node, _Context(scope, node.start_byte)).literal
+            if computed
+            else self.projection.name(key_node)
+        )
+        return {
+            "access_kind": "subscript" if computed else "attribute",
+            "property": key,
+            "receiver": None
+            if receiver is None
+            else self._row(
+                "receiver",
+                receiver,
+                scope,
+                self.resolver.resolve(receiver, _Context(scope, node.start_byte)),
+            ),
+        }
+
+    def _parameter_type(self, node: StructuralNode) -> dict[str, object]:
+        annotation = node.child_by_field_name("type")
+        children = (
+            []
+            if annotation is None
+            else [
+                child for child in annotation.named_children if child.type != "comment"
+            ]
+        )
+        native = children[0] if len(children) == 1 else None
+        predefined = (
+            native is not None
+            and native.type == "predefined_type"
+            and len(native.children) == 1
+        )
+        return {
+            "kind": "predefined" if predefined else "unqualified",
+            "name": native.children[0].type
+            if native is not None and predefined
+            else None,
+            "range": syntax_range(annotation) if annotation is not None else None,
+            "expression": self.projection.expression(native),
+            "qualification": "qualified" if predefined else "unknown",
+            "conditions": [],
+            "reasons": [] if predefined else ["type-resolution-not-performed"],
+        }
+
+    def _signature_parameter(
+        self, node: StructuralNode, index: int
+    ) -> dict[str, object]:
+        pattern = node.child_by_field_name("pattern")
+        rest = pattern is not None and pattern.type == "rest_pattern"
+        name = (
+            next(iter(pattern.named_children), None)
+            if rest and pattern is not None
+            else pattern
+        )
+        return {
+            "index": index,
+            "name": self.projection.name(name),
+            "range": syntax_range(node),
+            "expression": self.projection.expression(pattern),
+            "optional": node.type == "optional_parameter",
+            "rest": rest,
+            "type": self._parameter_type(node),
+        }
+
+    def _callable_signature(self, visit: SyntaxVisit) -> None:
+        node = visit.node
+        container = self._signature_container(node)
+        name = self.projection.name(node.child_by_field_name("name"))
+        parameters = node.child_by_field_name("parameters")
+        entries = (
+            []
+            if parameters is None
+            else [
+                child for child in parameters.named_children if child.type != "comment"
+            ]
+        )
+        projected = [
+            self._signature_parameter(child, index)
+            for index, child in enumerate(entries[:MAX_BINDING_DETAILS])
+        ]
+        clipped = len(entries) > len(projected)
+        value = self._signature_value(container, name, projected, clipped)
+        row = self._row("callable-signature", node, self.inventory.scope(node), value)
+        row.update(
+            name=name,
+            declaration_kind="method-signature",
+            container=None
+            if container is None
+            else {
+                "kind": "interface"
+                if container.type == "interface_declaration"
+                else "class",
+                "name": self.projection.name(container.child_by_field_name("name")),
+                "range": syntax_range(container),
+            },
+            syntax_context=visit.context,
+            parameters=projected,
+            parameter_count=len(entries),
+            parameters_completeness="incomplete" if clipped else "complete",
+            parameters_truncation="truncated" if clipped else "not-truncated",
+        )
+        self.rows.append(row)
+
+    def _signature_container(self, node: StructuralNode) -> StructuralNode | None:
+        body = self.parents.get(node_key(node))
+        if body is None or body.type not in {"interface_body", "class_body"}:
+            return None
+        container = self.parents.get(node_key(body))
+        return (
+            container
+            if container is not None
+            and container.type
+            in {
+                "interface_declaration",
+                "class_declaration",
+                "abstract_class_declaration",
+                "class",
+            }
+            else None
+        )
+
+    def _signature_value(
+        self,
+        container: StructuralNode | None,
+        name: str | None,
+        parameters: list[dict[str, object]],
+        clipped: bool,
+    ) -> _Value:
+        if (
+            container is None
+            or self.projection.name(container.child_by_field_name("name")) is None
+        ):
+            return _unknown("callable-container-unqualified")
+        if name is None:
+            return _unknown("callable-name-unqualified")
+        if clipped:
+            return _unknown("callable-parameter-projection-bound", container)
+        if any(
+            cast("dict[str, object]", row["type"])["qualification"] != "qualified"
+            for row in parameters
+        ):
+            return _unknown("callable-parameter-type-unqualified", container)
+        return _Value(support=(container,))
 
     def collect(self) -> list[dict[str, object]]:
         for binding in self.inventory.bindings:
             self._binding_row(binding)
+        self._property_writes()
         for visit in self.inventory.visits:
-            if visit.context != "value-syntax":
-                continue
-            if visit.node.type in {"call_expression", "new_expression"}:
-                self._call(visit)
-            elif visit.node.type in {
-                "identifier",
-                "shorthand_property_identifier",
-                "member_expression",
-                "subscript_expression",
-            }:
-                self._reference(visit)
-            elif visit.node.type in {"string", "template_string", "binary_expression"}:
-                self._literal_row(visit)
+            self._visit(visit)
         return sorted(self.rows, key=_row_key)
 
-    def _literal_row(self, visit: SyntaxVisit) -> None:
-        if visit.module is not None:
+    def _visit(self, visit: SyntaxVisit) -> None:
+        if visit.node.type in {"import_statement", "export_statement"}:
+            self._module_declaration(visit)
+        elif visit.node.type in {"method_signature", "abstract_method_signature"}:
+            self._callable_signature(visit)
+        if visit.context != "value-syntax":
+            self._type_module_call(visit)
             return
+        if visit.node.type in {"call_expression", "new_expression"}:
+            self._call(visit)
+        elif visit.node.type in {
+            "identifier",
+            "shorthand_property_identifier",
+            "member_expression",
+            "subscript_expression",
+        }:
+            self._reference(visit)
+        elif visit.node.type in {"string", "template_string", "binary_expression"}:
+            self._literal_row(visit)
+
+    def _type_module_call(self, visit: SyntaxVisit) -> None:
+        if visit.node.type != "call_expression":
+            return
+        callee = visit.node.child_by_field_name("function")
+        if callee is not None and callee.type == "import":
+            self._module_call(
+                visit,
+                callee,
+                _unknown("type-syntax-value-not-resolved", callee),
+                self._argument_nodes(visit.node),
+            )
+
+    def _literal_row(self, visit: SyntaxVisit) -> None:
         node = visit.node
         scope = self.inventory.scope(node)
         value = self.resolver.resolve(node, _Context(scope, node.start_byte))
-        self.rows.append(self._row("literal-binding", node, scope, value))
+        self.rows.append(self._row("literal-expression", node, scope, value))
 
 
 def ecmascript_bindings(

@@ -202,6 +202,9 @@ class PythonScopes(ast.NodeVisitor):
         self.owners: dict[ast.AST, PythonScope] = {}
         self.function_scopes: dict[FunctionNode, PythonScope] = {}
         self.type_nodes: set[ast.AST] = set()
+        self.literal_arguments: dict[ast.AST, tuple[ast.Call, ast.AST]] = {}
+        self.formatted_string_parts: set[ast.Constant] = set()
+        self._argument_call: tuple[ast.Call, ast.AST] | None = None
         self._in_type = False
         self.visit(tree)
         for scope in self.scopes:
@@ -217,7 +220,23 @@ class PythonScopes(ast.NodeVisitor):
         self.owners[node] = self.current
         if self._in_type:
             self.type_nodes.add(node)
+        if isinstance(node, (ast.Constant, ast.JoinedStr)) and self._argument_call:
+            self.literal_arguments[node] = self._argument_call
         super().visit(node)
+
+    def visit_Call(self, node: ast.Call) -> None:
+        self.visit(node.func)
+        before = self._argument_call
+        for argument in (*node.args, *node.keywords):
+            self._argument_call = (node, argument)
+            self.visit(argument)
+        self._argument_call = before
+
+    def visit_JoinedStr(self, node: ast.JoinedStr) -> None:
+        self.formatted_string_parts.update(
+            part for part in node.values if isinstance(part, ast.Constant)
+        )
+        self.generic_visit(node)
 
     def _visit_type(self, node: ast.AST | None) -> None:
         if node is None:

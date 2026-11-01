@@ -138,23 +138,22 @@ class SyntaxProjection:
         if node is None:
             return None
         end = min(node.end_byte, node.start_byte + EXPRESSION_PREVIEW_BYTES)
+        text = self.raw[node.start_byte : end].decode("utf-8", errors="ignore")
         return {
             "syntax_type": node.type,
             "range": syntax_range(node),
-            "text": self.raw[node.start_byte : end].decode("utf-8", errors="ignore"),
+            "text": text,
             "text_truncated": end != node.end_byte,
+            "name": text
+            if end == node.end_byte and node.type in _NAME_TYPES and "\\" not in text
+            else None,
         }
 
     def name(self, node: StructuralNode | None) -> str | None:
         """Expose only complete native identifier tokens, without name resolution."""
         expression = self.expression(node)
-        if expression is None or expression["text_truncated"]:
-            return None
-        if "\\" in str(expression["text"]):
-            return None
-        if node is not None and node.type in _NAME_TYPES:
-            return str(expression["text"])
-        return None
+        name = None if expression is None else expression["name"]
+        return name if isinstance(name, str) else None
 
     def property(
         self, node: StructuralNode | None, *, computed: bool = False
