@@ -618,21 +618,26 @@ def test_public_docs_expose_bounded_mcp_integration_and_apache_license() -> None
 
 def test_ci_and_dev_check_enforce_current_ruff_gate() -> None:
     workflow = _text(".github/workflows/ci.yml")
-    marker = "      - name: Enforce configured Ruff and zero complexity debt\n"
+    marker = "      - name: Validate dependency, formatting, static and typing authority\n"
     assert marker in workflow
     gate_block = workflow.split(marker, 1)[1].split("      - name:", 1)[0]
-    assert "run: make lint" in gate_block
+    assert "make lint" in gate_block
+    assert "make typecheck" in gate_block
     assert "continue-on-error" not in gate_block
     convergence = workflow.split("  qualification-convergence:", 1)[1]
-    assert "      - formatting" in convergence
-    assert "      - ruff-debt" in convergence
-    assert "FORMATTING: ${{ needs.formatting.result }}" in convergence
-    assert "RUFF_DEBT: ${{ needs.ruff-debt.result }}" in convergence
-    assert '"FORMATTING" "$FORMATTING"' in convergence
-    qualification_loop = convergence.split("for lane in", 1)[1].split("do", 1)[0]
-    assert "FORMATTING" not in qualification_loop
-    assert "RUFF_DEBT" in qualification_loop
-    assert 'test "$failed" -eq 0' in convergence
+    assert "needs: [fast-gate]" in convergence
+    assert "FAST_GATE:" in convergence
+    assert 'test "$FAST_GATE" = success' in convergence
+
+    nightly = _text(".github/workflows/full-qualification.yml")
+    debt_marker = "      - name: Enforce configured Ruff and zero complexity debt\n"
+    assert debt_marker in nightly
+    debt_block = nightly.split(debt_marker, 1)[1].split("      - name:", 1)[0]
+    assert "run: make lint" in debt_block
+    assert "continue-on-error" not in debt_block
+    full_convergence = nightly.split("  qualification-convergence:", 1)[1]
+    assert "RUFF_DEBT:" in full_convergence
+    assert 'test "$failed" -eq 0' in full_convergence
 
     makefile = _text("Makefile")
     dev_check = makefile.split("dev-check: setup", 1)[1].split("\ndev-check-batch:", 1)[
