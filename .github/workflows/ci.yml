@@ -16,6 +16,8 @@ permissions:
 jobs:
   fast-gate:
     name: Relevant verification and native smoke
+    outputs:
+      full_sharded: ${{ steps.admission.outputs.mode == 'full' && steps.full_membership.outcome == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -51,6 +53,7 @@ jobs:
       - name: Prove selector behavior against actual CodeMap before broad pytest
         run: uv run --frozen --offline --no-sync --group test python -m pytest -q tests/test_ci_verification.py
       - name: Admit candidate-scoped Hashmarks test membership
+        id: admission
         shell: bash
         run: |
           set -euo pipefail
@@ -67,6 +70,8 @@ jobs:
             --early-output "$RUNNER_TEMP/hashmarks-ci-early.nul" \
             > "$RUNNER_TEMP/hashmarks-ci-paths.nul"
           test -s "$RUNNER_TEMP/hashmarks-ci-paths.nul"
+          mode="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["mode"])' "$RUNNER_TEMP/hashmarks-ci-plan.json")"
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
           cat "$RUNNER_TEMP/hashmarks-ci-plan.json" >> "$GITHUB_STEP_SUMMARY"
       - name: Prove critical changed-verifier regressions before full pytest
         shell: bash
@@ -77,7 +82,23 @@ jobs:
               python -m pytest -q --maxfail=1 --durations=10 \
               < "$RUNNER_TEMP/hashmarks-ci-early.nul"
           fi
+      - name: Bind exact native full-suite membership for parallel runners
+        id: full_membership
+        if: steps.admission.outputs.mode == 'full'
+        continue-on-error: true
+        run: |
+          uv run --frozen --offline --no-sync --group test python scripts/ci_full_shards.py plan \
+            --manifest "$RUNNER_TEMP/hashmarks-full-shards.json"
+      - name: Preserve native full-suite membership
+        if: steps.full_membership.outcome == 'success'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hashmarks-full-shards-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/hashmarks-full-shards.json
+          if-no-files-found: error
+          retention-days: 14
       - name: Execute selected tests through native pytest
+        if: steps.admission.outputs.mode != 'full' || steps.full_membership.outcome != 'success'
         shell: bash
         run: |
           set -euo pipefail
@@ -106,14 +127,73 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  full-shards:
+    name: Native full pytest shard ${{ matrix.shard }} / 4
+    if: needs.fast-gate.outputs.full_sharded == 'true'
+    needs: [fast-gate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: true
+      matrix:
+        shard: [0, 1, 2, 3]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          enable-cache: true
+      - run: uv python install 3.11
+      - name: Materialize exact locked native test environment
+        run: uv sync --frozen --group test --extra mcp --python 3.11
+      - name: Retrieve committed-sha-bound native collection
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: hashmarks-full-shards-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/full-shard-plan
+      - name: Recheck all native collected tests and emit bounded shard members
+        shell: bash
+        env:
+          SHARD_INDEX: ${{ matrix.shard }}
+        run: |
+          set -euo pipefail
+          uv run --frozen --offline --no-sync --group test python scripts/ci_full_shards.py emit \
+            --manifest "$RUNNER_TEMP/full-shard-plan/hashmarks-full-shards.json" \
+            --shard "$SHARD_INDEX" --normal-output "$RUNNER_TEMP/normal-tests.nul" \
+            --isolated-output "$RUNNER_TEMP/isolated-tests.nul"
+      - name: Execute native ordinary pytest membership
+        shell: bash
+        run: |
+          set -euo pipefail
+          xargs -0 -r uv run --frozen --offline --no-sync --group test \
+            python -m pytest -q --maxfail=1 --durations=10 \
+            < "$RUNNER_TEMP/normal-tests.nul"
+      - name: Run process-sensitive tests in singleton native pytest processes
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' nodeid; do
+            uv run --frozen --offline --no-sync --group test \
+              python -m pytest -q --maxfail=1 "$nodeid"
+          done < "$RUNNER_TEMP/isolated-tests.nul"
+
   qualification-convergence:
     name: Qualification convergence
     if: always()
-    needs: [fast-gate]
+    needs: [fast-gate, full-shards]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: Require every mandatory verification stage
         env:
           FAST_GATE: ${{ needs.fast-gate.result }}
-        run: test "$FAST_GATE" = success
+          FULL_SHARDED: ${{ needs.fast-gate.outputs.full_sharded }}
+          FULL_SHARDS: ${{ needs.full-shards.result }}
+        run: |
+          test "$FAST_GATE" = success
+          if [ "$FULL_SHARDED" = true ]; then
+            test "$FULL_SHARDS" = success
+          else
+            test "$FULL_SHARDS" = skipped
+          fi
