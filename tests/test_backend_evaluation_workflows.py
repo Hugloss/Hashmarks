@@ -1405,9 +1405,7 @@ def test_aggregate_reads_current_receipts_without_executing_work(
     report = aggregate_backend(
         campaign_path=campaign,
         sources=sources,
-        selections={
-            "fixture": {"workflow_report": str(measured / "summary.json")}
-        },
+        selections={"fixture": {"workflow_report": str(measured / "summary.json")}},
         output_dir=tmp_path / "aggregate",
     )
     assert report["status"] == "INCOMPLETE"
