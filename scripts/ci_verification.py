@@ -145,15 +145,22 @@ def _qualified_links(graph: Mapping[str, Any], source: str) -> tuple[str, ...] |
         for row in rows
         if isinstance(row, dict)
         and source in row.get("covers_edit_candidates", [])
-        and row.get("coverage_evidence") in {"direct-reference", "bounded-indirect-reference"}
+        and row.get("coverage_evidence")
+        in {"direct-reference", "bounded-indirect-reference"}
         and isinstance(row.get("path"), str)
     ]
-    if not linked or len(linked) != len(rows) or not all(_test_file(path) for path in linked):
+    if (
+        not linked
+        or len(linked) != len(rows)
+        or not all(_test_file(path) for path in linked)
+    ):
         return None
     return tuple(sorted(set(linked)))
 
 
-def _source_links(root: Path, sources: tuple[str, ...]) -> dict[str, tuple[str, ...]] | None:
+def _source_links(
+    root: Path, sources: tuple[str, ...]
+) -> dict[str, tuple[str, ...]] | None:
     """Read canonical Hashmarks evidence; never infer negative links from a bound."""
     from hashmarks.codemap import CodeMap
     from hashmarks.verification_nomination_validation import (
@@ -222,7 +229,10 @@ def _source_test_files(
     if (
         nominations is None
         or set(nominations) != set(sources)
-        or any(not paths or not all(_test_file(path) for path in paths) for paths in nominations.values())
+        or any(
+            not paths or not all(_test_file(path) for path in paths)
+            for paths in nominations.values()
+        )
     ):
         return set(), "unproven-verification-membership"
     return {path for paths in nominations.values() for path in paths}, None
@@ -233,7 +243,9 @@ def select(
     base: str,
     *,
     worktree: bool = False,
-    links: Callable[[Path, tuple[str, ...]], dict[str, tuple[str, ...]] | None] = _source_links,
+    links: Callable[
+        [Path, tuple[str, ...]], dict[str, tuple[str, ...]] | None
+    ] = _source_links,
 ) -> dict[str, Any]:
     """Build a conservative plan; unknown coverage selects the complete suite."""
     root = root.resolve()
@@ -263,7 +275,9 @@ def select(
         "mode": mode,
         "changed_paths": list(changed),
         "pytest_paths": ["tests"] if mode == "full" else sorted(tests),
-        "reasons": sorted(set(full_reasons)) if full_reasons else ["qualified-relevant-selection"],
+        "reasons": sorted(set(full_reasons))
+        if full_reasons
+        else ["qualified-relevant-selection"],
         "authority": "development-ci-consumer; pytest remains the execution owner",
     }
     payload["plan_identity"] = _identity(payload)
@@ -279,7 +293,9 @@ def main() -> int:
     args = parser.parse_args()
     plan = select(args.root, args.base, worktree=args.worktree)
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(plan, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    args.output.write_text(
+        json.dumps(plan, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     sys.stderr.write(
         json.dumps({key: plan[key] for key in ("mode", "reasons", "pytest_paths")})
         + "\n"
