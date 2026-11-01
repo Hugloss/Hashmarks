@@ -62,21 +62,18 @@ def _source_barrier(facts: Sequence[_Fact]) -> str | None:
 def _expression(fact: _Fact) -> str | None:
     if fact.context:
         return None
+    value = fact.value.get("value_expression")
     if fact.kind == "make-variable-declaration":
-        if fact.value.get("assignment_operator") not in {":=", "::=", "="}:
+        if (
+            fact.value.get("assignment_operator") not in {":=", "::=", "="}
+            or fact.value.get("modifiers")
+        ):
             return None
-        if fact.value.get("modifiers"):
-            return None
-        value = fact.value.get("value_expression")
         return value.strip() if isinstance(value, str) else None
     if fact.value.get("modifier") not in {"", "export"}:
         return None
-    word = fact.value.get("value_expression")
-    if not isinstance(word, dict):
-        return None
-    expression = word.get("expression")
+    expression = value.get("expression") if isinstance(value, dict) else None
     return expression if isinstance(expression, str) else None
-
 
 def _direct_reference(expression: str, language: str) -> str | None:
     if language == "shell" and expression.startswith('"') and expression.endswith('"'):
@@ -100,17 +97,17 @@ def _resolve(
     language: str,
     visited: frozenset[str] = frozenset(),
 ) -> tuple[str, tuple[_Fact, ...]] | None:
-    if name in visited or len(visited) >= MAX_BINDING_HOPS:
-        return None
     candidates = definitions.get(name, [])
-    if len(candidates) != 1:
+    if (
+        name in visited
+        or len(visited) >= MAX_BINDING_HOPS
+        or len(candidates) != 1
+    ):
         return None
     fact = candidates[0]
     # Shell assignments expand immediately. Requiring earlier declarations for
     # Make too is deliberately conservative about later recursive definitions.
-    if fact.line.start >= before:
-        return None
-    expression = _expression(fact)
+    expression = _expression(fact) if fact.line.start < before else None
     if expression is None:
         return None
     atom = _static_atom(expression, language)
@@ -126,10 +123,7 @@ def _resolve(
         language=language,
         visited=visited | {name},
     )
-    if upstream is None:
-        return None
-    return upstream[0], (fact, *upstream[1])
-
+    return (upstream[0], (fact, *upstream[1])) if upstream is not None else None
 
 def _command_word(
     word: Mapping[str, object],
@@ -171,22 +165,27 @@ def _evidence(facts: Sequence[_Fact]) -> list[dict[str, object]]:
 def _observe_command(
     fact: _Fact, definitions: Mapping[str, list[_Fact]], barrier: str | None
 ) -> dict[str, object]:
-    if barrier is not None:
-        return {"state": "unclassified", "reason": barrier}
-    if any(not part.startswith("make-recipe:") for part in fact.context):
-        return {"state": "unclassified", "reason": "non-top-level-or-conditional"}
+    reason = barrier
+    if reason is None and any(
+        not part.startswith("make-recipe:") for part in fact.context
+    ):
+        reason = "non-top-level-or-conditional"
+    if reason is not None:
+        return {"state": "unclassified", "reason": reason}
     words = fact.value.get("words")
     if not isinstance(words, list) or not words:
         return {"state": "unclassified", "reason": "no-command-words"}
     rendered: list[str] = []
     declarations: list[_Fact] = []
     for item in words:
-        if not isinstance(item, dict):
-            return {"state": "unclassified", "reason": "unsupported-command-word"}
-        derived = _command_word(
-            cast("Mapping[str, object]", item),
-            fact=fact,
-            definitions=definitions,
+        derived = (
+            _command_word(
+                cast("Mapping[str, object]", item),
+                fact=fact,
+                definitions=definitions,
+            )
+            if isinstance(item, dict)
+            else None
         )
         if derived is None:
             return {"state": "unclassified", "reason": "unresolved-word-or-binding"}
