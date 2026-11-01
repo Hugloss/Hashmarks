@@ -16,6 +16,7 @@ from hashmarks.paths import normalize_relative_path
 
 from .repository_domains import RepositoryDomain, classify_repository_path
 from .repository_observation import evidence_identity
+from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
 from .verification_plan import _UnqualifiedNominationMember
 
 if TYPE_CHECKING:
@@ -141,7 +142,9 @@ class VerificationSupportMixin:
         rel = normalize_relative_path(path, allow_root=False)
         if reconcile:
             self.source.ensure_current(rel)
-        member, raw = self.source.member(rel, include_bytes=True)
+        member, raw = self.source._bounded_source_observation(
+            rel, VERIFICATION_RELEVANCE_DEFAULTS.source_member_bytes
+        )
         if member.get("state") == "known-present" and raw is not None:
             kind, reason, unsupported = self._support_path_details(rel, raw)
             if (

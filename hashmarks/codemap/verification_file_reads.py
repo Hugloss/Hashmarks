@@ -151,11 +151,17 @@ def _literal_path(
 
 class _LiteralReadVisitor(ast.NodeVisitor):
     def __init__(
-        self, roots: frozenset[str], names: frozenset[str], target: str
+        self,
+        roots: frozenset[str],
+        names: frozenset[str],
+        target: str,
+        *,
+        tests_only: bool = True,
     ) -> None:
         self.roots = roots
         self.names = names
         self.target = target
+        self.tests_only = tests_only
         self.test: str | None = None
         self.in_function = False
         self.terminated = False
@@ -166,7 +172,9 @@ class _LiteralReadVisitor(ast.NodeVisitor):
             return
         self.in_function = True
         self.terminated = False
-        self.test = node.name if node.name.startswith("test_") else None
+        self.test = (
+            node.name if not self.tests_only or node.name.startswith("test_") else None
+        )
         for child in node.body:
             self.visit(child)
             if self.terminated:
@@ -214,8 +222,11 @@ class _LiteralReadVisitor(ast.NodeVisitor):
         return
 
     def visit_Call(self, node: ast.Call) -> None:
+        reader_scope = (
+            self.test is not None or not self.tests_only and not self.in_function
+        )
         if (
-            self.test is not None
+            reader_scope
             and not self.terminated
             and len(self.reads)
             < VERIFICATION_RELEVANCE_DEFAULTS.literal_file_read_sites
@@ -224,10 +235,20 @@ class _LiteralReadVisitor(ast.NodeVisitor):
             self.reads.append(
                 {
                     "source_path": self.target,
-                    "test_symbol": self.test,
+                    "test_symbol" if self.tests_only else "reader_symbol": self.test,
                     "line": node.lineno,
                     "end_line": node.end_lineno or node.lineno,
                     "basis": "unshadowed-pathlib-literal-read",
+                    **(
+                        {
+                            "line": node.func.value.lineno,
+                            "end_line": node.func.value.end_lineno,
+                            "start_byte_column": node.func.value.col_offset,
+                            "end_byte_column": node.func.value.end_col_offset,
+                        }
+                        if not self.tests_only and isinstance(node.func, ast.Attribute)
+                        else {}
+                    ),
                 }
             )
         self.generic_visit(node)
@@ -243,14 +264,14 @@ class _LiteralReadVisitor(ast.NodeVisitor):
 
 
 def literal_repository_file_reads(
-    tree: ast.Module, reader_path: str, target: str
+    tree: ast.Module, reader_path: str, target: str, *, tests_only: bool = True
 ) -> list[dict[str, object]]:
     counts = _bound_names(tree)
     names = _path_imports(tree, counts)
     roots = _root_bindings(
         tree, names, counts, len(PurePosixPath(reader_path).parts) - 1
     )
-    visitor = _LiteralReadVisitor(roots, names, target)
+    visitor = _LiteralReadVisitor(roots, names, target, tests_only=tests_only)
     visitor.visit(tree)
     return visitor.reads
 
@@ -295,8 +316,8 @@ class VerificationFileReadsMixin:
         # positive relationships, never complete absence of file readers.
         state.search_bound_reasons.add("literal-file-reader-syntax-scope")
         self.source.ensure_current(state.edit_path)
-        target = self.reads.file_row(state.edit_path)
-        if target is None or self.files.visible_file(state.edit_path) is None:
+        target, _raw = self.source.member(state.edit_path)
+        if target.get("state") != "known-present":
             return
         for row in self._verification_test_lexical_rows(state)[
             : VERIFICATION_RELEVANCE_DEFAULTS.literal_file_reader_paths
@@ -310,7 +331,7 @@ class VerificationFileReadsMixin:
             ):
                 continue
             reads = self._verification_file_read_evidence(
-                path, state.edit_path, target.get("file_digest")
+                path, state.edit_path, target.get("member_revision")
             )
             if reads:
                 state.candidate_paths.add(path)

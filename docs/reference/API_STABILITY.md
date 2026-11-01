@@ -105,6 +105,13 @@ collection/runtime correlation observations. It preserves unknown consumer
 coverage and external execution authority. See
 [Changed-set verification evidence](CHANGED_SET_VERIFICATION.md).
 
+The source observation's additive `content` metadata distinguishes observed
+text/binary bytes, recognized image signatures and Git LFS pointer declarations.
+Changed-set observations can also carry `asset` consumer evidence from the same
+repository authorities. Neither field grants documentation-only, execution or
+merge authority; unknown consumer coverage and unobserved LFS objects remain
+explicit. See [Source observation](SOURCE_OBSERVATION.md#content-kind-and-git-lfs-observations).
+
 Structural operations use `CodeMap.structure.search()` and `.locality()`, with
 their existing evidence schemas and bounds. The old root methods are removed.
 Pure packet comparisons are imported from their defining modules:
