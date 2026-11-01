@@ -334,7 +334,9 @@ def test_selected_scope_is_explicit_canonical_and_bounded(options: dict) -> None
         MakeShellDeclarations(**options)
 
 
-def test_make_indirection_is_conditional_static_words_not_execution(tmp_path: Path) -> None:
+def test_make_indirection_is_conditional_static_words_not_execution(
+    tmp_path: Path,
+) -> None:
     _write(
         tmp_path,
         "Makefile",
@@ -371,16 +373,13 @@ def test_make_indirection_is_conditional_static_words_not_execution(tmp_path: Pa
     )
 
 
-def test_shell_indirection_uses_only_prior_top_level_single_atoms(tmp_path: Path) -> None:
+def test_shell_indirection_uses_only_prior_top_level_single_atoms(
+    tmp_path: Path,
+) -> None:
     _write(
         tmp_path,
         "demo.sh",
-        (
-            "RUNNER=python\n"
-            'TOOL="$RUNNER"\n'
-            '"$TOOL" -m demo\n'
-            "printf '%s' '$RUNNER'\n"
-        ),
+        ("RUNNER=python\nTOOL=\"$RUNNER\"\n\"$TOOL\" -m demo\nprintf '%s' '$RUNNER'\n"),
     )
     packet = _observe(tmp_path, MakeShellDeclarations(shell_paths=("demo.sh",)))
     commands = _values(packet, "shell-command-expression")
@@ -395,10 +394,13 @@ def test_shell_indirection_uses_only_prior_top_level_single_atoms(tmp_path: Path
 @pytest.mark.parametrize(
     ("source", "make"),
     [
-        ("RUNNER=first\nRUNNER=second\n\"$RUNNER\" arg\n", False),
-        ("A=$B\nB=$A\n\"$A\" arg\n", False),
-        ("RUNNER=python\nsource external.sh\n\"$RUNNER\" arg\n", False),
-        ("RUNNER=python\nif condition; then\n  RUNNER=other\nfi\n\"$RUNNER\" arg\n", False),
+        ('RUNNER=first\nRUNNER=second\n"$RUNNER" arg\n', False),
+        ('A=$B\nB=$A\n"$A" arg\n', False),
+        ('RUNNER=python\nsource external.sh\n"$RUNNER" arg\n', False),
+        (
+            'RUNNER=python\nif condition; then\n  RUNNER=other\nfi\n"$RUNNER" arg\n',
+            False,
+        ),
         ("RUNNER := python\nRUNNER := other\nall:\n\t$(RUNNER) arg\n", True),
         ("A = $(B)\nB = $(A)\nall:\n\t$(A) arg\n", True),
         ("RUNNER := python\ninclude override.mk\nall:\n\t$(RUNNER) arg\n", True),
