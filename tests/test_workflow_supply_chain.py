@@ -473,9 +473,9 @@ def test_fast_ci_remains_a_native_pytest_gate() -> None:
     assert "scripts/ci_verification.py" in fast
     assert "python -m pytest -q" in fast
     assert "Prove selector behavior against actual CodeMap before broad pytest" in fast
-    assert fast.index("Prove selector behavior against actual CodeMap before broad pytest") < (
-        fast.index("Execute selected tests through native pytest")
-    )
+    early = fast.index("Prove selector behavior against actual CodeMap before broad pytest")
+    full = fast.index("Execute selected tests through native pytest")
+    assert early < full
     assert "make artifact-check" in fast
     assert "mcp_installed_artifact_smoke.py" in fast
     assert 'if [ "$GITHUB_EVENT_NAME" != "push" ]; then' in fast
