@@ -466,12 +466,8 @@ def test_ci_static_gate_retains_required_quality_and_artifact_proofs() -> None:
     workflow = (_root() / ".github" / "workflows" / "ci.yml").read_text(
         encoding="utf-8"
     )
-    static_gate = workflow.split("  static-gate:\n", 1)[1].split(
-        "  fast-gate:\n", 1
-    )[0]
-    native_gate = workflow.split("  fast-gate:\n", 1)[1].split(
-        "  full-shards:\n", 1
-    )[0]
+    static_gate = workflow.split("  static-gate:\n", 1)[1].split("  fast-gate:\n", 1)[0]
+    native_gate = workflow.split("  fast-gate:\n", 1)[1].split("  full-shards:\n", 1)[0]
     assert "make lint" in static_gate and "make typecheck" in static_gate
     assert "make artifact-check" in static_gate
     assert "mcp_installed_artifact_smoke.py" in static_gate
