@@ -230,15 +230,13 @@ def test_hotspot_affinity_balances_files_without_dropping_cases(
     for name in names:
         path = native_repository / "tests" / name
         path.write_text("def test_a(): pass\ndef test_b(): pass\n", encoding="utf-8")
-        nodes.extend(
-            f"tests/{name}::{case}" for case in ("test_a", "test_b")
-        )
+        nodes.extend(f"tests/{name}::{case}" for case in ("test_a", "test_b"))
     plan = handoff._build_plan(
         native_repository, nodes, isolated=(), shard_count=4
     )
-    assert [row["weight"] for row in plan["shards"]] == sorted(
-        (row["weight"] for row in plan["shards"]), reverse=True
-    ) or all(row["weight"] > 0 for row in plan["shards"])
+    assert sorted(row["weight"] for row in plan["shards"]) == sorted(
+        handoff._weight(f"tests/{name}", 2) for name in names
+    )
     observed = [
         node for row in plan["shards"] for node in row["native_nodeids"]
     ]
