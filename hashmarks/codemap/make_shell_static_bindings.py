@@ -15,8 +15,12 @@ if TYPE_CHECKING:
 
 MAX_BINDING_HOPS = 8
 _SIMPLE_ATOM = re.compile(r"[A-Za-z_0-9./+-]+", re.ASCII)
-_MAKE_REF = re.compile(r"\$\(([A-Za-z_][A-Za-z_0-9]*)\)|\$\{([A-Za-z_][A-Za-z_0-9]*)\}", re.ASCII)
-_SHELL_REF = re.compile(r'\$([A-Za-z_][A-Za-z_0-9]*)|\$\{([A-Za-z_][A-Za-z_0-9]*)\}', re.ASCII)
+_MAKE_REF = re.compile(
+    r"\$\(([A-Za-z_][A-Za-z_0-9]*)\)|\$\{([A-Za-z_][A-Za-z_0-9]*)\}", re.ASCII
+)
+_SHELL_REF = re.compile(
+    r"\$([A-Za-z_][A-Za-z_0-9]*)|\$\{([A-Za-z_][A-Za-z_0-9]*)\}", re.ASCII
+)
 
 
 def _definitions(facts: Sequence[_Fact]) -> dict[str, list[_Fact]]:
@@ -64,16 +68,18 @@ def _expression(fact: _Fact) -> str | None:
         return None
     value = fact.value.get("value_expression")
     if fact.kind == "make-variable-declaration":
-        if (
-            fact.value.get("assignment_operator") not in {":=", "::=", "="}
-            or fact.value.get("modifiers")
-        ):
+        if fact.value.get("assignment_operator") not in {
+            ":=",
+            "::=",
+            "=",
+        } or fact.value.get("modifiers"):
             return None
         return value.strip() if isinstance(value, str) else None
     if fact.value.get("modifier") not in {"", "export"}:
         return None
     expression = value.get("expression") if isinstance(value, dict) else None
     return expression if isinstance(expression, str) else None
+
 
 def _direct_reference(expression: str, language: str) -> str | None:
     if language == "shell" and expression.startswith('"') and expression.endswith('"'):
@@ -98,11 +104,7 @@ def _resolve(
     visited: frozenset[str] = frozenset(),
 ) -> tuple[str, tuple[_Fact, ...]] | None:
     candidates = definitions.get(name, [])
-    if (
-        name in visited
-        or len(visited) >= MAX_BINDING_HOPS
-        or len(candidates) != 1
-    ):
+    if name in visited or len(visited) >= MAX_BINDING_HOPS or len(candidates) != 1:
         return None
     fact = candidates[0]
     # Shell assignments expand immediately. Requiring earlier declarations for
@@ -124,6 +126,7 @@ def _resolve(
         visited=visited | {name},
     )
     return (upstream[0], (fact, *upstream[1])) if upstream is not None else None
+
 
 def _command_word(
     word: Mapping[str, object],
