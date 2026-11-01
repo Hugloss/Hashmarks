@@ -291,15 +291,17 @@ def main() -> int:
             + "\n"
         )
         return 0
-    if (
-        args.shard is None
-        or args.normal_output is None
-        or args.isolated_output is None
-        or args.expected_output is None
-        or args.shard < 0
-        or args.shard >= args.shards
+    if args.shard is None or not 0 <= args.shard < args.shards:
+        parser.error("emit requires a valid shard")
+    if any(
+        path is None
+        for path in (
+            args.normal_output,
+            args.isolated_output,
+            args.expected_output,
+        )
     ):
-        parser.error("emit requires a valid shard and both NUL output paths")
+        parser.error("emit requires all three NUL output paths")
     plan = _bound_plan(root, args.manifest, shard_count=args.shards)
     row = plan["shards"][args.shard]
     _nul(row["normal_args"], args.normal_output)
