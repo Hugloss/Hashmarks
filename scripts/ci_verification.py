@@ -25,6 +25,10 @@ BASELINE = (
     "tests/test_verification_nomination_validation.py",
     "tests/test_verification_selection_identity.py",
 )
+DOCUMENTATION_CHECKS = (
+    "tests/test_documentation_links.py",
+    "tests/test_publication_docs.py",
+)
 # A change to an authority or broadly shared toolchain cannot be covered by
 # a bounded source-to-test nomination. Keep the entire real suite in the PR.
 BROAD_PATHS = frozenset(
@@ -222,7 +226,7 @@ def _classify_changes(
         if path in BROAD_PATHS or path.startswith(BROAD_PREFIXES):
             full_reasons.append(f"broad-authority:{path}")
         elif _documentation(path):
-            continue
+            tests.update(DOCUMENTATION_CHECKS)
         elif _test_file(path):
             tests.add(path)
         elif _source_file(path) and (root / path).is_file():

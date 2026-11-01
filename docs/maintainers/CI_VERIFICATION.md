@@ -25,6 +25,10 @@ exact source, even if the daily run previously passed.
 - `make test`: execute the complete native suite explicitly.
 - `make test-profile`: obtain pytest duration diagnostics for further optimization.
 
+Documentation changes explicitly run the native Markdown-link and publication-
+documentation contract tests in addition to the small mandatory baseline.
+A documentation-only change does not need a CodeMap query.
+
 The selection plan is JSON, bound to base SHA, effective checkout SHA, changed
 paths and a deterministic plan digest. CI preserves it as a run artifact. A
 `focused` plan is an **admission to run a subset**, not a completed verification
