@@ -409,7 +409,7 @@ def test_shell_indirection_uses_only_prior_top_level_single_atoms(
             True,
         ),
         (
-            "RUNNER=python\nmutate() { RUNNER=evil; }\n\"$RUNNER\" arg\n",
+            'RUNNER=python\nmutate() { RUNNER=evil; }\n"$RUNNER" arg\n',
             False,
         ),
         ("RUNNER ?= python\nall:\n\t$(RUNNER) arg\n", True),
