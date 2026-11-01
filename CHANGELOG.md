@@ -1,6 +1,8 @@
 # Changelog
 
-## 0.34.0 — Repository asset and changed-set evidence
+## 0.34.1 — Repository asset evidence and reliable Windows reinstallation
+
+- Preserve an existing Windows executable when it already matches the fully verified release bytes, including while another reader denies deletion. Candidate checksum and requested-version checks still run, and different installed bytes still use the normal replacement path.
 
 - Observe bounded text/binary content, media signatures and Git LFS pointer declarations through the existing Source member authority. Keep declared object identity distinct from observed pointer bytes without downloading objects or validating image integrity.
 - Compose source-bound asset references from supported Markdown links and literal Python file reads. Preserve literal-only occurrences, repository roles, incomplete source coverage, explicit bounds and unknown dynamic consumers; execution and documentation policy remain external.

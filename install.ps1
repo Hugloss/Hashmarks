@@ -184,7 +184,15 @@ try {
         throw "hashmarks installer: requested version $requestedVersion but downloaded binary reports $reportedVersion"
     }
 
-    if (Test-Path -LiteralPath $target) {
+    if (
+        (Test-Path -LiteralPath $target) -and
+        ((Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash -ieq $expected)
+    ) {
+        # Candidate verification still precedes this no-op. An existing reader
+        # must not force replacement of the exact release bytes already present.
+        Write-Verbose "Verified release bytes already installed: $target"
+    }
+    elseif (Test-Path -LiteralPath $target) {
         $backup = "$target.hashmarks-backup"
         if (Test-Path -LiteralPath $backup) {
             Remove-Item -LiteralPath $backup -Force
