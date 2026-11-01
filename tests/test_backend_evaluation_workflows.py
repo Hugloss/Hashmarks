@@ -545,9 +545,10 @@ def test_stage_display_failure_regrades_retained_real_cli_bytes_without_recaptur
         "scripts.repository_evaluation.backend_workflows.capture_mcp", forbidden
     )
     regraded = regrade_task_workflow(observed, workflow, rule, sources)
-    assert regraded["gates"]["facts"] is True
-    assert regraded["gates"]["cli"] is False
-    assert regraded["gates"]["presentation"] is False
+    gates = assert_object(regraded["gates"])
+    assert gates["facts"] is True
+    assert gates["cli"] is False
+    assert gates["presentation"] is False
     witnesses = []
     for stage in ("before", "after"):
         witnesses.extend(
