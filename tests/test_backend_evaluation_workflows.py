@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
@@ -121,6 +122,47 @@ def observed_api_workflow(
     )
     assert report["outcomes"][0]["receipt_reused"] is False
     assert (output / "handler/observations/before/api.json").is_file()
+    return suite_path, sources, output, report
+
+
+@pytest.fixture
+def isolated_api_workflow(
+    observed_api_workflow: tuple[Path, dict[str, Path], Path, dict[str, Any]],
+    tmp_path: Path,
+) -> tuple[Path, dict[str, Path], Path]:
+    """Clone immutable source proofs and artifacts before any destructive test."""
+    suite, sources, observed, _report = observed_api_workflow
+    frozen = tmp_path / "frozen"
+    frozen.mkdir()
+    shutil.copy2(suite, frozen / "suite.json")
+    shutil.copy2(suite.with_name("grader.json"), frozen / "grader.json")
+    output = tmp_path / "measure"
+    shutil.copytree(observed, output)
+    return frozen / "suite.json", sources, output
+
+
+@pytest.fixture(scope="module")
+def observed_cli_workflow(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> tuple[Path, dict[str, Path], Path, dict[str, Any]]:
+    """Retain one genuine CLI transport capture for independent grading tests."""
+    root = tmp_path_factory.mktemp("observed-backend-cli")
+    suite_path, sources = _make_corpus(root)
+    output = root / "observed"
+    report = run_backend(
+        sources=sources,
+        suite_path=suite_path,
+        output_dir=output,
+        transports=("cli",),
+    )
+    assert report["outcomes"][0]["receipt_reused"] is False
+    captured = output / "handler/observations/before/initial/cli.json"
+    assert {row["format"] for row in json.loads(captured.read_text())} == {
+        "none",
+        "structured",
+        "compact",
+        "text",
+    }
     return suite_path, sources, output, report
 
 
@@ -1459,20 +1501,14 @@ def test_initial_is_the_first_public_task_request_at_each_revision(
 
 
 def test_regrading_rejects_a_passing_summary_without_artifact_proof(
-    corpus: tuple[Path, dict[str, Path]], tmp_path: Path
+    observed_cli_workflow: tuple[Path, dict[str, Path], Path, dict[str, Any]],
 ) -> None:
     from scripts.repository_evaluation.backend_regrading import verify_task_summary
 
-    suite_path, sources = corpus
-    report = run_backend(
-        sources=sources,
-        suite_path=suite_path,
-        output_dir=tmp_path / "result",
-        transports=("cli",),
-    )
+    suite_path, sources, output, report = observed_cli_workflow
     suite, grader = load_corpus(suite_path, sources)
-    outcome = report["outcomes"][0]
-    root = tmp_path / "result/handler/observations"
+    outcome = deepcopy(report["outcomes"][0])
+    root = output / "handler/observations"
     verify_task_summary(
         root, suite["workflows"][0], grader["cases"]["handler"], sources, outcome
     )
@@ -1484,19 +1520,15 @@ def test_regrading_rejects_a_passing_summary_without_artifact_proof(
 
 
 def test_regrading_recomputes_actual_visible_size(
-    corpus: tuple[Path, dict[str, Path]], tmp_path: Path
+    observed_cli_workflow: tuple[Path, dict[str, Path], Path, dict[str, Any]],
+    tmp_path: Path,
 ) -> None:
     from scripts.repository_evaluation.backend_regrading import verify_task_summary
 
-    suite_path, sources = corpus
-    report = run_backend(
-        sources=sources,
-        suite_path=suite_path,
-        output_dir=tmp_path / "result",
-        transports=("cli",),
-    )
+    suite_path, sources, output, report = observed_cli_workflow
     suite, grader = load_corpus(suite_path, sources)
-    root = tmp_path / "result/handler/observations"
+    root = tmp_path / "observations"
+    shutil.copytree(output / "handler/observations", root)
     path = root / "before/initial/cli.json"
     captures = json.loads(path.read_text())
     captures[0]["estimated_tokens"] = 0
@@ -1527,18 +1559,35 @@ def test_correct_source_digest_cannot_qualify_wrong_symbol_name(
         load_corpus(suite_path, sources)
 
 
+def test_isolated_api_capture_is_source_bound_before_tampering(
+    isolated_api_workflow: tuple[Path, dict[str, Path], Path],
+    tmp_path: Path,
+) -> None:
+    """A copied positive capture must still qualify before destructive edits."""
+    from scripts.repository_evaluation.aggregate_backend import aggregate_backend
+
+    suite_path, sources, output = isolated_api_workflow
+    report = aggregate_backend(
+        campaign_path=_campaign_for_fixture(suite_path),
+        sources=sources,
+        selections={"fixture": {"workflow_report": str(output / "summary.json")}},
+        output_dir=tmp_path / "aggregate",
+    )
+    assert report["input_integrity"]["state"] == "PASS"
+    assert report["missing_workflow_reports"] == []
+    assert report["outcomes"][0]["gates"]["facts"] is True
+
+
 @pytest.mark.parametrize("mutation", ["summary", "artifact", "observer", "campaign"])
 def test_aggregate_rejects_unbound_or_modified_evidence(
-    corpus: tuple[Path, dict[str, Path]], tmp_path: Path, mutation: str
+    isolated_api_workflow: tuple[Path, dict[str, Path], Path],
+    tmp_path: Path,
+    mutation: str,
 ) -> None:
     from scripts.repository_evaluation.aggregate_backend import aggregate_backend
 
-    suite_path, sources = corpus
+    suite_path, sources, output = isolated_api_workflow
     campaign = _campaign_for_fixture(suite_path)
-    output = tmp_path / "measure"
-    run_backend(
-        sources=sources, suite_path=suite_path, output_dir=output, transports=()
-    )
     if mutation == "artifact":
         (output / "handler/observations/before/api.json").write_text("{}")
     elif mutation == "campaign":
