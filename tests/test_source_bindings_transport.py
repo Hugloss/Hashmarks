@@ -111,6 +111,7 @@ def test_cli_binding_projection_preserves_exact_native_packet(
     value = assert_object(json.loads(result.stdout))
     if presentation == "compact":
         assert value["schema"] == "hashmarks.evidence-presentation-envelope.v1"
+        assert assert_object(value["presentation"])["supported"] is True
         value = assert_object(value["result"])
     assert value == expected
     assert value["schema"] == "hashmarks.source-bindings.v1"

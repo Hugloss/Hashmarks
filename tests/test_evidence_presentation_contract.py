@@ -264,6 +264,11 @@ def native_packets(
                 "ecmascript",
                 codemap.source.ecmascript("src/observed.ts"),
             ),
+            (
+                "source_observation",
+                "bindings",
+                codemap.source.bindings(paths[0]),
+            ),
             ("repository_evidence", "observation", binding),
             (
                 "repository_evidence",
