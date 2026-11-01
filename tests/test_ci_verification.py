@@ -64,7 +64,7 @@ def _change(root: Path, path: str, content: str) -> None:
     )
 
 
-def _unreachable(*args: Any) -> None:
+def _unreachable(*args: object) -> None:
     raise AssertionError("CodeMap should not run for this change")
 
 
