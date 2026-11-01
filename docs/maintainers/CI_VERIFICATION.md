@@ -29,9 +29,32 @@ Documentation changes explicitly run the native Markdown-link and publication-
 documentation contract tests in addition to the small mandatory baseline.
 A documentation-only change does not need a CodeMap query.
 
-The fast gate first runs a small selector self-test using real CodeMap on a
-controlled source-to-verifier repository. A selector regression fails before
-the broader native pytest selection begins; it does not replace that proof.
+The native admission gate first runs a small selector self-test using real
+CodeMap on a controlled source-to-verifier repository. A selector regression
+fails before the broader native pytest selection begins; it does not replace
+that proof.
+
+### Parallel independent checks and full-suite admission
+
+The required PR workflow has two independent jobs on **the same exact checkout**:
+the static/artifact gate runs locked dependency checks, compile, Ruff, typing,
+release-request validation, genuine wheel/sdist installation and installed MCP
+SDK smoke; the native admission gate runs real CodeMap selector regressions,
+high-impact early pytest probes, scoped native pytest or SHA-bound full-suite
+collection and dispatch evidence. GitHub Actions can start both jobs together
+instead of serializing ~40–50 seconds of static checks before shard planning.
+
+Full-suite shards depend only on successful native admission, but **every**
+shard, the static/artifact gate, and native admission must succeed before the
+existing `Qualification convergence` status becomes green. A failure, skip,
+cancel or missing required gate cannot be treated as success. Focused changes
+retain the same native test membership; all releases/nightly qualification
+stay independent. The concurrency adjustment only moves externally controlled
+GitHub Actions steps: Hashmarks does not acquire execution or result authority.
+
+Measure the total run and critical path on successful source and broad CI PRs.
+Extra GitHub runner startup can offset the expected gain, so this parallelism
+is an observed timing hypothesis, not an automatic performance claim.
 
 For broad/shared verification changes, the consumer also executes a bounded
 critical regression cohort **before** the full native pytest suite. The cohort
