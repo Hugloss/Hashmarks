@@ -319,9 +319,9 @@ def _early_tests(root: Path, changed: tuple[str, ...], *, full: bool) -> list[st
     )
     priority = list(CRITICAL_VERIFICATION_TESTS) if critical_change else []
     priority.extend(path for path in changed if _test_file(path))
-    return [
-        path for path in dict.fromkeys(priority) if (root / path).is_file()
-    ][:EARLY_TEST_LIMIT]
+    return [path for path in dict.fromkeys(priority) if (root / path).is_file()][
+        :EARLY_TEST_LIMIT
+    ]
 
 
 def select(
@@ -392,7 +392,9 @@ def main() -> int:
     if args.early_output is not None:
         args.early_output.parent.mkdir(parents=True, exist_ok=True)
         args.early_output.write_bytes(
-            b"".join(path.encode("utf-8") + b"\0" for path in plan["early_pytest_paths"])
+            b"".join(
+                path.encode("utf-8") + b"\0" for path in plan["early_pytest_paths"]
+            )
         )
     # NUL-delimited argument transport: never use shell interpolation for test selectors.
     for path in plan["pytest_paths"]:
