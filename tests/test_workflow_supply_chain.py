@@ -448,9 +448,11 @@ def test_every_release_workflow_job_has_a_bounded_timeout() -> None:
 
 def test_ci_checkout_does_not_persist_git_credentials() -> None:
     for name in ("ci.yml", "full-qualification.yml"):
-        lines = (_root() / ".github" / "workflows" / name).read_text(
-            encoding="utf-8"
-        ).splitlines()
+        lines = (
+            (_root() / ".github" / "workflows" / name)
+            .read_text(encoding="utf-8")
+            .splitlines()
+        )
         checkout_indexes = [
             index for index, line in enumerate(lines) if "actions/checkout@" in line
         ]
@@ -463,9 +465,7 @@ def test_ci_checkout_does_not_persist_git_credentials() -> None:
 
 
 def test_fast_ci_remains_a_native_pytest_gate() -> None:
-    fast = (_root() / ".github" / "workflows" / "ci.yml").read_text(
-        encoding="utf-8"
-    )
+    fast = (_root() / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     assert "  pull_request:" in fast
     assert "  merge_group:" in fast
     assert "name: Qualification convergence" in fast
