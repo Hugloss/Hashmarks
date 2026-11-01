@@ -108,11 +108,14 @@ presentation format. The same CLI request must continue to invoke the
 installed public command through a real subprocess, with current source,
 state, output, presentation, and command validation.
 
-Importing the CLI dispatcher no longer eagerly imports the *identity
-engine or identity daemon* used by separate `snapshot`, `observe-inputs`,
-`stats`, `doctor`, and `daemon serve` command families. The identity
-mode enum has one lightweight public owner in `hashmarks.client`, with
-`hashmarks.identity` retaining the existing public re-export.
+Importing the Hashmarks package and CLI dispatcher no longer eagerly imports
+the *identity engine or identity daemon* used by separate `snapshot`, `observe-inputs`,
+`stats`, `doctor`, and `daemon serve` command families. The identity mode enum has one lightweight public owner in `hashmarks.client`,
+with `hashmarks.identity` retaining the existing public re-export. The
+package root retains its original `RepositoryIdentity` and
+`RepositoryIdentityMode` public names via its already-established lazy
+import contract, so simply importing the package does not defeat the
+dispatcher's import firewall.
 The identity/daemon implementations are imported only by their native
 command handlers. This shortens unrelated CLI startup without adding
 new command paths, changing repository intelligence, or skipping

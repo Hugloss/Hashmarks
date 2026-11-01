@@ -5,12 +5,13 @@ from __future__ import annotations
 import subprocess
 import sys
 
+from hashmarks import RepositoryIdentityMode as PublicMode
 from hashmarks.client import RepositoryIdentityMode as ClientMode
 from hashmarks.identity import RepositoryIdentityMode as FacadeMode
 
 
 def test_identity_modes_are_a_single_public_contract() -> None:
-    assert ClientMode is FacadeMode
+    assert ClientMode is FacadeMode is PublicMode
     assert [mode.value for mode in ClientMode] == ["auto", "local", "daemon"]
 
 
@@ -29,6 +30,11 @@ def test_cli_dispatch_import_keeps_identity_engine_and_daemon_lazy() -> None:
         "    raise AssertionError('expected argparse --version exit')\n"
         "assert 'hashmarks.engine' not in sys.modules\n"
         "assert 'hashmarks.daemon' not in sys.modules\n"
+        "import hashmarks\n"
+        "assert hashmarks.RepositoryIdentityMode is cli.RepositoryIdentityMode\n"
+        "assert 'hashmarks.engine' not in sys.modules\n"
+        "assert hashmarks.RepositoryIdentity.__name__ == 'RepositoryIdentity'\n"
+        "assert 'hashmarks.engine' in sys.modules\n"
     )
     result = subprocess.run(
         [sys.executable, "-c", code],

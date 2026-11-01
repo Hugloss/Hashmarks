@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING, Any
 from ._version import __version__
 from .digest import Digest, hash_bytes, hash_file
 from .graph import IdentityCycleError, IdentityGraph
-from .identity import RepositoryIdentity, RepositoryIdentityMode
 from .inputs import InputManifest, resolve_inputs
 from .observation import (
     ChangeSnapshot,
@@ -37,6 +36,9 @@ from .specs import (
 )
 
 if TYPE_CHECKING:
+    from .client import RepositoryIdentityMode as RepositoryIdentityMode
+    from .identity import RepositoryIdentity as RepositoryIdentity
+
     from .codemap import (
         CodeMap as CodeMap,
     )
@@ -110,7 +112,15 @@ __all__ = [
 
 
 def __getattr__(name: str) -> object:
-    """Lazily expose CodeMap APIs without loading the analysis graph eagerly."""
+    """Lazily expose component APIs without loading unrelated engines eagerly."""
+    if name == "RepositoryIdentity":
+        from .identity import RepositoryIdentity
+
+        return RepositoryIdentity
+    if name == "RepositoryIdentityMode":
+        from .client import RepositoryIdentityMode
+
+        return RepositoryIdentityMode
     if name == "CodeMap":
         from .codemap import CodeMap
 
