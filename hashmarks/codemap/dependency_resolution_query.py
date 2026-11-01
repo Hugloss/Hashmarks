@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import cast
+
+from .dependency_resolution_contract import normalized_text
 
 MAX_QUERIES = 32
 MAX_RESULTS = 256
@@ -342,6 +345,195 @@ def dependency_inventory_assessment(
             else "unknown"
         ),
     }
+
+
+def _package_selector(
+    observation: Mapping[str, object], selector: Mapping[str, object]
+) -> dict[str, str]:
+    if not isinstance(selector, Mapping):
+        raise ValueError("dependency package selector must be an object")
+    if set(selector) - {"ecosystem", "name", "version", "context"}:
+        raise ValueError("unknown dependency package selector field")
+    requested = {
+        field: normalized_text(
+            selector.get(field), label=f"dependency package {field}", required=True
+        )
+        for field in ("ecosystem", "name", "version", "context")
+        if field in selector or field in {"ecosystem", "name"}
+    }
+    if "context" in requested and requested["context"] not in cast(
+        "Sequence[str]", observation["contexts"]
+    ):
+        raise ValueError(f"unknown dependency package context: {requested['context']}")
+    return requested
+
+
+def _package_match(
+    observation: Mapping[str, object],
+    component: Mapping[str, object],
+    selection: Mapping[str, object],
+    contexts: set[str],
+    max_results: int,
+) -> dict[str, object]:
+    node_id = selection["node_id"]
+    evidence = {
+        "inventory": [
+            row
+            for row in cast("Sequence[Mapping[str, object]]", observation["inventory"])
+            if row["node_id"] == node_id and row["context"] in contexts
+        ],
+        "relationships": [
+            row
+            for row in cast(
+                "Sequence[Mapping[str, object]]", observation["relationships"]
+            )
+            if node_id in (row["source"], row["target"]) and row["context"] in contexts
+        ],
+        "module_ownership": [
+            row
+            for row in cast(
+                "Sequence[Mapping[str, object]]", observation["module_ownership"]
+            )
+            if node_id in cast("Sequence[str]", row["owners"])
+            and row["context"] in contexts
+        ],
+    }
+    return {
+        "component": dict(component),
+        "selection": dict(selection),
+        **{kind: rows[:max_results] for kind, rows in evidence.items()},
+        "omitted": {
+            kind: max(0, len(rows) - max_results) for kind, rows in evidence.items()
+        },
+    }
+
+
+def _package_inventory_contexts(
+    observation: Mapping[str, object],
+    contexts: set[str],
+    node_ids: set[str],
+    max_results: int,
+) -> list[dict[str, object]]:
+    inventory = cast("Sequence[Mapping[str, object]]", observation["inventory"])
+    coverage = dependency_inventory_assessment(observation)
+    result: list[dict[str, object]] = []
+    for row in cast("Sequence[Mapping[str, object]]", coverage["contexts"]):
+        context = str(row["context"])
+        if context not in contexts:
+            continue
+        matches = sorted(
+            {
+                str(item["node_id"])
+                for item in inventory
+                if item["context"] == context and item["node_id"] in node_ids
+            }
+        )
+        complete = _coverage_complete(
+            observation, context=context, kind="resolved-inventory"
+        )
+        result.append(
+            {
+                **row,
+                "membership": "present"
+                if matches
+                else "absent"
+                if complete
+                else "unknown",
+                "matching_inventory_count": len(matches),
+                "matching_inventory_node_ids": matches[:max_results],
+                "omitted_inventory_nodes": max(0, len(matches) - max_results),
+                "negative_evidence": (
+                    "not-applicable"
+                    if matches
+                    else "admissible-within-declared-scope"
+                    if complete
+                    else "not-admissible"
+                ),
+                "scope": "declared-resolved-inventory",
+            }
+        )
+    return result
+
+
+def dependency_package_query(
+    observation: Mapping[str, object],
+    selector: Mapping[str, object],
+    *,
+    max_results: int = 100,
+) -> dict[str, object]:
+    """Project exact package claims from a qualified retained dependency endpoint.
+
+    Coverage belongs to the supplied observation. The public projection qualifies
+    current source correspondence separately; this helper never resolves packages
+    or treats a bounded selection projection as an inventory absence proof.
+    """
+    _bounds({"max_results": max_results})
+    requested = _package_selector(observation, selector)
+    contexts = (
+        {requested["context"]}
+        if "context" in requested
+        else set(cast("Sequence[str]", observation["contexts"]))
+    )
+    components = {
+        str(row["component_id"]): row
+        for row in cast("Sequence[Mapping[str, object]]", observation["components"])
+        if row["ecosystem"] == requested["ecosystem"]
+        and row["name"] == requested["name"]
+    }
+    selections = [
+        row
+        for row in cast("Sequence[Mapping[str, object]]", observation["selections"])
+        if row["component_id"] in components
+        and ("version" not in requested or row["version"] == requested["version"])
+        and contexts.intersection(cast("Sequence[str]", row["contexts"]))
+    ]
+    matches = [
+        _package_match(
+            observation,
+            components[str(row["component_id"])],
+            row,
+            contexts,
+            max_results,
+        )
+        for row in selections[:max_results]
+    ]
+    inventory = _package_inventory_contexts(
+        observation, contexts, {str(row["node_id"]) for row in selections}, max_results
+    )
+    truncated = (
+        len(selections) > max_results
+        or any(
+            any(cast("Mapping[str, int]", row["omitted"]).values()) for row in matches
+        )
+        or any(row["omitted_inventory_nodes"] for row in inventory)
+    )
+    return deepcopy(
+        {
+            "selector": requested,
+            "match_count": len(selections),
+            "matches": matches,
+            "ambiguity": {
+                "multiple_selections": len(selections) > 1,
+                "multiple_versions": len({row["version"] for row in selections}) > 1,
+                "multiple_contexts": len(
+                    {
+                        context
+                        for row in selections
+                        for context in cast("Sequence[str]", row["contexts"])
+                        if context in contexts
+                    }
+                )
+                > 1,
+                "uniqueness": "not-established",
+            },
+            "contexts": inventory,
+            "truncation": "truncated" if truncated else "complete",
+            "bounds": {"max_results": max_results},
+            "evidence_scope": "retained-dependency-observation",
+            "authority": "qualified-external-observation",
+            "producer_authority": "caller-claimed",
+        }
+    )
 
 
 def dependency_query(  # noqa: C901, PLR0912, PLR0914, PLR0915

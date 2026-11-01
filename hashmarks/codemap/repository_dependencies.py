@@ -10,6 +10,7 @@ from hashmarks.freshness import freshness_state
 
 from .decision_session import ReadScopeOwner
 from .dependency_consumers import DependencyConsumersMixin
+from .dependency_projection import DependencyProjectionMixin
 from .dependency_resolution_delta import DependencyResolutionDeltaMixin
 from .dependency_resolution_derivation import DependencyResolutionDerivationMixin
 from .dependency_resolution_evidence import DependencyResolutionEvidenceMixin
@@ -24,6 +25,7 @@ if TYPE_CHECKING:
 
 
 class RepositoryDependencies(
+    DependencyProjectionMixin,
     DependencyConsumersMixin,
     DependencyResolutionEvidenceMixin,
     DependencyResolutionDeltaMixin,

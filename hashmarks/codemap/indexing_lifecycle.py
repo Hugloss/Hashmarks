@@ -279,6 +279,7 @@ class RepositoryIndex(IndexWatchMixin):
         return {
             "schema": _ANALYSIS_SCOPE_CONFORMANCE_SCHEMA,
             "pruned_segments": sorted(repository_file_discovery._PRUNE_DIRS),
+            "source_languages": dict(sorted(SOURCE_LANGUAGES.items())),
             "policy_fingerprint": self.files.policy_fingerprint(),
             "internal_state_path": self.files.internal_state_path or "",
         }

@@ -53,6 +53,24 @@ retains physical command projection, grouping, environment, timeout, execution
 and result authority in its existing execution path. This producer API creates
 no second execution path in either repository.
 
+## Dependency producer projection
+
+Use `codemap.dependencies.projection(observation, packages=..., source_paths=...)`
+for `hashmarks.dependency-projection.v1`, then pass the retained complete packet
+to `codemap.dependencies.requalify(packet)` when current evidence is needed.
+Hashmarks preserves the original dependency and source claims, qualifies current
+scoped inventory membership and absence, and reports whether a current
+source-consumer join is available. OH-Goon does not reconstruct those meanings
+from internal dependency tables or CodeMap storage.
+
+The [producer contract](../reference/DEPENDENCY_PROJECTION.md) covers Python
+distribution metadata, supplied npm lock evidence, native source consumers,
+contexts, incomplete capability and explicit bounds. A bounded empty projection
+cannot establish absence. A stale dependency/graph binding cannot be refreshed by
+rewriting its repository identity or retained member revisions. OH-Goon retains
+its own artifact retention, evidence admission, command/environment projection,
+execution results and certification authority.
+
 ## Agent responsibilities remain external
 
 Hashmarks may expose repository ambiguity, alternative candidates, likely repair surfaces, and verification relevance. It does not own:

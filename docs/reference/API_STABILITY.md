@@ -211,7 +211,8 @@ root operations are removed.
 
 Dependencies use `CodeMap.dependencies.observe()`, `.codemap()`, `.queries()`,
 `.import_correspondence()`, `.correlation()`, `.delta()`, `.derivation_authority()`,
-`.explain()` and `.consumers()`. `RepositoryDependencies` owns the existing internal
+`.explain()`, `.assessment()`, `.consumers()`, `.projection()` and `.requalify()`.
+`RepositoryDependencies` owns the existing internal
 dependency observation, correlation, derivation and endpoint-comparison
 implementations. It borrows Source, Imports, repository Correlation and
 Relationships directly; it has no Tasks or root dependency. Producer syntax remains
@@ -223,6 +224,17 @@ Every input must share the same Source read scope; a foreign relationship owner
 is rejected before observation. The existing Relationships owner supplies bounded
 downstream import observations instead of a second dependency-impact graph.
 Ordinary `CodeMap(...)` construction and `CodeMap.dependencies` access are unchanged.
+
+`projection(observation, *, packages, source_paths=(), limit=100, max_depth=8)` and
+`requalify(projection)` return the same registered
+`hashmarks.dependency-projection.v1` contract. The original qualified v3 observation
+and source-member baseline remain unchanged; current scoped inventory and source
+consumer qualification are explicit separate fields. The supported npm adapter
+is `hashmarks.adapters.npm_lock_dependency_observation`. Python distribution
+metadata and native npm namespace evidence use the existing consumer owner.
+See [Dependency projection](DEPENDENCY_PROJECTION.md) for exact bounds, scope and
+unknown/unsupported behavior. These are direct Python APIs, with no new service,
+CLI or MCP routes.
 
 `RepositoryIdentity.observe_directory()` is a local-only contents observation
 with native `snapshot("*")` identity and separately named physical materialization

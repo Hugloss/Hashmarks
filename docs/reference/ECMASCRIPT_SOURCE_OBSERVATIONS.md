@@ -1,6 +1,6 @@
 # ECMAScript source syntax observations
 
-`CodeMap.source.ecmascript()` observes import aliases, binding initializers,
+`CodeMap.source.ecmascript()` observes static module declarations, import aliases, binding initializers,
 object destructuring, assignments, property access, and call sites in one
 admitted JavaScript or TypeScript member. The facts come from the existing
 native syntax provider and Source's canonical stable byte capture. This operation
@@ -28,11 +28,21 @@ limit (default 200, maximum 500); MCP retains its existing limit of 50 results.
 
 ## Supported syntax and native capability
 
-The supported filename suffixes are `.js`, `.jsx`, `.ts`, and `.tsx`, using the
+The supported filename suffixes are `.js`, `.jsx`, `.mjs`, `.cjs`, `.ts`, `.tsx`,
+`.mts`, and `.cts`, using the
 existing source-language owner. JavaScript and JSX use the native `javascript`
 grammar; TypeScript uses `typescript`, and TSX uses `tsx`. Other suffixes return
 `unsupported-source-language`. This API does not guess a language from file
-contents.
+contents. Changes to the canonical language mapping participate in the existing
+index analysis-scope conformance, so reopening an older index discovers newly
+supported members through the normal reconciliation path.
+
+`module-declaration` facts preserve static imports, including side-effect imports,
+and re-exports, including export-star declarations. They carry the exact module
+literal, declaration kind, native byte range, syntax context and type-only status.
+Escaped or clipped module literals remain unresolved. These facts support the
+existing [dependency consumer projection](DEPENDENCY_PROJECTION.md); they do not
+resolve a package, TypeScript path mapping, export condition or runtime loader.
 
 Install the optional syntax extra, `hashmarks[syntax]`, to supply the supported
 native grammar package. The configured CodeMap range provider must expose native

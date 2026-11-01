@@ -63,6 +63,7 @@ introduce a dispatcher, interface registry or additional repository authority.
 | Repository declarations | `repository_declarations.py::RepositoryDeclarations`, exposed by `CodeMap.declarations` | Owns the existing declaration observation, discovery, derivation and explanation implementations. It borrows Bindings, with Source/Files/read scope from that same owner. Provider selection is call-local; previous observations affect only comparison. No provider foreign keys, inferred correspondence, semantic graph or retained provider state are introduced. |
 | Public declaration source selection | `repository_declaration_selection.py::source_declaration_providers` | Translates explicit CLI/MCP source selections into existing backend/interface providers. It validates the request shape, then delegates path/name/semantic bounds to those producers. It reads no source, keeps no state, and owns no syntax, discovery registry or evidence authority. |
 | Dependency observations | `repository_dependencies.py::RepositoryDependencies`, exposed by `CodeMap.dependencies` | Owns the existing internal dependency observation, correlation, derivation, comparison and bounded source-consumer implementations. It borrows Source, qualified Imports, repository Correlation and advisory Relationships within one read scope. Producer syntax terminates in adapters; semantic authority, physical source kind, completeness and coverage stay distinct. There is no root/task dependency or resolver execution. |
+| Dependency consumer projection | `dependency_projection.py::DependencyProjectionMixin`, within `RepositoryDependencies` | Composes existing qualified dependency queries, scoped assessment, native Source and consumer observations. Requalification validates the retained envelope before source reads, preserves the original v3 binding/member baseline, and rechecks all nominated inputs. Current membership is separate from historical coverage; current consumer joins retain the strict original graph binding. It stores no history and owns no resolver, new graph or execution policy. |
 | Changed-path composition and reuse | `repository_changes.py::RepositoryChanges`, exposed by `CodeMap.changes` | Owns existing impact, refresh, post-change, brief, freshness, snapshot and delta implementations. It borrows Tasks and Relationships, with Source/Index from the same task owner. Snapshot and impact memos belong to one exact read scope. Compositions bind the first qualified input generation and reject publication drift; cached snapshots validate that same binding before return. Explicit endpoint comparison never recollects another current endpoint. |
 | Cross-repository projection | `cross_repository_evidence.py::RepositoryCrossRepository`, exposed by `CodeMap.cross_repository` | Consumes Changes and its exact task facts. Caller-nominated boundaries, identities and explicit relationships remain evidence; no service discovery, inferred graph or lifecycle state is introduced. |
 | Evidence economics | `intelligence_economics.py::RepositoryEconomics`, exposed by `CodeMap.economics` | Consumes one Changes snapshot and the pure profile projection. Optional delta economics compare that same endpoint; invalid retained input rejects before current observation. Byte measurements do not choose execution, retries, schedules or certification. |
@@ -227,6 +228,14 @@ The adapter does not invoke uv, synchronize an environment, inspect dependency i
 The lock is qualified as resolution/inventory evidence, not installed-import ownership evidence. Absence of module ownership in a lock therefore does not become a negative module-ownership claim. Repository binding remains explicit through `repository_inputs`; the adapter does not infer source equivalence from nearby manifest files.
 
 ## Orthogonal state rule
+
+The npm lock adapter translates supplied v2/v3 installation metadata into the
+same dependency facts. Native install namespaces supply positive candidate
+ownership; explicit aliases preserve component identity separately. Unsupported
+local/workspace/link entries reduce coverage. `dependency_consumers.py` composes
+native Python or ECMAScript source facts and the existing import/relationship
+owners; it does not resolve npm runtime, subpath, workspace or TypeScript aliases.
+See [Dependency projection](DEPENDENCY_PROJECTION.md) for the public contract.
 
 Do not overload one field with multiple axes.
 

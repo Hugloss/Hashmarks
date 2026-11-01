@@ -204,6 +204,7 @@ class RepositorySource(
         visibility = (
             str(row.get("evidence_visibility") or decision.evidence_visibility.value)
             if row is not None
+            and decision.evidence_visibility is EvidenceVisibility.SOURCE
             else decision.evidence_visibility.value
         )
         indexed_revision = str(row.get("file_digest") or "") if row is not None else ""
@@ -494,6 +495,10 @@ class RepositorySource(
         self, relpath: str, max_bytes: int
     ) -> tuple[dict[str, object], bytes | None]:
         """Enforce the source budget while reusing canonical member authority."""
+        # Standalone retained-evidence reads do not enter an indexing read scope.
+        # Observe current admission without publishing a replacement generation.
+        if self.reads.depth == 0:
+            self.files.refresh_policy()
         candidate = self._repository_member_source(relpath)
         if isinstance(candidate, dict):
             return candidate, None
