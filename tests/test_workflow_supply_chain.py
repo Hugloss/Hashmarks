@@ -30,6 +30,12 @@ def test_external_github_actions_are_immutable_sha_pinned() -> None:
     assert not offenders, "mutable/unpinned workflow actions:\n" + "\n".join(offenders)
 
 
+def _full_workflow_text() -> str:
+    return (_root() / ".github" / "workflows" / "full-qualification.yml").read_text(
+        encoding="utf-8"
+    )
+
+
 def _publish_workflow_text() -> str:
     return (_root() / ".github" / "workflows" / "publish.yml").read_text(
         encoding="utf-8"
@@ -175,17 +181,18 @@ def test_release_request_is_a_minimal_auditable_version_trigger() -> None:
 def test_changed_release_request_is_checked_before_merge() -> None:
     text = (_root() / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     fast_gate = text.split("  fast-gate:\n", 1)[1].split(
-        "\n  authority-diagnostics:\n", 1
+        "\n  qualification-convergence:\n", 1
     )[0]
     assert (
-        'git diff --quiet "$BASE_SHA" HEAD -- .github/release-request.toml' in fast_gate
+        'git diff --quiet "$PR_BASE_SHA" HEAD -- .github/release-request.toml'
+        in fast_gate
     )
-    assert 'validate-release-candidate --base-ref "$BASE_SHA"' in fast_gate
+    assert 'validate-release-candidate --base-ref "$PR_BASE_SHA"' in fast_gate
 
 
 def test_standalone_workflows_consume_one_build_owner() -> None:
     workflows = (
-        _root() / ".github" / "workflows" / "ci.yml",
+        _root() / ".github" / "workflows" / "full-qualification.yml",
         _root() / ".github" / "workflows" / "publish.yml",
     )
 
@@ -198,7 +205,7 @@ def test_standalone_workflows_consume_one_build_owner() -> None:
 
 
 def test_ci_qualifies_native_linux_wsl_and_windows_install_paths() -> None:
-    text = (_root() / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    text = _full_workflow_text()
     linux = text.split("  standalone-artifact:\n", 1)[1].split(
         "\n  standalone-windows-artifact:\n",
         1,
@@ -268,7 +275,7 @@ def test_publish_requires_native_linux_wsl_and_windows_release_identity() -> Non
 
 
 def test_ci_rehearses_cross_job_publication_aggregation() -> None:
-    text = (_root() / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    text = _full_workflow_text()
     rehearsal = text.split("  publication-rehearsal:\n", 1)[1].split(
         "\n  precommit:\n",
         1,
@@ -296,7 +303,7 @@ def test_ci_rehearses_cross_job_publication_aggregation() -> None:
 
 
 def test_release_profile_installs_mcp_before_full_native_qualification() -> None:
-    text = (_root() / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    text = _full_workflow_text()
     release_job = text.split("  release-environment:\n", 1)[1].split(
         "\n  python-support:\n",
         1,
@@ -420,7 +427,12 @@ def test_post_publish_smoke_qualifies_public_python_wheel_consumer_path() -> Non
 
 def test_every_release_workflow_job_has_a_bounded_timeout() -> None:
     job_heading = re.compile(r"(?m)^  ([A-Za-z0-9_-]+):\n")
-    for name in ("ci.yml", "publish.yml", "post-publish-smoke.yml"):
+    for name in (
+        "ci.yml",
+        "full-qualification.yml",
+        "publish.yml",
+        "post-publish-smoke.yml",
+    ):
         text = (_root() / ".github" / "workflows" / name).read_text(encoding="utf-8")
         jobs = text.split("jobs:\n", 1)[1]
         matches = list(job_heading.finditer(jobs))
@@ -435,17 +447,46 @@ def test_every_release_workflow_job_has_a_bounded_timeout() -> None:
 
 
 def test_ci_checkout_does_not_persist_git_credentials() -> None:
-    lines = (
-        (_root() / ".github" / "workflows" / "ci.yml")
-        .read_text(encoding="utf-8")
-        .splitlines()
-    )
-    checkout_indexes = [
-        index for index, line in enumerate(lines) if "actions/checkout@" in line
-    ]
-    assert checkout_indexes
-    for index in checkout_indexes:
-        assert any(
-            "persist-credentials: false" in line
-            for line in lines[index + 1 : index + 5]
+    for name in ("ci.yml", "full-qualification.yml"):
+        lines = (
+            (_root() / ".github" / "workflows" / name)
+            .read_text(encoding="utf-8")
+            .splitlines()
         )
+        checkout_indexes = [
+            index for index, line in enumerate(lines) if "actions/checkout@" in line
+        ]
+        assert checkout_indexes
+        for index in checkout_indexes:
+            assert any(
+                "persist-credentials: false" in line
+                for line in lines[index + 1 : index + 5]
+            )
+
+
+def test_fast_ci_remains_a_native_pytest_gate() -> None:
+    fast = (_root() / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    assert "  pull_request:" in fast
+    assert "  merge_group:" in fast
+    assert "name: Qualification convergence" in fast
+    assert "make lint" in fast and "make typecheck" in fast
+    assert "scripts/ci_verification.py" in fast
+    assert "python -m pytest -q" in fast
+    assert "make artifact-check" in fast
+    assert "mcp_installed_artifact_smoke.py" in fast
+    assert 'if [ "$GITHUB_EVENT_NAME" != "push" ]; then' in fast
+    assert "needs: [fast-gate]" in fast
+    assert 'run: test "$FAST_GATE" = success' in fast
+
+
+def test_full_regression_remains_daily_and_manual_without_pr_cancellation() -> None:
+    full = _full_workflow_text()
+    assert "cron: '23 2 * * *'" in full
+    assert "  workflow_dispatch:" in full
+    assert "cancel-in-progress: false" in full
+    assert "  pull_request:" not in full
+    assert "name: Nightly qualification convergence" in full
+    assert "  python-support:" in full
+    assert "  mcp-interop:" in full
+    assert "  standalone-windows-artifact:" in full
+    assert "  publication-rehearsal:" in full

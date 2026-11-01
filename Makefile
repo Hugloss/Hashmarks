@@ -15,11 +15,12 @@ DIAGNOSTIC_PYTHON ?= python3
 DIAGNOSTIC_BATCH ?= 0
 DIAGNOSTIC_BATCH_LIMIT ?= 8
 DIAGNOSTIC_SHARD ?= 0
+CI_BASE_REF ?=
 EVALSHOT ?= ../EvalShot
 RUFF_DEBT_PREVIOUS_BASELINE ?=
 RUFF_AUTOFIX_SELECT ?= E4,E7,E9,I,T201
 
-.PHONY: help benchmark benchmark-check benchmark-report evaluation-help lock lock-check init setup bootstrap check start stop doctor compile map map-status map-watch agent-runner-journal-help hygiene ruff-available format format-check agent-finish agent-preflight lint ruff ruff-check ruff-format-check source-hygiene typecheck ty-check pyright-check precommit hooks-install lint-debt lint-debt-summary lint-debt-json test test-native test-diagnostic test-diagnostic-capabilities test-diagnostic-batch test-diagnostic-shard test-profile test-shard-plan test-shard dev-check dev-check-batch dev-check-tests artifact-check mcp-opencode-check mcp-claude-check mcp-codex-check mcp-pi-check mcp-chatgpt-handoff mcp-host-status mcp-concurrency-stress release-prepare release-check metrics metrics-fast metrics-scale metrics-500k metrics-derived-authority metrics-agent metrics-agent-corpus metrics-fresh-multi-repo metrics-blind-worker-ab metrics-worker-behavior-ab metrics-worker-inspection-ab metrics-worker-multistep-ab metrics-worker-failed-verification-ab metrics-agent-economics metrics-bm25-economics metrics-bm25-constrained metrics-agent-suite metrics-agent-trace metrics-agent-experiment metrics-agent-experiment-set metrics-agent-trace-normalize metrics-agent-regret metrics-agent-regret-suite metrics-compare clean-metrics
+.PHONY: help benchmark benchmark-check benchmark-report evaluation-help lock lock-check init setup bootstrap check start stop doctor compile map map-status map-watch agent-runner-journal-help hygiene ruff-available format format-check agent-finish agent-preflight lint ruff ruff-check ruff-format-check source-hygiene typecheck ty-check pyright-check precommit hooks-install lint-debt lint-debt-summary lint-debt-json test test-native test-fast test-diagnostic test-diagnostic-capabilities test-diagnostic-batch test-diagnostic-shard test-profile test-shard-plan test-shard dev-check dev-check-batch dev-check-tests artifact-check mcp-opencode-check mcp-claude-check mcp-codex-check mcp-pi-check mcp-chatgpt-handoff mcp-host-status mcp-concurrency-stress release-prepare release-check metrics metrics-fast metrics-scale metrics-500k metrics-derived-authority metrics-agent metrics-agent-corpus metrics-fresh-multi-repo metrics-blind-worker-ab metrics-worker-behavior-ab metrics-worker-inspection-ab metrics-worker-multistep-ab metrics-worker-failed-verification-ab metrics-agent-economics metrics-bm25-economics metrics-bm25-constrained metrics-agent-suite metrics-agent-trace metrics-agent-experiment metrics-agent-experiment-set metrics-agent-trace-normalize metrics-agent-regret metrics-agent-regret-suite metrics-compare clean-metrics
 
 help:
 	@printf '%s\n' \
@@ -30,6 +31,7 @@ help:
 	  '  make init           Materialize the locked test + MCP development environment' \
 	  '  make setup          Prepare local test environment and runtime doctor' \
 	  '  make test           Run authoritative normal OSS tests; HASHMARKS_CONSTRAINED_HOST=1 selects hosted diagnostics' \
+	  '  make test-fast      Run local Hashmarks-relevant pytest tests; override CI_BASE_REF as needed' \
 	  '  make test-diagnostic  Run all capability-aware hosted diagnostic shards (never release authority)' \
 	  '  make test-diagnostic-batch DIAGNOSTIC_BATCH=0  Run a bounded hosted diagnostic batch' \
 	  '  make test-diagnostic-shard DIAGNOSTIC_SHARD=12  Run one hosted diagnostic shard' \
@@ -283,6 +285,21 @@ test:
 
 test-native:
 	@$(UV_RUN) --offline --no-sync --group test python -m pytest -q
+
+test-fast:
+	@$(UV_SYNC) --group test
+	@set -eu; \
+		base="$(CI_BASE_REF)"; \
+		if [ -z "$base" ]; then \
+			base=HEAD; \
+			if [ -z "$(git status --porcelain)" ]; then base=HEAD^; fi; \
+		fi; \
+		plan=$(mktemp); paths=$(mktemp); \
+		trap 'rm -f "$plan" "$paths"' EXIT HUP INT TERM; \
+		$(UV_RUN) --offline --no-sync --group test python scripts/ci_verification.py \
+			--base "$base" --worktree --output "$plan" > "$paths"; \
+		test -s "$paths"; \
+		xargs -0 -r $(UV_RUN) --offline --no-sync --group test python -m pytest -q < "$paths"
 
 test-diagnostic-capabilities:
 	@$(DIAGNOSTIC_PYTHON) -m scripts.hosted_diagnostic --capabilities
