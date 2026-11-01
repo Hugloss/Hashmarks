@@ -427,7 +427,12 @@ def test_post_publish_smoke_qualifies_public_python_wheel_consumer_path() -> Non
 
 def test_every_release_workflow_job_has_a_bounded_timeout() -> None:
     job_heading = re.compile(r"(?m)^  ([A-Za-z0-9_-]+):\n")
-    for name in ("ci.yml", "full-qualification.yml", "publish.yml", "post-publish-smoke.yml"):
+    for name in (
+        "ci.yml",
+        "full-qualification.yml",
+        "publish.yml",
+        "post-publish-smoke.yml",
+    ):
         text = (_root() / ".github" / "workflows" / name).read_text(encoding="utf-8")
         jobs = text.split("jobs:\n", 1)[1]
         matches = list(job_heading.finditer(jobs))
