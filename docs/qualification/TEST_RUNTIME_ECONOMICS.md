@@ -49,3 +49,20 @@ using isolated inputs and directories.
 
 This is a **pytest fixture-cost optimization**, never a Hashmarks runtime cache,
 new result authority, or a replacement for genuine CLI/MCP end-to-end checks.
+
+## Share real CLI transport captures while isolating corruptions
+
+A separate module-scoped fixture may capture one real CLI workflow for multiple
+retained-result grading checks. It must collect all native presentation formats,
+not forge packets or replace the subprocess implementation. A consumer that
+changes an in-memory outcome deep-copies it. A consumer that corrupts a captured
+JSON file copies the evidence tree into a per-test directory first.
+
+Parametrized tamper tests may likewise copy one genuine source-bound API capture,
+suite, and grader into per-test directories before modifying them. A positive
+admission test must establish that the copied, unmodified evidence still binds
+to its source and submitted report. Campaign manifests stay next to their
+matching copied suite; no test corrupts the shared fixture.
+
+Tests that explicitly prove capture freshness, receipt reuse, transport behavior,
+or source mutation still acquire independent real witnesses.
