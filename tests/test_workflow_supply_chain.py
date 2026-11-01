@@ -180,14 +180,12 @@ def test_release_request_is_a_minimal_auditable_version_trigger() -> None:
 
 def test_changed_release_request_is_checked_before_merge() -> None:
     text = (_root() / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
-    fast_gate = text.split("  fast-gate:\n", 1)[1].split(
-        "\n  qualification-convergence:\n", 1
-    )[0]
+    static_gate = text.split("  static-gate:\n", 1)[1].split("  fast-gate:\n", 1)[0]
     assert (
         'git diff --quiet "$PR_BASE_SHA" HEAD -- .github/release-request.toml'
-        in fast_gate
+        in static_gate
     )
-    assert 'validate-release-candidate --base-ref "$PR_BASE_SHA"' in fast_gate
+    assert 'validate-release-candidate --base-ref "$PR_BASE_SHA"' in static_gate
 
 
 def test_standalone_workflows_consume_one_build_owner() -> None:
@@ -464,19 +462,29 @@ def test_ci_checkout_does_not_persist_git_credentials() -> None:
             )
 
 
-def test_fast_ci_remains_a_native_pytest_gate() -> None:
-    fast = (_root() / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
-    assert "  pull_request:" in fast
-    assert "  merge_group:" in fast
-    assert "name: Qualification convergence" in fast
-    static_gate = fast.split("  static-gate:\n", 1)[1].split("  fast-gate:\n", 1)[0]
-    native_gate = fast.split("  fast-gate:\n", 1)[1].split("  full-shards:\n", 1)[0]
+def test_ci_static_gate_retains_required_quality_and_artifact_proofs() -> None:
+    workflow = (_root() / ".github" / "workflows" / "ci.yml").read_text(
+        encoding="utf-8"
+    )
+    static_gate = workflow.split("  static-gate:\n", 1)[1].split(
+        "  fast-gate:\n", 1
+    )[0]
+    native_gate = workflow.split("  fast-gate:\n", 1)[1].split(
+        "  full-shards:\n", 1
+    )[0]
     assert "make lint" in static_gate and "make typecheck" in static_gate
     assert "make artifact-check" in static_gate
     assert "mcp_installed_artifact_smoke.py" in static_gate
     assert "make lint" not in native_gate and "make typecheck" not in native_gate
     assert "uv sync --frozen --group test --extra mcp" in native_gate
-    assert "scripts/ci_verification.py" in native_gate
+
+
+def test_fast_ci_remains_a_native_pytest_gate() -> None:
+    fast = (_root() / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    assert "  pull_request:" in fast
+    assert "  merge_group:" in fast
+    assert "name: Qualification convergence" in fast
+    assert "scripts/ci_verification.py" in fast
     assert "python -m pytest -q" in fast
     assert "Prove selector behavior against actual CodeMap before broad pytest" in fast
     early = fast.index(
