@@ -216,7 +216,9 @@ def test_duration_profile_records_actual_phase_seconds_without_weight_feedback(
     from types import SimpleNamespace
     from typing import cast
 
-    monkeypatch.setenv("HASHMARKS_CI_DURATION_REPORT", str(native_repository / "profile.json"))
+    monkeypatch.setenv(
+        "HASHMARKS_CI_DURATION_REPORT", str(native_repository / "profile.json")
+    )
     handoff._DURATION_BY_FILE.clear()
     nodes = ["tests/test_a.py::test_standard"]
     initial = handoff._build_plan(native_repository, nodes, isolated=(), shard_count=1)
@@ -227,9 +229,10 @@ def test_duration_profile_records_actual_phase_seconds_without_weight_feedback(
     profile = handoff._duration_profile()
     assert profile["file_seconds"] == {"tests/test_a.py": 0.75}
     assert profile["measurement"] == "pytest-phase-runtime-diagnostics-only"
-    assert handoff._build_plan(
-        native_repository, nodes, isolated=(), shard_count=1
-    ) == initial
+    assert (
+        handoff._build_plan(native_repository, nodes, isolated=(), shard_count=1)
+        == initial
+    )
     handoff._DURATION_BY_FILE.clear()
 
 

@@ -319,9 +319,7 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
         json.dumps(_duration_profile(), indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
-    ranked = sorted(
-        _DURATION_BY_FILE.items(), key=lambda row: (-row[1], row[0])
-    )
+    ranked = sorted(_DURATION_BY_FILE.items(), key=lambda row: (-row[1], row[0]))
     for path, seconds in ranked[:16]:
         sys.stdout.write(f"CI per-file pytest phase: {seconds:.2f}s {path}\n")
 
