@@ -79,7 +79,9 @@ def test_docs_only_runs_baseline_without_scanning(repository: tuple[Path, str]) 
     _change(root, "docs/README.md", "Updated\n")
     plan = module.select(root, base, links=_unreachable)
     assert plan["mode"] == "focused"
-    assert plan["pytest_paths"] == sorted(set(module.BASELINE) | set(module.DOCUMENTATION_CHECKS))
+    assert plan["pytest_paths"] == sorted(
+        set(module.BASELINE) | set(module.DOCUMENTATION_CHECKS)
+    )
     assert plan["base_sha"] == base
     assert plan["plan_identity"].startswith("sha256:")
 
