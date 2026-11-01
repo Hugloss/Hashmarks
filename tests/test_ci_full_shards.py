@@ -152,9 +152,7 @@ def test_expected_worker_membership_requires_valid_nul(
     with pytest.raises(pytest.UsageError, match="NUL-delimited"):
         handoff._expected_execution_membership()
     handoff._nul(["tests/test_a.py::test_one"], path)
-    assert handoff._expected_execution_membership() == [
-        "tests/test_a.py::test_one"
-    ]
+    assert handoff._expected_execution_membership() == ["tests/test_a.py::test_one"]
     handoff._nul(["tests/test_a.py::test_one"] * 2, path)
     with pytest.raises(pytest.UsageError, match="duplicated"):
         handoff._expected_execution_membership()

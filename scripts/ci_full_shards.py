@@ -229,7 +229,9 @@ def _expected_execution_membership() -> list[str]:
     except OSError as exc:
         raise pytest.UsageError("native shard expected membership unavailable") from exc
     if not raw or not raw.endswith(b"\0"):
-        raise pytest.UsageError("native shard expected membership must be NUL-delimited")
+        raise pytest.UsageError(
+            "native shard expected membership must be NUL-delimited"
+        )
     try:
         expected = [part.decode("utf-8") for part in raw.split(b"\0")[:-1]]
     except UnicodeDecodeError as exc:
