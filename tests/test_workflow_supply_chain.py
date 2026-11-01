@@ -498,6 +498,8 @@ def test_fast_ci_remains_a_native_pytest_gate() -> None:
     assert "HASHMARKS_CI_EXPECTED_NUL" in fast
     assert 'HASHMARKS_CI_EXPECTED_NODEID="$nodeid"' in fast
     assert fast.count("-p scripts.ci_full_shards") == 2
+    assert "HASHMARKS_CI_DURATION_REPORT" in fast
+    assert "Preserve non-authoritative pytest duration diagnostics" in fast
     assert "Recheck all native collected tests" in fast
     assert "Run process-sensitive tests in singleton native pytest processes" in fast
 

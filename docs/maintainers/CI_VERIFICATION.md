@@ -104,6 +104,30 @@ Focused source-only and documentation PRs retain the one-runner fast path.
 Nightly and exact-release qualification remain independent and unchanged.
 The matrix's potential wall-time benefit must be measured rather than assumed.
 
+### Duration-aware distribution
+
+The developer-only shard planner uses explicitly reviewed runtime-cost
+reservations from three recent successful CI profiles for repeatedly expensive
+backend workflows, real CLI/MCP transports, and native evidence tests. The
+reservation weights are **estimates**, not measured exact per-file durations
+and not product source/verification authority. Unknown files fall back to
+collected test count; singleton/process-sensitive tests retain dedicated
+pytest processes with their own estimated setup cost. Each planned run records
+per-shard estimated weights for reviewer diagnostics.
+
+This allocation changes only GitHub Actions worker assignment. Native pytest
+still defines all membership, every selected process proves its exact
+collection, and the four shards must all pass. Do not use empirical time
+weights to skip tests, change completeness, or turn a green subset into release
+certification. The existing pytest plugin also emits a small, diagnostic per-file phase-time
+receipt from the **actual ordinary pytest execution** (no new collection or
+test invocation). GitHub Actions retains these samples with the run, and the
+slowest measured modules are printed for review. This diagnostic output
+does not enter plan identity, test selection, exit status, or certification.
+
+Reprofile before changing pinned weights; compare actual
+slowest-shard runtime and end-to-end issue-to-merge time with the prior gate.
+
 ## Follow-up optimization
 
 Profile the expensive backend workflow fixtures and benchmark specimens. Split

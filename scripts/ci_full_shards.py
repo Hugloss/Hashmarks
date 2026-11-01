@@ -23,8 +23,32 @@ import pytest
 
 from hashmarks._development.test_shards import ISOLATED_NODEIDS
 
-SCHEMA = "hashmarks.ci-native-full-shards.v1"
+SCHEMA = "hashmarks.ci-native-full-shards.v2"
 SHARD_COUNT = 4
+
+# Development CI cost *estimates*, not product evidence or guaranteed timings.
+# Three genuine Ubuntu runner profiles (41315277100, 41315915103,
+# 41316522630) show these modules dominate the critical path. Values are
+# conservative reservations informed by repeated slowest-phase observations;
+# pytest does not report a complete per-file runtime in those logs.
+# Keep weights explicit and reviewed. A new/unknown file uses node-count cost.
+_NODE_COST_MS = 40
+_SINGLETON_COST_MS = 3_000
+_HOT_FILE_EXTRA_MS = {
+    "tests/test_backend_evaluation_workflows.py": 50_000,
+    "tests/test_backend_source_workflow.py": 16_000,
+    "tests/test_backend_structural_workflow.py": 15_000,
+    "tests/test_backend_runtime_workflow.py": 16_000,
+    "tests/test_repository_observation_cli.py": 10_000,
+    "tests/test_native_evidence_transport.py": 9_000,
+    "tests/test_extended_adversarial_authority.py": 9_000,
+    "tests/test_backend_declaration_transport.py": 4_000,
+}
+
+# Per-file pytest-phase timings are diagnostic-only. Nothing in test membership,
+# plan identity, execution, exit status, or certification reads these samples.
+_DURATION_PROFILE_SCHEMA = "hashmarks.development-ci-file-duration.v1"
+_DURATION_BY_FILE: dict[str, float] = {}
 
 
 class _NativeCollector:
@@ -72,8 +96,9 @@ def _test_function(nodeid: str) -> str:
     return "::".join(part.split("[", 1)[0] for part in nodeid.split("::"))
 
 
-def _weight(root: Path, path: str, count: int) -> int:
-    return count + min(60, (root / path).stat().st_size // 256)
+def _weight(path: str, count: int) -> int:
+    """Estimated milliseconds for a test-file group, never a membership rule."""
+    return count * _NODE_COST_MS + _HOT_FILE_EXTRA_MS.get(path, 0)
 
 
 def _empty_shards(count: int) -> list[dict[str, Any]]:
@@ -114,14 +139,13 @@ def _admit_isolation(nodeids: Sequence[str], isolated: Sequence[str]) -> set[str
 
 
 def _assign_normal_members(
-    root: Path,
     grouped: Mapping[str, list[str]],
     isolated: set[str],
     shards: list[dict[str, Any]],
 ) -> None:
     ordered = sorted(
         grouped.items(),
-        key=lambda row: (-_weight(root, row[0], len(row[1])), row[0]),
+        key=lambda row: (-_weight(row[0], len(row[1])), row[0]),
     )
     for path, members in ordered:
         ordinary = [row for row in members if _test_function(row) not in isolated]
@@ -131,7 +155,7 @@ def _assign_normal_members(
         shard = _least_loaded(shards)
         shard["normal_args"].extend(args)
         shard["native_nodeids"].extend(ordinary)
-        shard["weight"] += _weight(root, path, len(ordinary))
+        shard["weight"] += _weight(path, len(ordinary))
 
 
 def _assign_singletons(
@@ -142,7 +166,7 @@ def _assign_singletons(
         shard = _least_loaded(shards)
         shard["isolated_nodeids"].append(nodeid)
         shard["native_nodeids"].append(nodeid)
-        shard["weight"] += 10
+        shard["weight"] += _SINGLETON_COST_MS
 
 
 def _validate_and_sort(shards: list[dict[str, Any]], nodeids: Sequence[str]) -> None:
@@ -170,7 +194,7 @@ def _build_plan(
     grouped = _group_native_members(root, nodeids)
     isolated_names = _admit_isolation(nodeids, isolated)
     shards = _empty_shards(shard_count)
-    _assign_normal_members(root, grouped, isolated_names, shards)
+    _assign_normal_members(grouped, isolated_names, shards)
     _assign_singletons(nodeids, isolated_names, shards)
     _validate_and_sort(shards, nodeids)
     payload: dict[str, Any] = {
@@ -264,6 +288,42 @@ def pytest_collection_finish(session: pytest.Session) -> None:
     )
 
 
+def pytest_runtest_logreport(report: pytest.TestReport) -> None:
+    """Capture real setup, call and teardown durations without touching results."""
+    if not os.environ.get("HASHMARKS_CI_DURATION_REPORT"):
+        return
+    path = report.nodeid.split("::", 1)[0]
+    _DURATION_BY_FILE[path] = _DURATION_BY_FILE.get(path, 0.0) + report.duration
+
+
+def _duration_profile() -> dict[str, object]:
+    return {
+        "schema": _DURATION_PROFILE_SCHEMA,
+        "candidate_sha": _git_head(Path.cwd()),
+        "measurement": "pytest-phase-runtime-diagnostics-only",
+        "file_seconds": {
+            path: round(seconds, 3)
+            for path, seconds in sorted(_DURATION_BY_FILE.items())
+        },
+    }
+
+
+def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
+    """Emit a passive receipt even when the existing native test run failed."""
+    raw = os.environ.get("HASHMARKS_CI_DURATION_REPORT")
+    if not raw:
+        return
+    destination = Path(raw)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(
+        json.dumps(_duration_profile(), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    ranked = sorted(_DURATION_BY_FILE.items(), key=lambda row: (-row[1], row[0]))
+    for path, seconds in ranked[:16]:
+        sys.stdout.write(f"CI per-file pytest phase: {seconds:.2f}s {path}\n")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=("plan", "emit"))
@@ -287,6 +347,9 @@ def main() -> int:
                     "mode": "qualified-full-parallel",
                     "native_tests": plan["native_test_count"],
                     "shards": plan["shard_count"],
+                    "estimated_shard_cost_ms": [
+                        row["weight"] for row in plan["shards"]
+                    ],
                 },
                 sort_keys=True,
             )

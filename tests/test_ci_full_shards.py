@@ -208,6 +208,69 @@ def test_class_parametrization_keeps_full_isolated_function_name() -> None:
     assert handoff._test_function(nodeid) == "tests/test_a.py::TestCases::test_run"
 
 
+def test_duration_profile_records_actual_phase_seconds_without_weight_feedback(
+    native_repository: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Measurement only: the same static plan stays valid when timing changes."""
+    from types import SimpleNamespace
+    from typing import cast
+
+    monkeypatch.setenv(
+        "HASHMARKS_CI_DURATION_REPORT", str(native_repository / "profile.json")
+    )
+    handoff._DURATION_BY_FILE.clear()
+    nodes = ["tests/test_a.py::test_standard"]
+    initial = handoff._build_plan(native_repository, nodes, isolated=(), shard_count=1)
+    report = SimpleNamespace(nodeid=nodes[0], duration=0.25)
+    handoff.pytest_runtest_logreport(cast(pytest.TestReport, report))
+    report.duration = 0.5
+    handoff.pytest_runtest_logreport(cast(pytest.TestReport, report))
+    profile = handoff._duration_profile()
+    assert profile["file_seconds"] == {"tests/test_a.py": 0.75}
+    assert profile["measurement"] == "pytest-phase-runtime-diagnostics-only"
+    assert (
+        handoff._build_plan(native_repository, nodes, isolated=(), shard_count=1)
+        == initial
+    )
+    handoff._DURATION_BY_FILE.clear()
+
+
+def test_hotspot_costs_follow_observed_runtime_not_source_size() -> None:
+    slow = "tests/test_backend_evaluation_workflows.py"
+    ordinary = "tests/test_small_fast_suite.py"
+    assert handoff._weight(slow, 5) > handoff._weight(ordinary, 200)
+    assert handoff._weight(ordinary, 2) == 2 * handoff._NODE_COST_MS
+    assert handoff._SINGLETON_COST_MS > handoff._NODE_COST_MS
+
+
+def test_hotspot_affinity_balances_files_without_dropping_cases(
+    native_repository: Path,
+) -> None:
+    """Slow real-transport modules should receive separate file-affinity groups."""
+    names = (
+        "test_backend_evaluation_workflows.py",
+        "test_backend_source_workflow.py",
+        "test_backend_structural_workflow.py",
+        "test_backend_runtime_workflow.py",
+    )
+    nodes = []
+    for name in names:
+        path = native_repository / "tests" / name
+        path.write_text("def test_a(): pass\ndef test_b(): pass\n", encoding="utf-8")
+        nodes.extend(f"tests/{name}::{case}" for case in ("test_a", "test_b"))
+    plan = handoff._build_plan(native_repository, nodes, isolated=(), shard_count=4)
+    assert sorted(row["weight"] for row in plan["shards"]) == sorted(
+        handoff._weight(f"tests/{name}", 2) for name in names
+    )
+    observed = [node for row in plan["shards"] for node in row["native_nodeids"]]
+    assert sorted(observed) == sorted(nodes)
+    assert all(len(row["normal_args"]) == 1 for row in plan["shards"])
+    assert {row["normal_args"][0] for row in plan["shards"]} == {
+        f"tests/{name}" for name in names
+    }
+
+
 def test_nul_argv_preserves_exact_nodeids(tmp_path: Path) -> None:
     destination = tmp_path / "argv.nul"
     args = ["tests/test_a.py", "tests/test_b.py::test_sensitive"]

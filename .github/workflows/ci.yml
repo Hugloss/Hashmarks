@@ -167,6 +167,7 @@ jobs:
         shell: bash
         env:
           HASHMARKS_CI_EXPECTED_NUL: ${{ runner.temp }}/expected-normal.nul
+          HASHMARKS_CI_DURATION_REPORT: ${{ runner.temp }}/ci-shard-durations.json
         run: |
           set -euo pipefail
           xargs -0 -r uv run --frozen --offline --no-sync --group test \
@@ -181,6 +182,14 @@ jobs:
               uv run --frozen --offline --no-sync --group test \
               python -m pytest -p scripts.ci_full_shards -q --maxfail=1 "$nodeid"
           done < "$RUNNER_TEMP/isolated-tests.nul"
+      - name: Preserve non-authoritative pytest duration diagnostics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hashmarks-ci-duration-${{ github.run_id }}-${{ matrix.shard }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ci-shard-durations.json
+          if-no-files-found: warn
+          retention-days: 14
 
   qualification-convergence:
     name: Qualification convergence

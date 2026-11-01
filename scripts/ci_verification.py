@@ -61,6 +61,7 @@ BROAD_PATHS = frozenset(
         ".pre-commit-config.yaml",
         "tests/conftest.py",
         "scripts/ci_verification.py",
+        "scripts/ci_full_shards.py",
         "scripts/release_contract.py",
         "scripts/ruff_debt.py",
         "scripts/standalone_build.py",
