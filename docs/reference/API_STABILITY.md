@@ -202,12 +202,19 @@ comparison inputs and cannot restore provider or correspondence state. The old
 root operations are removed.
 
 Dependencies use `CodeMap.dependencies.observe()`, `.codemap()`, `.queries()`,
-`.import_correspondence()`, `.correlation()`, `.delta()`, `.derivation_authority()`
-and `.explain()`. `RepositoryDependencies` owns the existing internal dependency
-observation, correlation, derivation and endpoint-comparison implementations.
-It borrows Source, Imports and repository Correlation directly; it has no Tasks
-or root dependency. Producer syntax remains in adapters. The old root operations
-are removed.
+`.import_correspondence()`, `.correlation()`, `.delta()`, `.derivation_authority()`,
+`.explain()` and `.consumers()`. `RepositoryDependencies` owns the existing internal
+dependency observation, correlation, derivation and endpoint-comparison
+implementations. It borrows Source, Imports, repository Correlation and
+Relationships directly; it has no Tasks or root dependency. Producer syntax remains
+in adapters. The old root operations are removed.
+
+Version 0.33 requires the explicit `relationships` input when constructing
+`RepositoryDependencies(source, imports, correlation, relationships)` independently.
+Every input must share the same Source read scope; a foreign relationship owner
+is rejected before observation. The existing Relationships owner supplies bounded
+downstream import observations instead of a second dependency-impact graph.
+Ordinary `CodeMap(...)` construction and `CodeMap.dependencies` access are unchanged.
 
 `RepositoryIdentity.observe_directory()` is a local-only contents observation
 with native `snapshot("*")` identity and separately named physical materialization

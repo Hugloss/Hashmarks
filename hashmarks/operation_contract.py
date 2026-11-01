@@ -90,6 +90,10 @@ OPERATION_CONTRACTS = (
         ),
     ),
     OperationContract(
+        "dependency_consumers",
+        (("default", "hashmarks.dependency-consumers.v1"),),
+    ),
+    OperationContract(
         "repository_declarations",
         (
             ("observation", "hashmarks.repository-declarations.v1"),

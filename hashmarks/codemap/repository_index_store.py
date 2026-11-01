@@ -858,6 +858,18 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
                 str(row[0]) for row in self._db.execute("SELECT path FROM file_map")
             }
 
+    def paths_named(self, filename: str) -> tuple[str, ...]:
+        """Return indexed basename candidates without rediscovering the workspace."""
+        suffix = "/" + filename
+        with self._lock:
+            return tuple(
+                str(row[0])
+                for row in self._db.execute(
+                    "SELECT path FROM file_map WHERE path=? OR substr(path, -?)=? ORDER BY path",
+                    (filename, len(suffix), suffix),
+                )
+            )
+
     def _finish_file_write(self, *, bulk_write: bool, owns_transaction: bool) -> None:
         if not bulk_write:
             if owns_transaction:
