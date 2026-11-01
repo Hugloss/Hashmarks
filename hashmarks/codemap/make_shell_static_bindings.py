@@ -44,9 +44,16 @@ def _source_barrier(facts: Sequence[_Fact]) -> str | None:
             "make-unresolved-recipe",
             "shell-unresolved-statement",
             "shell-control-syntax",
+            "shell-function-declaration",
             "make-conditional-syntax",
         }:
             return "source-may-change-bindings"
+        if fact.kind == "make-variable-declaration":
+            expression = fact.value.get("value_expression")
+            if isinstance(expression, str) and re.search(
+                r"\$\(\s*(?:eval|call|shell|file)\b", expression
+            ):
+                return "native-make-function-not-interpreted"
         if fact.kind == "shell-command-expression":
             words = fact.value.get("words")
             if isinstance(words, list) and words:
