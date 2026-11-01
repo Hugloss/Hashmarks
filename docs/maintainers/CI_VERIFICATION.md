@@ -70,5 +70,5 @@ Check repository rulesets after merging, especially any requirements naming
 removed *individual* legacy CI jobs. Do not weaken those rules until the
 replacement check is observed on a real PR and on the merge queue.
 
-The active `main` ruleset observed during this PR has no required-status rule; 
+The active `main` ruleset observed during this PR has no required-status rule;
 configure `Qualification convergence` as required separately after this PR passes.
