@@ -317,7 +317,7 @@ def _early_tests(root: Path, changed: tuple[str, ...], *, full: bool) -> list[st
         or path.startswith("hashmarks/codemap/task_evidence_")
         for path in changed
     )
-    priority = list(CRITICAL_VERIFICATION_TESTS) if critical_change else []
+    priority: list[str] = list(CRITICAL_VERIFICATION_TESTS) if critical_change else []
     priority.extend(path for path in changed if _test_file(path))
     return [path for path in dict.fromkeys(priority) if (root / path).is_file()][
         :EARLY_TEST_LIMIT
