@@ -145,12 +145,15 @@ class VerificationSupportMixin:
             return self._native_path_details(path, raw)
         return "verification-support", "test-domain-repository-member", []
 
-    def _verification_path_kind(self, path: str) -> dict[str, object]:
+    def _verification_path_kind(
+        self, path: str, *, reconcile: bool = True
+    ) -> dict[str, object]:
         """Classify a qualified member, never promote a test-directory helper."""
         if TYPE_CHECKING:
             self = cast("RepositoryVerification", self)
         rel = normalize_relative_path(path, allow_root=False)
-        self.source.ensure_current(rel)
+        if reconcile:
+            self.source.ensure_current(rel)
         member, raw = self.source.member(rel, include_bytes=True)
         if member.get("state") == "known-present" and raw is not None:
             kind, reason, unsupported = self._support_path_details(rel, raw)

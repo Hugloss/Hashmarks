@@ -82,9 +82,9 @@ def test_support_path_roles_are_reused_only_within_one_reference_observation(
         original = repository.verification._verification_path_kind
         observed: list[str] = []
 
-        def observe(path: str) -> dict[str, object]:
+        def observe(path: str, *, reconcile: bool = True) -> dict[str, object]:
             observed.append(path)
-            return original(path)
+            return original(path, reconcile=reconcile)
 
         monkeypatch.setattr(repository.verification, "_verification_path_kind", observe)
         with repository.reads.session():

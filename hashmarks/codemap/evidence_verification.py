@@ -9,7 +9,12 @@ from typing import TYPE_CHECKING, TypeAlias, cast
 from hashmarks.operation_contract import operation_response, operation_schema
 from hashmarks.python_ast_cache import read_python_ast
 
-from .decision_session import ReadScope, ReadScopeOwner, decision_scoped
+from .decision_session import (
+    DecisionRefreshRequired,
+    ReadScope,
+    ReadScopeOwner,
+    decision_scoped,
+)
 from .model import EvidenceVisibility
 from .query_primitives import _TASK_STOPWORDS, _query_terms
 from .repository_domains import RepositoryDomain, classify_repository_path
@@ -640,7 +645,7 @@ class RepositoryVerification(
         """Qualify shared test helpers once per bounded reference observation."""
         if path not in state.reference_path_roles:
             state.reference_path_roles[path] = str(
-                self._verification_path_kind(path)["kind"]
+                self._verification_path_kind(path, reconcile=False)["kind"]
             )
         kind = state.reference_path_roles[path]
         if kind == "unknown":
@@ -1049,11 +1054,22 @@ class RepositoryVerification(
             "test_symbol": test_symbol,
             # This is repository-declared nomination availability. Installed
             # executables and physical commands are external consumer concerns.
-            "runner_available": bool(self.nomination(path)["available"]),
+            "runner_available": self._verification_nomination_available(path),
             "supporting_source_members": self._verification_candidate_members(
                 state, path
             ),
         }
+
+    def _verification_nomination_available(self, path: str) -> bool:
+        """Qualify optional availability without refreshing indexed selection."""
+        assert self.reads.scope is not None
+        try:
+            return bool(self.nomination(path)["available"])
+        except DecisionRefreshRequired:
+            # The active parent scope keeps this probe non-mutating. A stale
+            # source or manifest makes availability unqualified; the selection
+            # owner retains its indexed binding and existing freshness fence.
+            return False
 
     def _verification_candidate_members(
         self, state: _VerificationRelevanceState, path: str
@@ -1064,7 +1080,6 @@ class RepositoryVerification(
             paths.update(state.import_owner_contributors.get(ref_path, ()))
         members: list[dict[str, object]] = []
         for member_path in sorted(paths - {""}):
-            self.source.ensure_current(member_path)
             member, _raw = self.source.member(member_path)
             members.append(member)
         return members

@@ -49,6 +49,12 @@ layout, worker selection, timeout, retry or scheduling decision. Legacy advisory
 `plan()` is not consulted by this operation or by its relevance candidates;
 candidate availability uses source-qualified nominations, not installed tools.
 
+Shared indexed relevance keeps its caller's selected binding intact. Optional
+availability remains unqualified when current source or metadata cannot support
+a nomination; it does not refresh away the existing task evidence staleness
+signal. The changed-set producer owns reconciliation of its observed source
+contributors and then obtains strict current target nominations.
+
 ## Relationships and support scope
 
 Ordinary source relationships reuse the existing bounded reference owner.

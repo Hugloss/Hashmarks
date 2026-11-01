@@ -132,7 +132,14 @@ class VerificationChangesMixin:
             None,
             (),
         )
-        return dict(self.for_owner(request, limit=min(limit, 16)))
+        relevance = dict(self.for_owner(request, limit=min(limit, 16)))
+        # Shared indexed selection preserves stale bindings for its callers.
+        # This producer owns reconciliation of the contributors it qualifies.
+        for path in cast(
+            "list[str]", relevance.get("unresolved_reference_identity_paths", [])
+        ):
+            self.source.ensure_current(path)
+        return relevance
 
     def _changed_reference_members(
         self, path: str, candidate: Mapping[str, object]
@@ -145,8 +152,9 @@ class VerificationChangesMixin:
             paths.update(str(item) for item in via)
         members = _supporting_members(candidate)
         observed_paths = {str(member["path"]) for member in members}
-        for member_path in sorted(paths - observed_paths):
+        for member_path in sorted(paths | observed_paths):
             self.source.ensure_current(member_path)
+        for member_path in sorted(paths - observed_paths):
             member, _raw = self.source.member(member_path)
             members.append(member)
         return members
