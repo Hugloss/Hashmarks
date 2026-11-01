@@ -126,15 +126,16 @@ def _qualified_links(graph: Mapping[str, Any], source: str) -> tuple[str, ...] |
     qualification = graph.get("verification_qualification")
     if not isinstance(qualification, dict) or graph.get("stale") is not False:
         return None
-    if (
-        qualification.get("completeness") != "complete"
-        or qualification.get("truncation") != "complete"
-        or qualification.get("negative_evidence_admissible") is not True
-        or qualification.get("qualified_identity_ambiguous") is True
-        or qualification.get("verifier_identity_ambiguous") is True
-        or qualification.get("search_bound_reasons")
-        or source not in graph.get("edit_candidates", [])
-    ):
+    conditions = (
+        qualification.get("completeness") == "complete",
+        qualification.get("truncation") == "complete",
+        qualification.get("negative_evidence_admissible") is True,
+        qualification.get("qualified_identity_ambiguous") is not True,
+        qualification.get("verifier_identity_ambiguous") is not True,
+        not qualification.get("search_bound_reasons"),
+        source in graph.get("edit_candidates", []),
+    )
+    if not all(conditions):
         return None
     rows = graph.get("verification_owners")
     if not isinstance(rows, list):
@@ -155,7 +156,9 @@ def _qualified_links(graph: Mapping[str, Any], source: str) -> tuple[str, ...] |
 def _source_links(root: Path, sources: tuple[str, ...]) -> dict[str, tuple[str, ...]] | None:
     """Read canonical Hashmarks evidence; never infer negative links from a bound."""
     from hashmarks.codemap import CodeMap
-    from hashmarks.verification_nomination_validation import validate_verification_nomination
+    from hashmarks.verification_nomination_validation import (
+        validate_verification_nomination,
+    )
 
     linked: dict[str, tuple[str, ...]] = {}
     with CodeMap(root) as codemap:
@@ -185,6 +188,46 @@ def _identity(payload: Mapping[str, Any]) -> str:
     return "sha256:" + hashlib.sha256(encoded).hexdigest()
 
 
+def _classify_changes(
+    root: Path, changed: tuple[str, ...]
+) -> tuple[list[str], set[str], list[str]]:
+    """Separate direct test edits from source files and broad authority changes."""
+    full_reasons: list[str] = []
+    tests: set[str] = set(BASELINE)
+    sources: list[str] = []
+    for path in changed:
+        if path in BROAD_PATHS or path.startswith(".github/"):
+            full_reasons.append(f"broad-authority:{path}")
+        elif _documentation(path):
+            continue
+        elif _test_file(path):
+            tests.add(path)
+        elif _source_file(path) and (root / path).is_file():
+            sources.append(path)
+        else:
+            full_reasons.append(f"unclassified:{path}")
+    return full_reasons, tests, sources
+
+
+def _source_test_files(
+    root: Path,
+    sources: tuple[str, ...],
+    links: Callable[[Path, tuple[str, ...]], dict[str, tuple[str, ...]] | None],
+) -> tuple[set[str], str | None]:
+    """Translate observed relations into a developer test scope, or refuse it."""
+    try:
+        nominations = links(root, sources)
+    except (OSError, ValueError, RuntimeError, KeyError, TypeError) as exc:
+        return set(), f"relevance-unavailable:{type(exc).__name__}"
+    if (
+        nominations is None
+        or set(nominations) != set(sources)
+        or any(not paths or not all(_test_file(path) for path in paths) for paths in nominations.values())
+    ):
+        return set(), "unproven-verification-membership"
+    return {path for paths in nominations.values() for path in paths}, None
+
+
 def select(
     root: Path,
     base: str,
@@ -200,33 +243,17 @@ def select(
     if not worktree and _git(root, "status", "--porcelain", "--untracked-files=normal"):
         raise ValueError("hosted candidate checkout must be clean")
     changed, unusual = _diff_paths(root, base_sha, head, worktree=worktree)
-    full_reasons = ["unusual-git-change"] if unusual else []
+    full_reasons, tests, sources = _classify_changes(root, changed)
+    if unusual:
+        full_reasons.append("unusual-git-change")
     if not changed:
         full_reasons.append("empty-change-set")
-    tests: set[str] = set(BASELINE)
-    sources: list[str] = []
-    for path in changed:
-        if path in BROAD_PATHS or path.startswith(".github/"):
-            full_reasons.append(f"broad-authority:{path}")
-        elif _documentation(path):
-            continue
-        elif _test_file(path):
-            tests.add(path)
-        elif _source_file(path) and (root / path).is_file():
-            sources.append(path)
-        else:
-            full_reasons.append(f"unclassified:{path}")
     if sources and not full_reasons:
-        try:
-            nominations = links(root, tuple(sources))
-        except (OSError, ValueError, RuntimeError, KeyError, TypeError) as exc:
-            nominations = None
-            full_reasons.append(f"relevance-unavailable:{type(exc).__name__}")
-        if nominations is None or set(nominations) != set(sources):
-            full_reasons.append("unproven-verification-membership")
+        selected, reason = _source_test_files(root, tuple(sources), links)
+        if reason:
+            full_reasons.append(reason)
         else:
-            for paths in nominations.values():
-                tests.update(paths)
+            tests.update(selected)
     mode = "full" if full_reasons else "focused"
     payload: dict[str, Any] = {
         "schema": SCHEMA,
@@ -253,9 +280,10 @@ def main() -> int:
     plan = select(args.root, args.base, worktree=args.worktree)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(plan, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    print(
-        json.dumps({key: plan[key] for key in ("mode", "reasons", "pytest_paths")}),
-        file=sys.stderr,
+    sys.stderr.write(
+        json.dumps({key: plan[key] for key in ("mode", "reasons", "pytest_paths")})
+        + "
+"
     )
     # NUL-delimited argument transport: never use shell interpolation for test selectors.
     for path in plan["pytest_paths"]:
