@@ -96,13 +96,24 @@ def test_source_uses_proven_hashmarks_links(repository: tuple[Path, str]) -> Non
     assert "tests/test_worker.py" in plan["pytest_paths"]
 
 
-def test_unknown_source_relevance_runs_entire_suite(repository: tuple[Path, str]) -> None:
+def test_unknown_source_relevance_runs_entire_suite(
+    repository: tuple[Path, str],
+) -> None:
     root, base = repository
     _change(root, "hashmarks/worker.py", "def compute():\n    return 3\n")
     plan = module.select(root, base, links=lambda _root, _paths: None)
     assert plan["mode"] == "full"
     assert plan["pytest_paths"] == ["tests"]
     assert "unproven-verification-membership" in plan["reasons"]
+
+
+
+def test_empty_source_nominations_are_not_focused(repository: tuple[Path, str]) -> None:
+    root, base = repository
+    _change(root, "hashmarks/worker.py", "def compute():\n    return 4\n")
+    plan = module.select(root, base, links=lambda _root, paths: {paths[0]: ()})
+    assert plan["mode"] == "full"
+    assert plan["pytest_paths"] == ["tests"]
 
 
 def test_shared_policy_requires_full_suite(repository: tuple[Path, str]) -> None:
