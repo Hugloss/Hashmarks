@@ -107,7 +107,6 @@ def test_unknown_source_relevance_runs_entire_suite(
     assert "unproven-verification-membership" in plan["reasons"]
 
 
-
 def test_empty_source_nominations_are_not_focused(repository: tuple[Path, str]) -> None:
     root, base = repository
     _change(root, "hashmarks/worker.py", "def compute():\n    return 4\n")
