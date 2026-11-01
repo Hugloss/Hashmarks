@@ -1,5 +1,80 @@
 # Dependency evidence adapters and producer-neutral authority
 
+## Python distribution metadata and source consumers
+
+The uv adapter accepts optional `distribution_metadata` entries containing an
+exact selected `node_id`, `METADATA` bytes as `metadata`, and optional `RECORD`
+bytes as `record`. The caller selects and captures those artifacts; Hashmarks
+does not discover an interpreter, inspect an
+ambient environment, install a package, import dependency code or scan dependency
+implementations. `Name` and `Version` must match the one explicit uv selection.
+That correspondence preserves the caller's environment/artifact claims; it does
+not authenticate the installed distribution or establish source equivalence.
+
+The edge adapter translates listed `.py` members in `RECORD` into the existing
+producer-neutral v3 `module-ownership` facts. Distribution names are never treated
+as import names. Namespace contributors remain separate owners; stub-only `.pyi`
+members, unsupported native extensions, paths outside the import root and
+top-level declarations alone do not prove a runtime owner. `RECORD` hash/size
+columns are opaque producer syntax covered by the artifact fingerprint; they
+are not interpreted or verified against installed file bytes. Each supplied
+physical artifact has its own byte fingerprint and source identity. Metadata
+completeness, module coverage and repository consumer
+coverage remain distinct. Module-ownership coverage is always incomplete for this
+adapter: arbitrary namespaces, loaders, optional providers and runtime mutations
+cannot be ruled out from these supplied artifacts.
+
+```python
+snapshot = uv_lock_dependency_observation(
+    lock=lock_bytes,
+    distribution_metadata=[
+        {
+            "node_id": selected_node_id,
+            "metadata": metadata_bytes,
+            "record": record_bytes,
+        }
+    ],
+)
+observation = codemap.dependencies.observe(snapshot)
+consumers = codemap.dependencies.consumers(
+    observation,
+    source_paths=["src/example/bridge.py"],
+    node_ids=[selected_node_id],
+)
+```
+
+`CodeMap.dependencies.consumers` is the registered command-free
+`hashmarks.dependency-consumers.v1` observation. Explicit paths choose a bounded
+source scope; they do not assert that an import exists. The native Source owner
+qualifies bytes/revisions, the shared Python AST cache provides syntax, and actual
+static import statements establish returned import rows. Each row retains its
+source member, conditional/deferred status, metadata owner ambiguity and source
+provenance. Relative/local-shadowed imports do not acquire external ownership.
+The existing relationship owner supplies unchanged bounded advisory downstream
+relations; no second impact graph is constructed. No row asserts that a runtime
+import executed successfully or that a verifier is sufficient.
+
+Selected nodes must belong to the existing semantic `pypi` ecosystem. Other
+module namespaces, such as Maven/JPMS names that happen to have the same spelling,
+cannot become Python consumer ownership. This is a supported semantic profile,
+not a test of producer kind or adapter name.
+
+The observation rejects stale/foreign/tampered dependency packets and rechecks
+source members before returning. Missing, denied or malformed source, missing
+metadata and bounded/truncated output cannot establish absence. The result always
+keeps `consumer_scope.completeness: incomplete` and
+`negative_evidence: not-admissible`. A complete syntax observation of explicitly
+named members is not a closed dependency-consumer universe. Consumer admission,
+any justified broader proof, process execution, results and certification stay
+outside Hashmarks.
+
+Ownership note: observed facts are supplied native distribution/module claims
+and current repository import syntax. Authority comes from caller-selected
+metadata and native Source observations, with independent completeness/freshness.
+The existing dependency, source, import and relationship owners are extended;
+no resolver, environment discovery, admission or execution policy is acquired.
+Decision: **OBSERVER**.
+
 **Status: normative dependency-evidence architecture.**
 
 Hashmarks dependency evidence has one direction of travel:
