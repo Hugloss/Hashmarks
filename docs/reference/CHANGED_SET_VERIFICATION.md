@@ -110,6 +110,17 @@ inline Markdown image/link or an unshadowed, repository-root-qualified literal
 `literal-only`; computed paths, dynamic loaders and files outside the maintained
 index are not an exhaustively observed consumer set.
 
+The existing Python read observer also recognizes finite tuple/list collections
+of those literal paths, either inline or through an earlier unique binding.
+A uniquely bound `for` receiver can establish a read of a collection member
+inside that loop only. Collections are limited to the existing 64-read-site
+bound; mixed dynamic members, escaped or mutated collections, shadowed names,
+and outer loop exits remain unqualified. A nested loop's own `continue` does
+not change an earlier read in its enclosing loop. These are source-qualified
+positive relationships with the existing reader/source revisions, not execution
+observations or proof that the verifier is sufficient. Unsupported syntax does
+not establish absence.
+
 The asset packet reports its actual limits: currently 64 candidate members,
 64 returned references, 1 MiB per supporting member and 4 MiB of supporting
 source bytes. `source_coverage` qualifies the selected source observations, not
