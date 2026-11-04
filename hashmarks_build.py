@@ -406,6 +406,7 @@ def _deterministic_tar_info(info: tarfile.TarInfo) -> tarfile.TarInfo:
     info.uname = ""
     info.gname = ""
     info.mtime = 0
+    info.mode = 0o755 if info.mode & 0o111 else 0o644
     return info
 
 

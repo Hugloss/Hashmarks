@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import tarfile
 from typing import TYPE_CHECKING
 
 import pytest
@@ -72,3 +73,35 @@ def test_wheel_is_reproducible_across_source_mtime_changes(
     name_b = hashmarks_build.build_wheel(second)
     assert name_a == name_b
     assert _sha(first / name_a) == _sha(second / name_b)
+
+
+@pytest.mark.skipif(
+    os.name == "nt", reason="POSIX write and executable modes are unavailable"
+)
+@pytest.mark.parametrize("mode", [0o644, 0o755])
+def test_sdist_bytes_ignore_group_write_but_preserve_executable_intent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: int
+) -> None:
+    release = tmp_path / "release"
+    (release / "hashmarks").mkdir(parents=True)
+    members = {
+        "pyproject.toml": '[project]\nname="hashmarks"\nversion="1.2.3"\n',
+        "hashmarks/_version.py": '__version__ = "1.2.3"\n',
+        "hashmarks/__init__.py": "",
+        "README.md": "# Hashmarks\n",
+    }
+    for name, content in members.items():
+        member = release / name
+        member.write_text(content, encoding="utf-8")
+        member.chmod(mode)
+    monkeypatch.setattr(hashmarks_build, "ROOT", release)
+    first = tmp_path / "a"
+    name_a = hashmarks_build.build_sdist(first)
+    for name in members:
+        (release / name).chmod(mode | 0o020)
+    second = tmp_path / "b"
+    name_b = hashmarks_build.build_sdist(second)
+    assert _sha(first / name_a) == _sha(second / name_b)
+    with tarfile.open(second / name_b, "r:gz") as archive:
+        authored = archive.getmember("hashmarks-1.2.3/hashmarks/_version.py")
+        assert authored.mode == mode
