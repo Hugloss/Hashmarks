@@ -431,10 +431,62 @@ class DecisionScope:
         refreshed.add(path)
         return self._index.reconcile_path(path, expected_generation=expected_generation)
 
+    @contextmanager
+    def _observation_diagnostics(
+        self, enabled: bool
+    ) -> Generator[dict[str, int | str] | None, None, None]:
+        if not enabled:
+            yield None
+            return
+        if self.depth:
+            raise ValueError(
+                "observation diagnostics must be enabled at the outermost read owner"
+            )
+        self._diagnostics_last = None
+        started_ns = time.perf_counter_ns()
+        observation: dict[str, int | str] = {
+            "attempts": 0,
+            "abandoned_attempts": 0,
+            "reconciliations": 0,
+            "reconciliation_time_ns": 0,
+            "session_outcome": "failed",
+        }
+        accepted = False
+        try:
+            yield observation
+            accepted = True
+        finally:
+            if self._diagnostics_last is not None:
+                observation["outcome"] = "accepted" if accepted else "failed"
+                observation["wall_time_ns"] = time.perf_counter_ns() - started_ns
+                self._diagnostics_last["observation"] = observation
+
+    @contextmanager
+    def _observation_attempt_diagnostics(
+        self, observation: dict[str, int | str] | None
+    ) -> Generator[None, None, None]:
+        if observation is None:
+            yield
+            return
+        self._diagnostics_last = None
+        observation["attempts"] = int(observation["attempts"]) + 1
+        observation["session_outcome"] = "failed"
+        try:
+            yield
+        except DecisionRefreshRequired:
+            observation["session_outcome"] = "abandoned"
+            observation["abandoned_attempts"] = (
+                int(observation["abandoned_attempts"]) + 1
+            )
+            raise
+        else:
+            observation["session_outcome"] = "accepted"
+
     def observe(
         self,
         operation: Callable[[ReadScope], _R],
         *,
+        diagnostics: bool = False,
         expected_generation: int | None = None,
         _allow_incomplete: bool = False,
     ) -> _R:
@@ -443,23 +495,49 @@ class DecisionScope:
         A source refresh publishes outside the read scope. Only that exact
         publication may become the next expected generation; another writer
         invalidates the observation rather than being silently adopted.
+
+        Opt-in diagnostics belong to the outermost read owner. They retain only
+        the final session profile plus scalar reconciliation costs and outcomes;
+        nested default observations inherit the outer session's instrumentation.
         """
-        with python_ast_session(), syntax_session(self._index.range_provider):
+        with (
+            self._observation_diagnostics(diagnostics) as observation,
+            python_ast_session(),
+            syntax_session(self._index.range_provider),
+        ):
             refreshed: set[str] = set()
             while True:
                 try:
-                    with self.session(
-                        expected_generation=expected_generation,
-                        _allow_incomplete=_allow_incomplete,
-                    ) as scope:
+                    with (
+                        self._observation_attempt_diagnostics(observation),
+                        self.session(
+                            diagnostics=diagnostics,
+                            expected_generation=expected_generation,
+                            _allow_incomplete=_allow_incomplete,
+                        ) as scope,
+                    ):
                         expected_generation = scope.generation
-                        return operation(scope)
+                        result = operation(scope)
+                    return result
                 except DecisionRefreshRequired as exc:
                     if self.depth:
                         raise
-                    expected_generation = self._reconcile_member(
-                        exc.path, refreshed, expected_generation=expected_generation
-                    )
+                    started_ns = time.perf_counter_ns() if observation else 0
+                    try:
+                        expected_generation = self._reconcile_member(
+                            exc.path, refreshed, expected_generation=expected_generation
+                        )
+                        if observation is not None:
+                            observation["reconciliations"] = (
+                                int(observation["reconciliations"]) + 1
+                            )
+                    finally:
+                        if observation is not None:
+                            observation["reconciliation_time_ns"] = (
+                                int(observation["reconciliation_time_ns"])
+                                + time.perf_counter_ns()
+                                - started_ns
+                            )
 
     @staticmethod
     def _diagnostic_normalize(value: object) -> object:

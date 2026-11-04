@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.35.1 — Refresh-safe observation diagnostics
+
+- Enable native diagnostics directly on `CodeMap.reads.observe()` while preserving generation-bound reads, source reconciliation and the original callback result. Explicit nested opt-in fails before the callback; ordinary nested observations inherit the outer profile.
+- Retain the final session profile and a bounded scalar summary of observation attempts, reconciliation cost and outcomes. Distinguish accepted, abandoned and failed reads without retaining attempt histories or presenting stale prior diagnostics as a new observation.
+- Keep receipts detached, process-local and diagnostic only. Whole-call elapsed time includes the supplied callback; producer spans describe narrower attribution. Telemetry retention, execution policy and verification-result authority remain with external consumers.
+
 ## 0.35.0 — Qualified dependency version predicates
 
 - Observe Python/PEP 440 and npm version predicates through the existing dependency package projection. Preserve raw versions, ecosystem/context identity, match/nonmatch/unclassified counts and bounded selection evidence; range nonmatch does not become package absence.
