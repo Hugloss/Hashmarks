@@ -59,10 +59,29 @@ retained projection; it does not create a fresh observation from old claims.
 
 Package selectors require exact `ecosystem` and `name` and optionally exact
 `version`, a typed `version_predicate`, and declared `context`. Exact `version`
-and `version_predicate` are mutually exclusive. Names use the adapter's normalized component
-identity; the core does not guess import names or apply ecosystem-specific
-name normalization. Unknown contexts and unknown selector fields are rejected.
+and `version_predicate` are mutually exclusive. Package-name matching is
+ecosystem-qualified: PyPI queries and component names use native
+`packaging.utils.canonicalize_name`, while npm, scoped npm and other opaque
+ecosystem names retain exact spelling. This changes query matching only;
+declared component names, component IDs and selection IDs remain unchanged.
+`MLFlow` matches `mlflow`; `ML_Flow` matches `ml-flow`, not `mlflow`.
+`@scope/ml_flow` remains distinct from `@scope/ml-flow` in npm.
+Unknown contexts and unknown selector fields are rejected.
 Requests normalize, sort and deduplicate selectors and repository-relative paths.
+
+The public `hashmarks.dependency_package_query_identity(ecosystem, name)` call
+returns the original requested spelling, canonical query name, semantic rule and
+native engine/version provenance without reading a repository or registry. Each
+projected package retains the same `package_identity` evidence alongside its
+original selector. **OBSERVER:** this is package-coordinate correspondence over
+declared dependency facts; it grants no installation, resolution or execution
+authority. Query equivalence never merges distinct retained component IDs or
+strengthens bounded matches into uniqueness.
+
+Retained requalification checks name semantics as well as version-predicate
+semantics before source work. A packet missing that evidence, or one whose
+native name engine/semantics changed, requires a fresh projection; it is not
+silently reinterpreted with the new matching rule.
 
 Python consumers use the existing `uv_lock_dependency_observation()` adapter,
 including explicitly supplied `METADATA` and `RECORD` when module ownership is

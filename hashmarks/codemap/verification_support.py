@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import ast
 import configparser
+import tomllib
+from collections.abc import Mapping
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING, cast
 
@@ -17,6 +19,7 @@ from hashmarks.python_ast_cache import parse_python_ast
 
 from .repository_domains import RepositoryDomain, classify_repository_path
 from .repository_observation import evidence_identity
+from .verification_context import MAX_CONTEXT_ANCESTORS
 from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
 from .verification_plan import _UnqualifiedNominationMember
 
@@ -24,8 +27,24 @@ if TYPE_CHECKING:
     from .evidence_verification import RepositoryVerification
 
 _SUPPORT_SCAN_LIMIT = 512
-_INI_CONFIG = {"pytest.ini": "pytest", "tox.ini": "pytest", "setup.cfg": "tool:pytest"}
+_INI_CONFIG = {
+    "pytest.ini": "pytest",
+    ".pytest.ini": "pytest",
+    "tox.ini": "pytest",
+    "setup.cfg": "tool:pytest",
+}
 _JS_SUFFIXES = {".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts"}
+_PYTEST_NAME_OPTIONS = {
+    "python_files",
+    "python_classes",
+    "python_functions",
+}
+_PYTEST_SELECTION_OPTIONS = _PYTEST_NAME_OPTIONS | {
+    "addopts",
+    "testpaths",
+    "norecursedirs",
+}
+_PYTEST_TOML_CONFIG = {"pytest.toml", ".pytest.toml"}
 _PathDetails = tuple[str, str, list[str]]
 
 
@@ -48,6 +67,8 @@ def _pytest_dynamic_features(tree: ast.Module) -> list[str]:
     for node in ast.walk(tree):
         if isinstance(node, ast.Name) and node.id == "pytest_plugins":
             features.add("pytest-plugin-consumers-not-observed")
+        if isinstance(node, ast.Name) and node.id == "__test__":
+            features.add("pytest-test-flag-not-interpreted")
         if isinstance(node, ast.Attribute) and node.attr == "getfixturevalue":
             features.add("dynamic-fixture-consumers-not-observed")
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -64,21 +85,45 @@ def _python_path_details(raw: bytes, *, conftest: bool) -> _PathDetails:
     unsupported = _pytest_dynamic_features(tree)
     if conftest:
         return "verification-support", "pytest-conftest", unsupported
+    if "pytest-test-flag-not-interpreted" in unsupported:
+        return "unknown", "pytest-test-flag-not-interpreted", unsupported
     if _python_test_declarations(tree):
         return "verifier", "python-test-declaration", unsupported
     return "verification-support", "test-domain-support-source", unsupported
 
 
-def _ini_config_details(name: str, raw: bytes) -> _PathDetails:
-    parser = configparser.ConfigParser(interpolation=None, strict=True)
+class _AuthoredIniOptions(configparser.ConfigParser):
+    """Use the stdlib parser with its supported case-preserving extension."""
+
+    def optionxform(self, optionstr: str) -> str:
+        return optionstr
+
+
+def _ini_options(name: str, raw: bytes) -> Mapping[str, object] | None:
+    parser = _AuthoredIniOptions(interpolation=None, strict=True, default_section="")
     try:
         parser.read_string(raw.decode("utf-8"))
     except (UnicodeError, configparser.Error):
-        return "unknown", "pytest-configuration-syntax-unqualified", []
+        raise _UnqualifiedNominationMember(
+            "pytest-configuration-syntax-unqualified"
+        ) from None
     # pytest.ini itself establishes the configuration location, even if empty.
-    if name == "pytest.ini" or parser.has_section(_INI_CONFIG[name]):
-        return "verification-support", "pytest-configuration", []
-    return "source", "repository-source", []
+    section = _INI_CONFIG[name]
+    if parser.has_section(section):
+        return dict(parser.items(section))
+    return {} if name in {"pytest.ini", ".pytest.ini"} else None
+
+
+def _ini_config_details(name: str, raw: bytes) -> _PathDetails:
+    try:
+        options = _ini_options(name, raw)
+    except _UnqualifiedNominationMember:
+        return "unknown", "pytest-configuration-syntax-unqualified", []
+    return (
+        ("verification-support", "pytest-configuration", [])
+        if options is not None
+        else ("source", "repository-source", [])
+    )
 
 
 def _test_filename(path: PurePosixPath) -> bool:
@@ -92,6 +137,78 @@ def _test_filename(path: PurePosixPath) -> bool:
 
 class VerificationSupportMixin:
     """Extend the verification owner with syntax and scope observations only."""
+
+    def _pytest_selection_options(self, filename: str, raw: bytes) -> dict[str, object]:
+        """Translate only authored options; native matching is not performed."""
+        if TYPE_CHECKING:
+            self = cast("RepositoryVerification", self)
+        if filename == "pyproject.toml":
+            options = self._pytest_manifest_options(raw)
+        elif filename in _PYTEST_TOML_CONFIG:
+            options = tomllib.loads(raw.decode("utf-8")).get("pytest")
+            if options is not None and not isinstance(options, Mapping):
+                raise _UnqualifiedNominationMember("pytest-configuration-options")
+        else:
+            options = _ini_options(filename, raw)
+        return (
+            {
+                key: options[key]
+                for key in sorted(_PYTEST_SELECTION_OPTIONS)
+                if key in options
+            }
+            if isinstance(options, Mapping)
+            else {}
+        )
+
+    def _pytest_selection_declarations(
+        self, path: str, members: list[dict[str, object]], *, reconcile: bool
+    ) -> dict[str, object]:
+        """Retain source declarations, never reproduce pytest's selection rules."""
+        if TYPE_CHECKING:
+            self = cast("RepositoryVerification", self)
+        declarations: list[dict[str, object]] = []
+        try:
+            parent = PurePosixPath(path).parent
+            ancestors = (parent, *parent.parents)
+            if len(ancestors) > MAX_CONTEXT_ANCESTORS:
+                raise _UnqualifiedNominationMember("manifest-ancestor-limit")
+            for ancestor in ancestors:
+                for filename in (
+                    "pyproject.toml",
+                    *sorted(_PYTEST_TOML_CONFIG),
+                    *_INI_CONFIG,
+                ):
+                    manifest = (ancestor / filename).as_posix()
+                    raw = self._nomination_source_member(
+                        manifest, members, reconcile=reconcile
+                    )
+                    if raw is None:
+                        continue
+                    selected = self._pytest_selection_options(filename, raw)
+                    if selected:
+                        declarations.append({"path": manifest, "options": selected})
+        except (_UnqualifiedNominationMember, UnicodeError, tomllib.TOMLDecodeError):
+            return {
+                "state": "unknown",
+                "declarations": declarations,
+                "reason": "pytest-selection-configuration-unqualified",
+                "collection": "not-observed",
+                "selection_authority": "native-pytest",
+                "configuration_resolution": "not-performed",
+            }
+        return {
+            "state": "declared" if declarations else "not-observed",
+            "declarations": declarations,
+            "custom_name_patterns": any(
+                _PYTEST_NAME_OPTIONS.intersection(
+                    cast(Mapping[str, object], row["options"])
+                )
+                for row in declarations
+            ),
+            "collection": "not-observed",
+            "selection_authority": "native-pytest",
+            "configuration_resolution": "not-performed",
+        }
 
     def _native_path_details(self, path: PurePosixPath, raw: bytes) -> _PathDetails:
         if TYPE_CHECKING:
@@ -146,8 +263,18 @@ class VerificationSupportMixin:
         member, raw = self.source._bounded_source_observation(
             rel, VERIFICATION_RELEVANCE_DEFAULTS.source_member_bytes
         )
+        supporting = [member]
+        selection = None
         if member.get("state") == "known-present" and raw is not None:
             kind, reason, unsupported = self._support_path_details(rel, raw)
+            if PurePosixPath(rel).suffix == ".py":
+                selection = self._pytest_selection_declarations(
+                    rel, supporting, reconcile=reconcile
+                )
+                if selection["state"] == "unknown" or selection.get(
+                    "custom_name_patterns"
+                ):
+                    kind, reason = "unknown", "pytest-selection-scope-unqualified"
             if (
                 kind in {"verifier", "verification-support"}
                 and PurePosixPath(rel).suffix in _JS_SUFFIXES | {".go"}
@@ -163,10 +290,13 @@ class VerificationSupportMixin:
             "kind": kind,
             "reason": reason,
             "source_member_revision": member.get("member_revision"),
-            "supporting_source_members": [member],
+            "supporting_source_members": supporting,
             "unsupported_features": unsupported,
             "authority": "repository-source-syntax-only",
             "collection_authority": "external",
+            "native_collection": "not-observed",
+            "negative_evidence_admissible": False,
+            "native_selection": selection,
         }
         return {
             **payload,

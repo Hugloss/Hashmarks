@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, field
-from typing import TypedDict
+from typing import Literal, NotRequired, TypedDict
 
 from hashmarks.paths import normalize_relative_path
 
@@ -22,24 +22,33 @@ from .repository_declaration_provider import (
 
 MAX_MAKE_SHELL_PATHS = 16
 MAX_MAKE_SHELL_BYTES = 262_144
-MAX_STATEMENT_CHARS = 8_192
+MAX_STATEMENT_CHARS = 16_384
 MAX_STATEMENT_WORDS = 256
+MAX_MAKE_SHELL_FACTS = 4_096
 _NAME = r"[A-Za-z_][A-Za-z_0-9]*"
+_MAKE_NAME = r"[A-Za-z_.][A-Za-z_0-9.-]*"
 _ASSIGNMENT = re.compile(rf"^({_NAME})=(.*)$", re.DOTALL)
 _MAKE_ASSIGNMENT = re.compile(
-    rf"^\s*((?:(?:export|override|private)\s+)*)({_NAME}|\.RECIPEPREFIX)\s*(::=|:=|\?=|\+=|!=|=)\s*(.*)$",
+    rf"^\s*((?:(?:export|override|private)\s+)*)({_MAKE_NAME})\s*(::=|:=|\?=|\+=|!=|=)\s*(.*)$",
     re.DOTALL,
 )
 _FUNCTION = re.compile(
     rf"^(?:function\s+)?({_NAME})\s*\(\s*\)\s*\{{\s*(.*)$", re.DOTALL
 )
+_ARRAY_ASSIGNMENT = re.compile(
+    rf"^(?:(local|readonly|export)\s+)?({_NAME})=\((.*)\)\s*$", re.DOTALL
+)
 _TOKEN = re.compile(
-    r"(?:'[^']*'|\"(?:\\.|[^\"\\])*\"|\\.|\$\([A-Za-z_][A-Za-z_0-9]*\)|[^\s;&|<>()'\"\\])+|&&|\|\||[;&|<>()]",
+    r"(?:'[^']*'|\"(?:\\.|[^\"\\])*\"|\\.|\$\("
+    + _MAKE_NAME
+    + r"\)|[^\s;&|<>()'\"\\])+|&&|\|\||[;&|<>()]",
     re.DOTALL,
 )
 _FRAGMENT = re.compile(r"'[^']*'|\"(?:\\.|[^\"\\])*\"|\\.|[^'\"\\]+", re.DOTALL)
-_SHELL_REFERENCE = re.compile(rf"(?<!\$)\$(?:\{{({_NAME})\}}|({_NAME}))")
-_MAKE_REFERENCE = re.compile(rf"(?<!\$)\$(?:\{{({_NAME})\}}|\(({_NAME})\))")
+_SHELL_REFERENCE = re.compile(
+    rf"(?<!\$)\$(?:\{{({_NAME}|[0-9]+|[@*])(?:\[[@*]\]|(?::?-)[^}}]*)?\}}|({_NAME}|[0-9]|[@*]))"
+)
+_MAKE_REFERENCE = re.compile(rf"(?<!\$)\$(?:\{{({_MAKE_NAME})\}}|\(({_MAKE_NAME})\))")
 _SEPARATORS = frozenset({";", "&&", "||", "|", "&"})
 _CONTROL_STARTS = frozenset({"if", "for", "while", "until", "case", "select"})
 _CONTROL_ENDS = frozenset({"fi", "done", "esac"})
@@ -68,6 +77,7 @@ class _Word(TypedDict):
     state: str
     literal: str | None
     reference_names: list[str]
+    reference: NotRequired[dict[str, object]]
 
 
 class _Assignment(TypedDict):
@@ -185,12 +195,52 @@ def _word(expression: str, *, language: str) -> _Word:
     unresolved = (
         "$" in active or "`" in active or bool(re.search(r"[*?\[\]{}~]", unquoted))
     )
-    return {
+    result: _Word = {
         "expression": expression,
         "state": "unresolved-expansion" if unresolved else "literal",
         "literal": None if unresolved else _literal_word(expression),
         "reference_names": list(references),
     }
+    if language == "shell":
+        quoted = expression.startswith('"') and expression.endswith('"')
+        selected = expression[1:-1] if quoted else expression
+        match = re.fullmatch(
+            rf"\$(?:\{{({_NAME}|[0-9]+|[@*])(\[[@*]\])?(?:(:?)-(.*))?\}}|({_NAME}|[0-9]|[@*]))",
+            selected,
+            re.DOTALL,
+        )
+        if match is not None:
+            name, array, colon, fallback, simple = match.groups()
+            name = name or simple
+            result["reference"] = {
+                "name": name,
+                "kind": "array-elements"
+                if array
+                else "positional"
+                if name.isdigit() or name in {"@", "*"}
+                else "scalar",
+                "quoted": quoted,
+                "element_mode": array[1] if array else None,
+                "operator": ":-"
+                if colon == ":"
+                else "-"
+                if fallback is not None
+                else None,
+                "fallback_expression": fallback,
+                "effective_value": "not-established",
+            }
+    else:
+        quoted = expression[:1] in {"'", '"'} and expression[-1:] == expression[:1]
+        selected = expression[1:-1] if quoted else expression
+        match = _MAKE_REFERENCE.fullmatch(selected)
+        if match is not None:
+            result["reference"] = {
+                "name": match.group(1) or match.group(2),
+                "kind": "make-variable",
+                "quoted": quoted,
+                "effective_value": "not-established",
+            }
+    return result
 
 
 def _reference_names(words: Sequence[_Word]) -> tuple[str, ...]:
@@ -242,6 +292,7 @@ class _ShellReader:
     controls: list[str] = field(default_factory=list)
     facts: list[_Fact] = field(default_factory=list)
     stopped: bool = False
+    max_facts: int = MAX_GROUPS
 
     @property
     def context(self) -> tuple[str, ...]:
@@ -257,12 +308,13 @@ class _ShellReader:
         self.facts.append(
             _Fact(kind, line, self.context, value, references, self.language)
         )
-        if len(self.facts) > MAX_GROUPS:
+        if len(self.facts) > self.max_facts:
             raise ValueError("Make/shell declarations exceed group bound")
 
     def _control(self, line: _Line, word: str) -> bool:
         if word in _CONTROL_STARTS:
             self._record("shell-control-syntax", line, {"expression": line.text})
+            self._loop_binding(line, word)
             self.controls.append(f"conditional-or-loop:{line.start}")
         elif word in _CONTROL_ENDS:
             self._record("shell-control-syntax", line, {"expression": line.text})
@@ -273,6 +325,21 @@ class _ShellReader:
         else:
             return False
         return True
+
+    def _loop_binding(self, line: _Line, word: str) -> None:
+        if word not in {"for", "select"}:
+            return
+        tokens = _tokens(line.text)
+        name = tokens[1] if len(tokens) > 1 else ""
+        self._record(
+            "shell-binding-write",
+            line,
+            {
+                "name": name if re.fullmatch(_NAME, name) else None,
+                "write_syntax": "loop-target",
+                "effective_value": "not-established",
+            },
+        )
 
     def _function(self, line: _Line) -> bool:
         match = _FUNCTION.fullmatch(line.text.strip())
@@ -337,6 +404,16 @@ class _ShellReader:
         if self._declarations(line, declarations, modifier=modifier):
             return
         assignments, command = _environment_prefix(tokens, language=self.language)
+        if command and command[0] in {"shift", "set"}:
+            self._record(
+                "shell-positional-write",
+                line,
+                {
+                    "operation_spelling": command[0],
+                    "native_operation_binding": "not-established",
+                    "effective_parameters": "not-established",
+                },
+            )
         words = [_word(token, language=self.language) for token in command]
         references = (*_assignment_references(assignments), *_reference_names(words))
         self._record(
@@ -365,9 +442,9 @@ class _ShellReader:
         first = text.split(maxsplit=1)[0].rstrip(";")
         if self._control(line, first) or self._function(line):
             return
-        if text in {"}", "};"}:
-            if self.functions:
-                self.functions.pop()
+        if self._close_function(text):
+            return
+        if self._array(line, text):
             return
         tokens = _tokens(text)
         if not tokens:
@@ -376,6 +453,36 @@ class _ShellReader:
             return
         for words, preceding in _command_parts(tokens):
             self._command(line, words, preceding)
+
+    def _close_function(self, text: str) -> bool:
+        if text not in {"}", "};"}:
+            return False
+        if self.functions:
+            self.functions.pop()
+        return True
+
+    def _array(self, line: _Line, text: str) -> bool:
+        array = _ARRAY_ASSIGNMENT.fullmatch(text)
+        if array is None or self.language != "shell":
+            return False
+        modifier, name, body = array.groups()
+        tokens = _tokens(body)
+        if any(token in _SEPARATORS | {"(", ")", "<", ">"} for token in tokens):
+            return False
+        elements = [_word(token, language=self.language) for token in tokens]
+        self._record(
+            "shell-array-declaration",
+            line,
+            {
+                "name": name,
+                "elements": elements,
+                "modifier": modifier or "",
+                "assignment_operator": "=",
+                "effective_value": "not-established",
+            },
+            _reference_names(elements),
+        )
+        return True
 
     def _unsupported(self, line: _Line, tokens: list[str]) -> bool:
         active, _ = _active_fragments(line.text, language=self.language)
@@ -395,6 +502,7 @@ class _ShellReader:
             line,
             {
                 "expression": line.text,
+                "token_expressions": list(tokens),
                 "reason": "unsupported-control-redirection-or-expansion",
                 "remaining_file_observation": "not-observed"
                 if "<<" in active
@@ -404,7 +512,23 @@ class _ShellReader:
         # A here-document's following physical lines are data, not commands.
         if "<<" in active:
             self.stopped = True
+        elif "`" not in active:
+            self._observe_command_prefix(line, tokens)
         return True
+
+    def _observe_command_prefix(self, line: _Line, tokens: list[str]) -> None:
+        parts = list(_command_parts(tokens))
+        if len(parts) < 2 or parts[1][1] not in {"&&", "||"}:
+            return
+        words = parts[0][0]
+        if words[0] in _CONTROL_STARTS | _CONTROL_ENDS | _CONTROL_PARTS:
+            return
+        if set(words) & {"(", ")", "<", ">", "{", "}"}:
+            return
+        self.controls.append(f"uninterpreted-remainder:{line.start}")
+        self._command(_Line(line.start, line.end, " ".join(words)), words, "")
+        self.controls.pop()
+        self.facts[-1].value["prefix_of_uninterpreted_statement"] = True
 
 
 def _make_comment(text: str) -> str:
@@ -425,6 +549,7 @@ class _MakeReader:
     define_depth: int = 0
     custom_recipe_prefix: bool = False
     stopped: bool = False
+    max_facts: int = MAX_GROUPS
 
     def _record(
         self,
@@ -436,7 +561,7 @@ class _MakeReader:
         self.facts.append(
             _Fact(kind, line, tuple(self.conditions), value, references, "make")
         )
-        if len(self.facts) > MAX_GROUPS:
+        if len(self.facts) > self.max_facts:
             raise ValueError("Make/shell declarations exceed group bound")
 
     def _directive(self, line: _Line, text: str) -> bool:
@@ -479,6 +604,24 @@ class _MakeReader:
                 for item in _MAKE_REFERENCE.finditer(active)
             )
         )
+        tokens: list[str] = []
+        try:
+            tokens = _tokens(value)
+        except ValueError:
+            words = None
+        else:
+            words = (
+                [_word(token, language="make") for token in tokens]
+                if not any(
+                    token in _SEPARATORS | {"(", ")", "<", ">"} for token in tokens
+                )
+                else None
+            )
+        environment, command = (
+            _environment_prefix(tokens, language="make")
+            if words is not None
+            else ([], [])
+        )
         self._record(
             "make-variable-declaration",
             line,
@@ -487,6 +630,13 @@ class _MakeReader:
                 "assignment_operator": operator,
                 "modifiers": modifiers.split(),
                 "value_expression": value,
+                "value_words": words,
+                "value_environment_prefix": environment,
+                "value_command_words": [
+                    _word(token, language="make") for token in command
+                ]
+                if words is not None
+                else None,
                 "effective_value": "not-established",
                 "evaluation": "native-make-owned",
             },
@@ -513,6 +663,7 @@ class _MakeReader:
         shell = _ShellReader(
             language="make",
             base_context=(*self.conditions, f"make-recipe:{line.start}"),
+            max_facts=self.max_facts,
         )
         shell.read(_Line(line.start, line.end, recipe[len(prefix) :]))
         for fact in shell.facts:
@@ -559,7 +710,7 @@ class _MakeReader:
             self._recipe(line)
         elif not self._directive(line, text) and not self._assignment(line, text):
             self._target(line, text)
-        if len(self.facts) > MAX_GROUPS:
+        if len(self.facts) > self.max_facts:
             raise ValueError("Make/shell declarations exceed group bound")
 
 
@@ -582,17 +733,21 @@ def _source_references(fact: _Fact, facts: Sequence[_Fact]) -> dict[str, object]
         row
         for row in facts
         if row.kind
-        == (
-            "make-variable-declaration"
+        in (
+            {"make-variable-declaration"}
             if fact.language == "make"
-            else "shell-variable-declaration"
+            else {
+                "shell-variable-declaration",
+                "shell-binding-write",
+                "shell-array-declaration",
+            }
         )
     ]
     references = [
         {
             "name": name,
             "declaration_candidates": [
-                _candidate(row) for row in variables if row.value["name"] == name
+                _candidate(row) for row in variables if row.value.get("name") == name
             ],
             "binding": "unresolved",
             "candidate_scope": "same-selected-file-syntax-only",
@@ -614,6 +769,19 @@ def _source_references(fact: _Fact, facts: Sequence[_Fact]) -> dict[str, object]
     return result
 
 
+def _source_value(fact: _Fact, facts: Sequence[_Fact]) -> dict[str, object]:
+    return {
+        **fact.value,
+        **_source_references(fact, facts),
+        "context": list(fact.context),
+        "source_language": fact.language,
+        "authority": "direct-static-syntax-only",
+        "execution": "not-established",
+        "coverage": "incomplete",
+        "negative_evidence_admissible": False,
+    }
+
+
 def _group(
     path: str, fact: _Fact, ordinal: int, facts: Sequence[_Fact], *, provider: str
 ) -> dict[str, object]:
@@ -631,19 +799,10 @@ def _group(
                 "declaration_id": "selected-source-syntax",
                 "semantic_role": {"kind": "syntax-only-observation"},
                 "value_state": "resolved",
-                "value": {
-                    **fact.value,
-                    **_source_references(fact, facts),
-                    "context": list(fact.context),
-                    "source_language": fact.language,
-                    "authority": "direct-static-syntax-only",
-                    "execution": "not-established",
-                    "coverage": "incomplete",
-                    "negative_evidence_admissible": False,
-                },
+                "value": _source_value(fact, facts),
                 "producer": {
                     "provider": provider,
-                    "parser": "bounded-make-shell-syntax.v2",
+                    "parser": "bounded-make-shell-syntax.v4",
                 },
                 "evidence": [
                     {
@@ -667,6 +826,36 @@ def _group(
     }
 
 
+def _file_fact(
+    raw: str, facts: Sequence[_Fact], language: str, *, stopped: bool
+) -> _Fact:
+    return _Fact(
+        "make-shell-file-observation",
+        _Line(1, max(1, len(raw.splitlines())), ""),
+        (),
+        {
+            "facts": [
+                {
+                    "kind": fact.kind,
+                    "start_line": fact.line.start,
+                    "end_line": fact.line.end,
+                    "value": _source_value(fact, facts),
+                }
+                for fact in facts
+            ],
+            "observed_fact_count": len(facts),
+            "facts_completeness": "incomplete"
+            if stopped
+            else "complete-supported-subset",
+            "facts_truncation": "not-truncated",
+            "remaining_source": "not-observed" if stopped else "selected-file-observed",
+            "max_source_facts": MAX_MAKE_SHELL_FACTS,
+            "semantic_coverage": "incomplete",
+        },
+        language=language,
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class MakeShellDeclarations:
     """Observe the documented Make/shell subset in explicitly selected files."""
@@ -674,8 +863,11 @@ class MakeShellDeclarations:
     make_paths: tuple[str, ...] = ()
     shell_paths: tuple[str, ...] = ()
     name: str = "make-shell-syntax"
+    layout: Literal["groups", "file"] = "groups"
 
     def __post_init__(self) -> None:
+        if self.layout not in {"groups", "file"}:
+            raise ValueError("Make/shell layout must be groups or file")
         paths = (*self.make_paths, *self.shell_paths)
         if not 1 <= len(paths) <= MAX_MAKE_SHELL_PATHS:
             raise ValueError("Make/shell provider requires 1..16 exact paths")
@@ -707,13 +899,24 @@ class MakeShellDeclarations:
             raw = context.read_bytes(path)
             if len(raw) > MAX_MAKE_SHELL_BYTES:
                 raise ValueError("Make/shell source exceeds bounded input")
-            reader = _MakeReader() if language == "make" else _ShellReader()
-            for line in _logical_lines(raw.decode("utf-8"), language=language):
+            max_facts = MAX_MAKE_SHELL_FACTS if self.layout == "file" else MAX_GROUPS
+            reader = (
+                _MakeReader(max_facts=max_facts)
+                if language == "make"
+                else _ShellReader(max_facts=max_facts)
+            )
+            text = raw.decode("utf-8")
+            for line in _logical_lines(text, language=language):
                 reader.read(line)
             add_static_binding_observations(reader.facts)
+            projected = (
+                [_file_fact(text, reader.facts, language, stopped=reader.stopped)]
+                if self.layout == "file"
+                else reader.facts
+            )
             groups.extend(
                 _group(path, fact, ordinal, reader.facts, provider=self.name)
-                for ordinal, fact in enumerate(reader.facts)
+                for ordinal, fact in enumerate(projected)
             )
             if len(groups) > MAX_GROUPS:
                 raise ValueError("Make/shell declarations exceed group bound")
@@ -721,7 +924,8 @@ class MakeShellDeclarations:
             groups=tuple(groups),
             provenance={
                 "provider": self.name,
-                "semantics": "hashmarks.make-shell-syntax.v2",
+                "semantics": "hashmarks.make-shell-syntax.v4",
+                "layout": self.layout,
                 "make_paths": sorted(self.make_paths),
                 "shell_paths": sorted(self.shell_paths),
                 "missing_selected_paths": missing,

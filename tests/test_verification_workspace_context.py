@@ -4,16 +4,23 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 from contract_assertions import assert_array, assert_object, assert_records
 
 from hashmarks import CodeMap
-from hashmarks.digest import Digest
+from hashmarks.codemap import indexing_lifecycle
 from hashmarks.file_store import UnstableFileError
 from hashmarks.verification_nomination_validation import (
     validate_verification_nomination,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from hashmarks.codemap.python_import_roots import PythonImportRoots
+    from hashmarks.file_store import FileDigestStore
 
 
 def _write(root: Path, path: str, content: str) -> None:
@@ -280,24 +287,31 @@ def test_packaging_projection_cannot_bind_a_later_manifest_revision(
     with CodeMap(tmp_path) as repository:
         first = repository.index.sync()
         _write(tmp_path, "pyproject.toml", after)
-        original = repository.file_store.read_bytes_stable
-        intervened = False
+        original = indexing_lifecycle.observe_python_import_roots
+        captures = 0
 
-        def read_then_change(
-            path: str | Path, *, max_attempts: int = 3
-        ) -> tuple[bytes, Digest]:
-            nonlocal intervened
-            result = original(path, max_attempts=max_attempts)
-            if Path(path) == tmp_path / "pyproject.toml" and not intervened:
-                intervened = True
-                _write(tmp_path, "pyproject.toml", before)
+        def capture_then_change(
+            workspace: Path,
+            pyprojects: Sequence[Path],
+            file_store: FileDigestStore,
+        ) -> PythonImportRoots:
+            nonlocal captures
+            result = original(workspace, pyprojects, file_store)
+            captures += 1
+            assert captures == 1
+            assert workspace == tmp_path
+            assert tmp_path / "pyproject.toml" in pyprojects
+            assert result.roots == ("lib",)
+            _write(tmp_path, "pyproject.toml", before)
             return result
 
         with monkeypatch.context() as race:
-            race.setattr(repository.file_store, "read_bytes_stable", read_then_change)
+            race.setattr(
+                indexing_lifecycle, "observe_python_import_roots", capture_then_change
+            )
             with pytest.raises(UnstableFileError, match="import-root input changed"):
                 repository.verification.changed_set(["lib/catalog/total.py"])
-        assert intervened
+        assert captures == 1
         assert repository.index.python_import_roots == ("src",)
         assert repository.store.generation() == first.generation
         assert repository.store.meta("sync.build_state") == "COMPLETE"

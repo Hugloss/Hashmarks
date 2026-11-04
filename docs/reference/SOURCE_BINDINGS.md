@@ -33,7 +33,7 @@ contract. Its syntax facts do not gain the qualification of this operation.
 Schema: `hashmarks.source-bindings.v1`.
 
 The additive consumer-evidence fields below are produced by
-`hashmarks.source-binding-interpreter.v2`. Consumers bind the actual producer
+`hashmarks.source-binding-interpreter.v4`. Consumers bind the actual producer
 identity and supported interpreter contract; the schema name alone does not
 prove that a released installation supplies these fields.
 
@@ -144,6 +144,31 @@ use of that parameter, infer all callers, or traverse a call graph. At most one
 local helper edge is interpreted. Mutable globals, rebinding and unsupported
 call shapes cannot be promoted into runtime target certainty.
 
+Python additionally emits `conditional-call-binding` when a conditional default
+or single observed helper input has an exact symbolic call use of that same
+parameter. The join uses the native parameter identity, not a matching private
+name or another source walk. A qualified import plus a `Server` property use,
+for example, can describe a conditional source candidate. The original
+`call-site` still has its unknown target; it is never rewritten.
+
+Each joined row retains `input_binding`, the helper's `input_call` when present,
+the exact `parameter`, and `parameter_use` with the original unknown call,
+symbolic relationship, range and reasons. Default/supplied alternatives remain
+separate rows. Their conditions include the original binding/use conditions,
+external callers not being observed and call-site execution not being
+established. Every joined row still denies runtime target and negative-evidence
+authority. Consumers may grade these conditional source observations under
+their own declared-owner policy; they cannot call them unconditional runtime
+ownership or use a missing row as evidence of absence.
+
+Unused defaults, unrelated same-named parameters and unsupported/multihop inputs
+do not manufacture joins. Later property mutation or supporting-evidence bounds
+withdraw candidate qualification while retaining uncertainty and conditions.
+At most 256 call uses per input binding and the existing 100,000-result internal
+row budget qualify this family. Bound exhaustion fails full-scope qualification
+before result projection. Ordinary output clipping retains the full observed
+count and explicit incomplete/truncated status.
+
 A parameter can still have an independently qualified authored property path.
 For example, in `def publish(journal): finish = journal.finish_detail; finish()`,
 the call's `target` remains null and its main `qualification` remains unknown.
@@ -155,6 +180,26 @@ supplied value, without establishing what value a caller supplies. Mutation,
 shadowing, unsupported forms or an interpretation bound can withdraw that
 independent qualification. Consumers must not replace the main unknown target
 with this symbolic path or a default/helper argument fact.
+
+### Unresolved lexical origins
+
+Python preserves an authored unresolved name as a symbolic origin. For example,
+`load = unprovided_loader; load("pkg")` carries a `symbolic_reference` with
+`root.kind="unresolved-name"`, the original spelling, its exact source range and
+lexical scope. Supported alias and property paths retain their supporting
+ranges. The main fact stays `qualification="unknown"`, `target=null`, with
+`unresolved-lexical-name`; the symbolic descriptor qualifies only that authored
+source relationship. Its `runtime_identity` remains `not-established`.
+
+Builtin-looking spellings such as `__import__` receive no special runtime
+identity. A parameter with the same spelling retains its parameter root;
+declared, rebound, dynamically written or star-imported namespaces cannot become
+an unresolved unique origin. Alias depth and expression/support bounds still
+withdraw unsupported provenance. Default and supplied-helper facts can carry
+this origin with their existing conditions, but never substitute it for a
+parameter's unknown runtime target. Consumers must inspect those separate
+conditional facts when their policy concerns possible authored origins; an
+unknown call target is not evidence that no such origin exists.
 
 ### Strings and computed properties
 

@@ -14,6 +14,8 @@ from hashmarks.codemap import (
 )
 from hashmarks.codemap.make_shell_declarations import (
     MAX_MAKE_SHELL_BYTES,
+    MAX_MAKE_SHELL_FACTS,
+    MAX_STATEMENT_CHARS,
     MAX_STATEMENT_WORDS,
 )
 
@@ -235,8 +237,11 @@ def test_dynamic_expansion_includes_and_make_macros_are_observed_without_executi
         == "not-observed"
     )
     unresolved = _values(packet, "shell-unresolved-statement")
-    assert len(unresolved) == 3
+    assert len(unresolved) == 2
     assert all(row["execution"] == "not-established" for row in unresolved)
+    array = _values(packet, "shell-array-declaration")[0]
+    assert [word["literal"] for word in array["elements"]] == ["first", "second"]
+    assert array["effective_value"] == "not-established"
     commands = _values(packet, "shell-command-expression")
     assert all("macro-data-not-a-command" not in row["expression"] for row in commands)
     sourced = next(row for row in commands if row["expression"] == "source external.sh")
@@ -369,7 +374,7 @@ def test_make_indirection_is_conditional_static_words_not_execution(
     assert command["execution"] == "not-established"
     assert observation["negative_evidence_admissible"] is False
     assert packet["providers"][0]["provenance"]["semantics"] == (
-        "hashmarks.make-shell-syntax.v2"
+        "hashmarks.make-shell-syntax.v4"
     )
 
 
@@ -435,7 +440,7 @@ def test_static_binding_unknown_with_ambiguous_or_dynamic_source(
         )
 
 
-def test_static_binding_does_not_treat_unsafe_expansion_as_simple_word(
+def test_multiword_make_fragment_is_conditional_source_not_effective_argv(
     tmp_path: Path,
 ) -> None:
     _write(
@@ -445,8 +450,410 @@ def test_static_binding_does_not_treat_unsafe_expansion_as_simple_word(
     )
     packet = _observe(tmp_path, MakeShellDeclarations(make_paths=("Makefile",)))
     command = _values(packet, "shell-command-expression")[0]
-    assert command["static_binding_observation"] == {
-        "state": "unclassified",
-        "reason": "unresolved-word-or-binding",
-    }
+    observed = command["static_binding_observation"]
+    assert observed["state"] == "conditional-source"
+    assert observed["words"] == ["python", "-m", "unsafe", "demo"]
+    assert "authored-make-word-fragment-only" in observed["conditions"]
+    assert observed["effective_command"] == observed["execution"] == "not-established"
+    assert observed["negative_evidence_admissible"] is False
     assert command["literal_argv"] is None
+
+
+@pytest.mark.parametrize("value", ['"two words"', '""', ""])
+def test_non_atom_make_values_do_not_acquire_single_atom_qualification(
+    tmp_path: Path, value: str
+) -> None:
+    _write(tmp_path, "Makefile", f"TOOL = {value}\ncheck:\n\t$(TOOL) selected\n")
+    packet = _observe(tmp_path, MakeShellDeclarations(make_paths=("Makefile",)))
+    observed = _values(packet, "shell-command-expression")[0][
+        "static_binding_observation"
+    ]
+    assert observed["state"] == "conditional-source"
+    assert observed["effective_command"] == observed["execution"] == "not-established"
+
+
+def test_nested_make_command_fragments_keep_unknown_environment_and_default_conditions(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path,
+        "Makefile",
+        "SHELL := bash\nSCRIPT ?= scripts/check.sh\n"
+        "LAUNCH = $(SHELL) $(SCRIPT)\n"
+        'FRONT = LOG_DIR="$(UNSUPPLIED)" $(LAUNCH)\n'
+        "check:\n\t@$(FRONT) selected\n",
+    )
+    packet = _observe(tmp_path, MakeShellDeclarations(make_paths=("Makefile",)))
+    command = _values(packet, "shell-command-expression")[0]
+    observed = command["static_binding_observation"]
+    assert observed["state"] == "conditional-source"
+    assert observed["words"] == ["bash", "scripts/check.sh", "selected"]
+    assert "make-variable-not-already-defined" in observed["conditions"]
+    environment = observed["command_local_environment"]
+    assert environment[0]["name"] == "LOG_DIR"
+    assert environment[0]["value_expression"]["state"] == "unresolved-expansion"
+    assert environment[0]["value_expression"]["literal"] is None
+    assert {row["name"] for row in observed["supporting_declarations"]} == {
+        "SHELL",
+        "SCRIPT",
+        "LAUNCH",
+        "FRONT",
+    }
+    assert observed["effective_command"] == "not-established"
+    assert command["literal_argv"] is None
+
+
+def test_shell_arrays_preserve_elements_without_splitting_quoted_scalars(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path,
+        "demo.sh",
+        'TOOLS=(runner "two words")\n"${TOOLS[@]}" selected\n'
+        'SCALAR="runner two words"\n"$SCALAR" selected\n"$TOOLS" selected\n"${TOOLS[*]}" selected\n',
+    )
+    packet = _observe(tmp_path, MakeShellDeclarations(shell_paths=("demo.sh",)))
+    array, scalar, unsupported_scalar_array, joined_array = _values(
+        packet, "shell-command-expression"
+    )
+    assert array["static_binding_observation"]["words"] == [
+        "runner",
+        "two words",
+        "selected",
+    ]
+    assert scalar["static_binding_observation"]["words"] == [
+        "runner two words",
+        "selected",
+    ]
+    assert (
+        unsupported_scalar_array["static_binding_observation"]["state"]
+        == "unclassified"
+    )
+    assert array["literal_argv"] is scalar["literal_argv"] is None
+    assert joined_array["static_binding_observation"]["state"] == "unclassified"
+    assert array["static_binding_observation"]["execution"] == "not-established"
+
+
+def test_helper_arguments_are_separate_conditional_source_invocations(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path,
+        "demo.sh",
+        'run() {\n  local tool="$1"\n  local action="$2"\n'
+        '  "$tool" "$action" "$3"\n}\n'
+        "run first inspect 'one; inert'\nrun second check other\nrun \"$EXTERNAL\" check other\n",
+    )
+    packet = _observe(tmp_path, MakeShellDeclarations(shell_paths=("demo.sh",)))
+    body = _values(packet, "shell-command-expression")[0]
+    assert body["static_binding_observation"]["state"] == "unclassified"
+    invocations = body["invocation_binding_observation"]
+    assert invocations["max_helper_edges"] == 1
+    first, second, unknown = invocations["candidates"]
+    assert first["observation"]["words"] == ["first", "inspect", "one; inert"]
+    assert second["observation"]["words"] == ["second", "check", "other"]
+    assert unknown["observation"]["state"] == "unclassified"
+    assert first["invocation_site"]["start_line"] == 6
+    assert second["invocation_site"]["start_line"] == 7
+    assert (
+        "one-observed-source-invocation-not-all-callers"
+        in first["observation"]["conditions"]
+    )
+    assert first["observation"]["effective_command"] == "not-established"
+    assert invocations["negative_evidence_admissible"] is False
+
+
+def test_function_local_names_do_not_merge_across_source_scopes(tmp_path: Path) -> None:
+    _write(
+        tmp_path,
+        "demo.sh",
+        'first() {\n local tool=alpha\n "$tool" inspect\n}\n'
+        'second() {\n local tool=beta\n "$tool" check\n}\n',
+    )
+    packet = _observe(tmp_path, MakeShellDeclarations(shell_paths=("demo.sh",)))
+    first, second = _values(packet, "shell-command-expression")
+    assert first["static_binding_observation"]["words"] == ["alpha", "inspect"]
+    assert second["static_binding_observation"]["words"] == ["beta", "check"]
+    assert (
+        "source-context-applies:function:first:1"
+        in first["static_binding_observation"]["conditions"]
+    )
+    assert (
+        "source-context-applies:function:second:5"
+        in second["static_binding_observation"]["conditions"]
+    )
+
+
+def test_authored_shell_fallback_does_not_claim_the_ambient_value(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "demo.sh", 'TOOL="${EXTERNAL:-fallback}"\n"$TOOL" inspect\n')
+    packet = _observe(tmp_path, MakeShellDeclarations(shell_paths=("demo.sh",)))
+    observed = _values(packet, "shell-command-expression")[0][
+        "static_binding_observation"
+    ]
+    assert observed["state"] == "conditional-source"
+    assert observed["words"] == ["fallback", "inspect"]
+    assert "parameter-unset-or-empty" in observed["conditions"]
+    assert "parameter-present-branch-unobserved" in observed["conditions"]
+    assert observed["effective_command"] == "not-established"
+    assert observed["negative_evidence_admissible"] is False
+
+
+def test_recursive_and_multihop_helpers_are_not_expanded_into_execution(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path,
+        "demo.sh",
+        'second() { "$1" "$2"; }\n'
+        'first() { second "$1" "$2"; first "$1" next; }\n'
+        "first runner inspect\n",
+    )
+    packet = _observe(tmp_path, MakeShellDeclarations(shell_paths=("demo.sh",)))
+    commands = _values(packet, "shell-command-expression")
+    second = commands[0]["invocation_binding_observation"]
+    assert second["candidates"][0]["observation"]["state"] == "unclassified"
+    recursive = commands[1]["invocation_binding_observation"]["candidates"][0]
+    assert recursive["observation"]["reason"] == "recursive-helper-edge-not-interpreted"
+
+
+def test_file_projection_retains_more_than_legacy_group_bound_without_absence_claims(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "demo.sh", "".join(f"echo value{index}\n" for index in range(160)))
+    with pytest.raises(RepositoryDeclarationProviderError):
+        _observe(tmp_path, MakeShellDeclarations(shell_paths=("demo.sh",)))
+    packet = _observe(
+        tmp_path, MakeShellDeclarations(shell_paths=("demo.sh",), layout="file")
+    )
+    group = _groups(packet, "make-shell-file-observation")[0]
+    observation = group["declarations"][0]["value"]
+    assert len(packet["declarations"]["groups"]) == 1
+    assert observation["observed_fact_count"] == len(observation["facts"]) == 160
+    assert observation["facts_truncation"] == "not-truncated"
+    assert observation["facts"][159]["start_line"] == 160
+    assert observation["facts"][159]["value"]["literal_argv"] == ["echo", "value159"]
+    assert observation["negative_evidence_admissible"] is False
+    assert (
+        _evidence(packet, group)[0]["member_revision"]
+        == packet["providers"][0]["inputs"][0]["member_revision"]
+    )
+
+
+def test_file_projection_marks_unsupported_remaining_source_explicitly(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "demo.sh", "cat <<EOF\nnot-a-command\nEOF\necho unobserved\n")
+    packet = _observe(
+        tmp_path, MakeShellDeclarations(shell_paths=("demo.sh",), layout="file")
+    )
+    observation = _values(packet, "make-shell-file-observation")[0]
+    assert observation["facts_completeness"] == "incomplete"
+    assert observation["remaining_source"] == "not-observed"
+    assert observation["facts_truncation"] == "not-truncated"
+    assert observation["negative_evidence_admissible"] is False
+
+
+def test_file_projection_source_fact_limit_refuses_without_a_prefix(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "demo.sh", "echo source\n" * (MAX_MAKE_SHELL_FACTS + 1))
+    with pytest.raises(RepositoryDeclarationProviderError):
+        _observe(
+            tmp_path, MakeShellDeclarations(shell_paths=("demo.sh",), layout="file")
+        )
+
+
+def test_long_bounded_authored_statement_remains_source_only(tmp_path: Path) -> None:
+    literal = "x" * 8_300
+    _write(tmp_path, "demo.sh", "printf '%s' '" + literal + "'\n")
+    packet = _observe(tmp_path, MakeShellDeclarations(shell_paths=("demo.sh",)))
+    assert _values(packet, "shell-command-expression")[0]["literal_argv"] == [
+        "printf",
+        "%s",
+        literal,
+    ]
+    _write(tmp_path, "demo.sh", "echo '" + "x" * MAX_STATEMENT_CHARS + "'\n")
+    with pytest.raises(RepositoryDeclarationProviderError):
+        _observe(tmp_path, MakeShellDeclarations(shell_paths=("demo.sh",)))
+
+
+def test_dotted_make_assignments_are_not_invented_target_declarations(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path,
+        "Makefile",
+        ".DEFAULT_GOAL := check\nLOCAL.TOOL := runner\ncheck:\n\t$(LOCAL.TOOL) inspect\n",
+    )
+    packet = _observe(tmp_path, MakeShellDeclarations(make_paths=("Makefile",)))
+    assert [row["name"] for row in _values(packet, "make-variable-declaration")] == [
+        ".DEFAULT_GOAL",
+        "LOCAL.TOOL",
+    ]
+    assert [row["targets"] for row in _values(packet, "make-target-declaration")] == [
+        ["check"]
+    ]
+    assert _values(packet, "shell-command-expression")[0]["static_binding_observation"][
+        "words"
+    ] == ["runner", "inspect"]
+
+
+def test_uninterpreted_recipe_tail_does_not_rewrite_make_source_bindings(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path,
+        "Makefile",
+        "TOOL := runner\nother:\n\tprintf x >/dev/null\ncheck:\n"
+        '\t@test -x "$(TOOL)" || { printf unavailable >&2; exit 2; }\n'
+        "\t$(TOOL) inspect\n",
+    )
+    packet = _observe(tmp_path, MakeShellDeclarations(make_paths=("Makefile",)))
+    unresolved = _values(packet, "shell-unresolved-statement")
+    assert len(unresolved) == 2
+    prefix, command = _values(packet, "shell-command-expression")
+    assert prefix["prefix_of_uninterpreted_statement"] is True
+    assert prefix["static_binding_observation"]["words"] == ["test", "-x", "runner"]
+    assert (
+        "source-context-applies:uninterpreted-remainder:5"
+        in prefix["static_binding_observation"]["conditions"]
+    )
+    assert command["static_binding_observation"]["words"] == ["runner", "inspect"]
+    assert (
+        command["static_binding_observation"]["effective_command"] == "not-established"
+    )
+
+
+def test_candidate_fanout_refuses_before_unbounded_word_accumulation(
+    tmp_path: Path,
+) -> None:
+    aliases = ["A0 = first second"]
+    aliases.extend(
+        f"A{index} = $(A{index - 1}) $(A{index - 1})" for index in range(1, 8)
+    )
+    _write(tmp_path, "Makefile", "\n".join((*aliases, "check:", "\t$(A7) $(A7)")))
+    with pytest.raises(RepositoryDeclarationProviderError):
+        _observe(tmp_path, MakeShellDeclarations(make_paths=("Makefile",)))
+
+
+def test_file_layout_preserves_the_shared_result_byte_limit(tmp_path: Path) -> None:
+    _write(tmp_path, "demo.sh", "echo source\n" * 3_000)
+    with pytest.raises(ValueError, match="groups exceeds .* encoded bytes"):
+        _observe(
+            tmp_path, MakeShellDeclarations(shell_paths=("demo.sh",), layout="file")
+        )
+
+
+def test_invocation_cannot_retroactively_bind_an_earlier_scalar_assignment(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path,
+        "demo.sh",
+        'run() { "$TOOL" inspect; }\nTOOL="$LATER"\nLATER=runner\nrun\n',
+    )
+    packet = _observe(tmp_path, MakeShellDeclarations(shell_paths=("demo.sh",)))
+    body = _values(packet, "shell-command-expression")[0]
+    invocation = body["invocation_binding_observation"]["candidates"][0]
+    assert invocation["observation"]["state"] == "unclassified"
+    assert body["literal_argv"] is None
+
+
+def test_one_helpers_arguments_cannot_bind_another_helpers_global_assignment(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path,
+        "demo.sh",
+        'g() {\n x="$1"\n}\nf() {\n echo "$x"\n}\nf wrong\n',
+    )
+    packet = _observe(tmp_path, MakeShellDeclarations(shell_paths=("demo.sh",)))
+    body = _values(packet, "shell-command-expression")[0]
+    invocation = body["invocation_binding_observation"]["candidates"][0]
+    assert invocation["observation"]["state"] == "unclassified"
+
+
+@pytest.mark.parametrize(
+    "word,expected", [('"$10"', None), ('"${10}"', "ten"), ('"$*"', None)]
+)
+def test_positional_source_forms_do_not_invent_native_word_boundaries(
+    tmp_path: Path, word: str, expected: str | None
+) -> None:
+    _write(
+        tmp_path,
+        "demo.sh",
+        f"run() {{ echo {word}; }}\nrun one two three four five six seven eight nine ten\n",
+    )
+    packet = _observe(tmp_path, MakeShellDeclarations(shell_paths=("demo.sh",)))
+    body = _values(packet, "shell-command-expression")[0]
+    observed = body["invocation_binding_observation"]["candidates"][0]["observation"]
+    if expected is None:
+        assert observed["state"] == "unclassified"
+    else:
+        assert observed["words"] == ["echo", expected]
+        assert observed["execution"] == "not-established"
+
+
+@pytest.mark.parametrize("after", [False, True])
+@pytest.mark.parametrize("loop", ["for", "select"])
+def test_loop_target_write_prevents_reuse_of_an_old_unique_binding(
+    tmp_path: Path, after: bool, loop: str
+) -> None:
+    source = f"TOOL=first\n{loop} TOOL in second; do\n"
+    source += " :\n" if after else ' "$TOOL" action\n'
+    source += "done\n" + ('"$TOOL" action\n' if after else "")
+    _write(tmp_path, "demo.sh", source)
+    packet = _observe(tmp_path, MakeShellDeclarations(shell_paths=("demo.sh",)))
+    command = next(
+        row
+        for row in _values(packet, "shell-command-expression")
+        if row["expression"].endswith("action")
+    )
+    assert command["static_binding_observation"]["state"] == "unclassified"
+    write = _values(packet, "shell-binding-write")[0]
+    assert write["name"] == "TOOL" and write["effective_value"] == "not-established"
+
+
+@pytest.mark.parametrize("mutation", ["shift", "set -- changed"])
+def test_positional_mutation_is_not_interpreted_as_the_original_caller_arguments(
+    tmp_path: Path, mutation: str
+) -> None:
+    _write(
+        tmp_path,
+        "demo.sh",
+        f'run() {{\n {mutation}\n echo "$1"\n}}\nrun first second\n',
+    )
+    packet = _observe(tmp_path, MakeShellDeclarations(shell_paths=("demo.sh",)))
+    body = next(
+        row
+        for row in _values(packet, "shell-command-expression")
+        if row["expression"].startswith("echo")
+    )
+    assert (
+        body["invocation_binding_observation"]["candidates"][0]["observation"]["state"]
+        == "unclassified"
+    )
+
+
+@pytest.mark.parametrize("loop", ["for", "select"])
+def test_loop_target_also_invalidates_function_local_source_bindings(
+    tmp_path: Path, loop: str
+) -> None:
+    _write(
+        tmp_path,
+        "demo.sh",
+        f'run() {{\n local TOOL=first\n {loop} TOOL in second; do\n :\n done\n "$TOOL" action\n}}\nrun\n',
+    )
+    packet = _observe(tmp_path, MakeShellDeclarations(shell_paths=("demo.sh",)))
+    body = next(
+        row
+        for row in _values(packet, "shell-command-expression")
+        if row["expression"].endswith("action")
+    )
+    assert body["static_binding_observation"]["state"] == "unclassified"
+    assert (
+        body["invocation_binding_observation"]["candidates"][0]["observation"]["state"]
+        == "unclassified"
+    )

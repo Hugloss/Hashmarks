@@ -5,11 +5,15 @@ from copy import deepcopy
 from dataclasses import dataclass
 from typing import cast
 
-from .dependency_resolution_contract import normalized_text
+import packaging
+from packaging.utils import canonicalize_name
+
+from .dependency_resolution_contract import _MAX_TEXT_CHARS, normalized_text
 from .dependency_version_predicates import (
     normalize_version_predicate,
     prepare_version_predicate,
 )
+from .repository_observation import evidence_identity
 
 MAX_QUERIES = 32
 MAX_RESULTS = 256
@@ -43,6 +47,44 @@ _OPERATION_QUERY_FIELDS = {
     ),
 }
 _QUERY_FIELDS = frozenset().union(*_OPERATION_QUERY_FIELDS.values())
+
+
+def _canonical_package_name(ecosystem: str, name: str) -> str:
+    return canonicalize_name(name) if ecosystem == "pypi" else name
+
+
+def dependency_package_query_identity(ecosystem: str, name: str) -> dict[str, object]:
+    """Qualify caller name matching without changing retained component identity.
+
+    PyPI normalization uses the same native library for any producer's package
+    spelling. Other ecosystems keep opaque exact names, including npm scopes.
+    This observes no registry, installation, or repository membership.
+    """
+    if isinstance(name, str) and len(name) > _MAX_TEXT_CHARS:
+        raise ValueError("dependency package name exceeds its text bound")
+    selected_ecosystem = normalized_text(
+        ecosystem, label="dependency package ecosystem", required=True
+    )
+    selected_name = normalized_text(
+        name, label="dependency package name", required=True
+    )
+    pypi = selected_ecosystem == "pypi"
+    packet: dict[str, object] = {
+        "schema": "hashmarks.dependency-package-query-identity.v1",
+        "ecosystem": selected_ecosystem,
+        "requested_name": name,
+        "canonical_name": _canonical_package_name(selected_ecosystem, selected_name),
+        "semantics": "pypa-normalized-name.v1" if pypi else "opaque-exact-name.v1",
+        "engine": {
+            "name": "packaging" if pypi else "exact-text",
+            "version": packaging.__version__ if pypi else None,
+            "operation": "packaging.utils.canonicalize_name" if pypi else "equality",
+        },
+        "scope": "query-identity-only; retained-component-and-selection-ids-unchanged",
+        "coordinate_existence": "not-observed",
+    }
+    packet["identity"] = evidence_identity(str(packet["schema"]), packet)
+    return packet
 
 
 @dataclass(frozen=True)
@@ -522,6 +564,9 @@ def dependency_package_query(
     """
     _bounds({"max_results": max_results})
     requested = _package_selector(observation, selector)
+    package_identity = dependency_package_query_identity(
+        str(requested["ecosystem"]), str(requested["name"])
+    )
     contexts = (
         {str(requested["context"])}
         if "context" in requested
@@ -531,7 +576,8 @@ def dependency_package_query(
         str(row["component_id"]): row
         for row in cast("Sequence[Mapping[str, object]]", observation["components"])
         if row["ecosystem"] == requested["ecosystem"]
-        and row["name"] == requested["name"]
+        and _canonical_package_name(str(row["ecosystem"]), str(row["name"]))
+        == package_identity["canonical_name"]
     }
     candidates = [
         row
@@ -568,6 +614,7 @@ def dependency_package_query(
     return deepcopy(
         {
             "selector": requested,
+            "package_identity": package_identity,
             "match_count": len(selections),
             "matches": matches,
             "ambiguity": {

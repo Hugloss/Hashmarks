@@ -29,18 +29,21 @@ DOCUMENTATION_CHECKS = (
     "tests/test_documentation_links.py",
     "tests/test_publication_docs.py",
 )
-# Historical regressions are explicit CI priority probes, not a claim that
+# Source contracts and historical regressions are explicit CI priority probes, not a claim that
 # CodeMap's bounded reverse references enumerate every dynamic verifier.
 # Shared verification changes still run the entire native pytest suite.
 CRITICAL_VERIFICATION_TESTS = (
+    "tests/test_public_api_contract.py",
     "tests/test_agent_start_provenance.py",
     "tests/test_verification_observation_freshness.py",
     "tests/test_verification_nomination_binding.py",
+    "tests/test_verification_workspace_context.py",
     "tests/test_changed_set_verification.py",
     "tests/test_changed_set_membership.py",
 )
 CRITICAL_SOURCE_PATHS = frozenset(
     {
+        "hashmarks/__init__.py",
         "hashmarks/codemap/engine.py",
         "hashmarks/codemap/evidence_verification.py",
         "hashmarks/codemap/decision_session.py",
