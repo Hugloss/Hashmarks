@@ -152,6 +152,13 @@ def _metadata_string_array(project: dict[str, object], field: str) -> tuple[str,
     return tuple(values)
 
 
+def _required_dependency_lines(project: dict[str, object]) -> list[str]:
+    requirements = _metadata_string_array(project, "dependencies")
+    if any(not value.strip() for value in requirements):
+        raise RuntimeError("project.dependencies must contain non-empty requirements")
+    return [f"Requires-Dist: {requirement}" for requirement in requirements]
+
+
 def _metadata_bytes() -> bytes:
     name, version, requires_python, extras = _project()
     project = _project_metadata()
@@ -171,6 +178,7 @@ def _metadata_bytes() -> bytes:
         for value in _metadata_string_array(project, "classifiers")
     )
     lines.extend(f"Provides-Extra: {extra}" for extra in extras)
+    lines.extend(_required_dependency_lines(project))
     optional = project.get("optional-dependencies", {})
     if not isinstance(optional, dict):
         raise RuntimeError("project.optional-dependencies must be a table")

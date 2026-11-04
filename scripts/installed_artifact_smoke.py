@@ -15,10 +15,15 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from typing import cast
 
 import hashmarks
 from hashmarks import CodeMap, File, RepositoryIdentity, validate_native_consumer_bundle
 from hashmarks._command_output import log_command_output
+from hashmarks.adapters import (
+    npm_lock_dependency_observation,
+    uv_lock_dependency_observation,
+)
 from hashmarks.codemap import MakeShellDeclarations, PythonUvManifestDeclarations
 from hashmarks.operation_contract import operation_schema
 
@@ -107,6 +112,89 @@ def _check_repository_intelligence() -> None:
             _check_ecmascript_source(codemap)
             _check_declaration_providers(codemap)
             _check_membership_handoff(codemap)
+            _check_dependency_version_predicates(codemap)
+
+
+def _check_dependency_version_predicates(codemap: CodeMap) -> None:
+    python_lock = b"""version = 1
+revision = 3
+[[package]]
+name = "example"
+version = "1"
+source = {virtual = "."}
+dependencies = [{name = "sample-python"}]
+[[package]]
+name = "sample-python"
+version = "1.5.0"
+source = {registry = "https://example.invalid/simple"}
+"""
+    npm_lock = json.dumps(
+        {
+            "name": "example",
+            "lockfileVersion": 3,
+            "packages": {
+                "": {"name": "example", "version": "1"},
+                "node_modules/@scope/sample": {"version": "1.2.3+build"},
+            },
+        }
+    ).encode()
+    cases = (
+        (
+            uv_lock_dependency_observation(lock=python_lock),
+            "pypi",
+            "sample-python",
+            "pep440",
+            ">=1,<2",
+        ),
+        (
+            npm_lock_dependency_observation(lock=npm_lock),
+            "npm",
+            "@scope/sample",
+            "npm-semver",
+            "=1.2.3+other",
+        ),
+    )
+    for snapshot, ecosystem, name, dialect, expression in cases:
+        observed = codemap.dependencies.observe(snapshot)
+        projected = codemap.dependencies.projection(
+            observed,
+            packages=[
+                {
+                    "ecosystem": ecosystem,
+                    "name": name,
+                    "version_predicate": {"dialect": dialect, "expression": expression},
+                }
+            ],
+        )
+        predicate = _installed_dependency_predicate(projected)
+        if predicate["counts"] != {"match": 1, "nonmatch": 0, "unclassified": 0}:
+            raise RuntimeError(
+                "installed dependency predicate lost native version semantics"
+            )
+        engine = predicate.get("engine")
+        if (
+            not isinstance(engine, dict)
+            or not engine.get("version")
+            or not predicate.get("predicate_identity")
+        ):
+            raise RuntimeError("installed dependency predicate lost engine provenance")
+        refreshed = codemap.dependencies.requalify(projected)
+        if _installed_dependency_predicate(refreshed)["counts"] != predicate["counts"]:
+            raise RuntimeError(
+                "installed dependency predicate failed retained requalification"
+            )
+
+
+def _installed_dependency_predicate(projection: dict[str, object]) -> dict[str, object]:
+    packages = projection.get("packages")
+    if not isinstance(packages, list) or len(packages) != 1:
+        raise RuntimeError("installed dependency projection lost its package")
+    package = packages[0]
+    if not isinstance(package, dict) or not isinstance(
+        package.get("version_predicate"), dict
+    ):
+        raise RuntimeError("installed dependency projection lost its predicate")
+    return cast("dict[str, object]", package["version_predicate"])
 
 
 def _check_source_receipt(codemap: CodeMap) -> None:

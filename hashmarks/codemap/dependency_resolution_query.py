@@ -6,6 +6,10 @@ from dataclasses import dataclass
 from typing import cast
 
 from .dependency_resolution_contract import normalized_text
+from .dependency_version_predicates import (
+    normalize_version_predicate,
+    prepare_version_predicate,
+)
 
 MAX_QUERIES = 32
 MAX_RESULTS = 256
@@ -349,12 +353,16 @@ def dependency_inventory_assessment(
 
 def _package_selector(
     observation: Mapping[str, object], selector: Mapping[str, object]
-) -> dict[str, str]:
+) -> dict[str, object]:
     if not isinstance(selector, Mapping):
         raise ValueError("dependency package selector must be an object")
-    if set(selector) - {"ecosystem", "name", "version", "context"}:
+    if set(selector) - {"ecosystem", "name", "version", "context", "version_predicate"}:
         raise ValueError("unknown dependency package selector field")
-    requested = {
+    if "version" in selector and "version_predicate" in selector:
+        raise ValueError(
+            "dependency exact version and version predicate are mutually exclusive"
+        )
+    requested: dict[str, object] = {
         field: normalized_text(
             selector.get(field), label=f"dependency package {field}", required=True
         )
@@ -365,7 +373,52 @@ def _package_selector(
         "Sequence[str]", observation["contexts"]
     ):
         raise ValueError(f"unknown dependency package context: {requested['context']}")
+    if "version_predicate" in selector:
+        requested["version_predicate"] = normalize_version_predicate(
+            selector["version_predicate"]
+        )
     return requested
+
+
+def _predicate_package_selections(
+    observation: Mapping[str, object],
+    requested: Mapping[str, object],
+    selections: Sequence[Mapping[str, object]],
+    contexts: set[str],
+    max_results: int,
+) -> tuple[list[Mapping[str, object]], dict[str, object] | None]:
+    if "version_predicate" not in requested:
+        return list(selections), None
+    prepared = prepare_version_predicate(
+        str(requested["ecosystem"]), requested["version_predicate"]
+    )
+    evidence = prepared.evidence
+    counts = {"match": 0, "nonmatch": 0, "unclassified": 0}
+    matches: list[Mapping[str, object]] = []
+    rows: list[dict[str, object]] = []
+    for selection in selections:
+        classification = prepared.classify(selection["version"])
+        counts[str(classification["state"])] += 1
+        if classification["state"] == "match":
+            matches.append(selection)
+        if len(rows) < max_results:
+            rows.append({"selection": dict(selection), **classification})
+    complete = evidence["availability"] == "supported" and all(
+        _coverage_complete(observation, context=context, kind="selection")
+        for context in contexts
+    )
+    return matches, {
+        **evidence,
+        "counts": counts,
+        "selections": rows,
+        "omitted_selection_count": max(0, len(selections) - len(rows)),
+        "truncation": "truncated" if len(selections) > max_results else "complete",
+        "scope": "retained-package-selection-versions",
+        "completeness": "complete"
+        if complete and not counts["unclassified"]
+        else "incomplete",
+        "negative_evidence": "not-admissible",
+    }
 
 
 def _package_match(
@@ -470,7 +523,7 @@ def dependency_package_query(
     _bounds({"max_results": max_results})
     requested = _package_selector(observation, selector)
     contexts = (
-        {requested["context"]}
+        {str(requested["context"])}
         if "context" in requested
         else set(cast("Sequence[str]", observation["contexts"]))
     )
@@ -480,13 +533,16 @@ def dependency_package_query(
         if row["ecosystem"] == requested["ecosystem"]
         and row["name"] == requested["name"]
     }
-    selections = [
+    candidates = [
         row
         for row in cast("Sequence[Mapping[str, object]]", observation["selections"])
         if row["component_id"] in components
         and ("version" not in requested or row["version"] == requested["version"])
         and contexts.intersection(cast("Sequence[str]", row["contexts"]))
     ]
+    selections, predicate = _predicate_package_selections(
+        observation, requested, candidates, contexts, max_results
+    )
     matches = [
         _package_match(
             observation,
@@ -498,7 +554,7 @@ def dependency_package_query(
         for row in selections[:max_results]
     ]
     inventory = _package_inventory_contexts(
-        observation, contexts, {str(row["node_id"]) for row in selections}, max_results
+        observation, contexts, {str(row["node_id"]) for row in candidates}, max_results
     )
     truncated = (
         len(selections) > max_results
@@ -506,6 +562,8 @@ def dependency_package_query(
             any(cast("Mapping[str, int]", row["omitted"]).values()) for row in matches
         )
         or any(row["omitted_inventory_nodes"] for row in inventory)
+        or predicate is not None
+        and bool(predicate["omitted_selection_count"])
     )
     return deepcopy(
         {
@@ -532,6 +590,7 @@ def dependency_package_query(
             "evidence_scope": "retained-dependency-observation",
             "authority": "qualified-external-observation",
             "producer_authority": "caller-claimed",
+            **({"version_predicate": predicate} if predicate is not None else {}),
         }
     )
 
