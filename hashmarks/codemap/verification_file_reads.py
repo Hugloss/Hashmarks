@@ -39,15 +39,22 @@ def _binding_name(node: ast.AST) -> str | None:
             | ast.MatchMapping(rest=name)
         ):
             return name
-        case ast.Attribute(value=value, ctx=ast.Store() | ast.Del()):
-            while isinstance(value, ast.Attribute):
+        case (
+            ast.Attribute(value=value, ctx=ast.Store() | ast.Del())
+            | ast.Subscript(value=value, ctx=ast.Store() | ast.Del())
+        ):
+            while isinstance(value, (ast.Attribute, ast.Subscript)):
                 value = value.value
             return value.id if isinstance(value, ast.Name) else None
     return None
 
 
-def _bound_names(tree: ast.Module) -> Counter[str]:
+def _name_uses(
+    tree: ast.Module,
+) -> tuple[Counter[str], Counter[str], Counter[str]]:
     counts: Counter[str] = Counter()
+    loads: Counter[str] = Counter()
+    iterations: Counter[str] = Counter()
     for node in ast.walk(tree):
         if isinstance(node, (ast.Import, ast.ImportFrom)):
             counts.update(
@@ -55,7 +62,11 @@ def _bound_names(tree: ast.Module) -> Counter[str]:
             )
         elif (name := _binding_name(node)) is not None:
             counts[name] += 1
-    return counts
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load):
+            loads[node.id] += 1
+        elif isinstance(node, ast.For) and isinstance(node.iter, ast.Name):
+            iterations[node.iter.id] += 1
+    return counts, loads, iterations
 
 
 def _path_imports(tree: ast.Module, counts: Counter[str]) -> frozenset[str]:
@@ -149,6 +160,29 @@ def _literal_path(
     return (*parent, *PurePosixPath(normalized).parts)
 
 
+def _has_loop_exit(node: ast.AST, *, nested_loop: bool = False) -> bool:
+    if isinstance(
+        node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)
+    ):
+        return False
+    if isinstance(node, (ast.Return, ast.Raise)):
+        return True
+    if isinstance(node, (ast.Break, ast.Continue)):
+        return not nested_loop
+    if isinstance(node, ast.Assert) and isinstance(node.test, ast.Constant):
+        return not bool(node.test.value)
+    if isinstance(node, (ast.For, ast.AsyncFor, ast.While)):
+        return any(
+            _has_loop_exit(child, nested_loop=True) for child in node.body
+        ) or any(
+            _has_loop_exit(child, nested_loop=nested_loop) for child in node.orelse
+        )
+    return any(
+        _has_loop_exit(child, nested_loop=nested_loop)
+        for child in ast.iter_child_nodes(node)
+    )
+
+
 class _LiteralReadVisitor(ast.NodeVisitor):
     def __init__(
         self,
@@ -156,11 +190,17 @@ class _LiteralReadVisitor(ast.NodeVisitor):
         names: frozenset[str],
         target: str,
         *,
+        counts: Counter[str],
+        iteration_only_names: frozenset[str],
         tests_only: bool = True,
     ) -> None:
         self.roots = roots
         self.names = names
         self.target = target
+        self.counts = counts
+        self.iteration_only_names = iteration_only_names
+        self.collections: dict[str, tuple[tuple[str, ...], ...]] = {}
+        self.iterated_targets: set[str] = set()
         self.tests_only = tests_only
         self.test: str | None = None
         self.in_function = False
@@ -175,12 +215,45 @@ class _LiteralReadVisitor(ast.NodeVisitor):
         self.test = (
             node.name if not self.tests_only or node.name.startswith("test_") else None
         )
+        outer_collections = self.collections.copy()
+        outer_targets = self.iterated_targets
+        self.iterated_targets = set()
         for child in node.body:
             self.visit(child)
             if self.terminated:
                 break
         self.test = None
         self.in_function = False
+        self.collections = outer_collections
+        self.iterated_targets = outer_targets
+
+    def visit_Assign(self, node: ast.Assign) -> None:
+        if len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
+            name = node.targets[0].id
+            paths = self._finite_paths(node.value)
+            if (
+                paths is not None
+                and self.counts[name] == 1
+                and name in self.iteration_only_names
+            ):
+                self.collections[name] = paths
+        self.generic_visit(node)
+
+    def _finite_paths(self, node: ast.expr) -> tuple[tuple[str, ...], ...] | None:
+        if isinstance(node, ast.Name):
+            return self.collections.get(node.id)
+        if not isinstance(node, (ast.Tuple, ast.List)) or not (
+            0
+            < len(node.elts)
+            <= VERIFICATION_RELEVANCE_DEFAULTS.literal_file_read_sites
+        ):
+            return None
+        paths = tuple(_literal_path(item, self.roots, self.names) for item in node.elts)
+        return (
+            tuple(path for path in paths if path is not None)
+            if all(path is not None for path in paths)
+            else None
+        )
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         self._visit_function(node)
@@ -194,6 +267,17 @@ class _LiteralReadVisitor(ast.NodeVisitor):
 
     def visit_Lambda(self, node: ast.Lambda) -> None:
         return
+
+    def _visit_comprehension(self, node: ast.expr) -> None:
+        outer_targets = self.iterated_targets
+        self.iterated_targets = set()
+        self.generic_visit(node)
+        self.iterated_targets = outer_targets
+
+    visit_GeneratorExp = _visit_comprehension
+    visit_ListComp = _visit_comprehension
+    visit_SetComp = _visit_comprehension
+    visit_DictComp = _visit_comprehension
 
     def visit_If(self, node: ast.If) -> None:
         # Dynamic guards, including typing-only aliases, remain unqualified.
@@ -216,7 +300,20 @@ class _LiteralReadVisitor(ast.NodeVisitor):
         return
 
     def visit_For(self, node: ast.For) -> None:
-        return
+        paths = self._finite_paths(node.iter)
+        if (
+            paths is None
+            or not isinstance(node.target, ast.Name)
+            or self.counts[node.target.id] != 1
+            or any(_has_loop_exit(child) for child in node.body)
+        ):
+            return
+        outer_targets = self.iterated_targets.copy()
+        if any(PurePosixPath(*parts).as_posix() == self.target for parts in paths):
+            self.iterated_targets.add(node.target.id)
+        for child in node.body:
+            self.visit(child)
+        self.iterated_targets = outer_targets
 
     def visit_AsyncFor(self, node: ast.AsyncFor) -> None:
         return
@@ -260,18 +357,34 @@ class _LiteralReadVisitor(ast.NodeVisitor):
         }:
             return False
         parts = _literal_path(node.func.value, self.roots, self.names)
-        return parts is not None and PurePosixPath(*parts).as_posix() == self.target
+        if parts is not None:
+            return PurePosixPath(*parts).as_posix() == self.target
+        receiver = node.func.value
+        while _is_call(receiver, self.names) and isinstance(receiver, ast.Call):
+            receiver = receiver.args[0]
+        return isinstance(receiver, ast.Name) and receiver.id in self.iterated_targets
 
 
 def literal_repository_file_reads(
     tree: ast.Module, reader_path: str, target: str, *, tests_only: bool = True
 ) -> list[dict[str, object]]:
-    counts = _bound_names(tree)
+    counts, collection_uses, iteration_uses = _name_uses(tree)
     names = _path_imports(tree, counts)
     roots = _root_bindings(
         tree, names, counts, len(PurePosixPath(reader_path).parts) - 1
     )
-    visitor = _LiteralReadVisitor(roots, names, target, tests_only=tests_only)
+    visitor = _LiteralReadVisitor(
+        roots,
+        names,
+        target,
+        counts=counts,
+        iteration_only_names=frozenset(
+            name
+            for name, uses in collection_uses.items()
+            if uses == iteration_uses[name]
+        ),
+        tests_only=tests_only,
+    )
     visitor.visit(tree)
     return visitor.reads
 

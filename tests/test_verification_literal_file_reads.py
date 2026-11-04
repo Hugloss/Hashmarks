@@ -63,6 +63,94 @@ def test_literal_repository_document_reader_is_a_structural_verifier(
     assert qualification["completeness"] == "incomplete"
 
 
+@pytest.mark.parametrize("collection", ["tuple", "list"])
+def test_finite_repository_document_iteration_is_a_structural_verifier(
+    tmp_path: Path, collection: str
+) -> None:
+    opening, closing = ("(", ")") if collection == "tuple" else ("[", "]")
+    _fixture(
+        tmp_path,
+        f"    documents = {opening}ROOT / 'docs/guide.md', ROOT / 'README.md'{closing}\n"
+        "    for document in documents:\n"
+        "        text = document.read_text(encoding='utf-8')\n"
+        "        assert text\n",
+    )
+    (tmp_path / "README.md").write_text("# Repository\n")
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        graph = codemap.tasks.verification_ownership_graph("Verify docs/guide.md")
+        changed = codemap.verification.changed_set(["docs/guide.md"])
+    (owner,) = _linked(graph)
+    (read,) = assert_records(owner["file_read_evidence"])
+    assert read["test_symbol"] == "test_commands"
+    assert read["reader_revision"] and read["source_revision"]
+    qualification = assert_object(graph["verification_qualification"])
+    assert qualification["completeness"] == "incomplete"
+    assert qualification["negative_evidence_admissible"] is False
+    (target,) = assert_records(changed["targets"])
+    assert target["path"] == "tests/test_guide.py"
+    assert assert_object(target["nomination"])["available"] is True
+    assert changed["negative_evidence_admissible"] is False
+    assert changed["execution_authority"] == "external"
+
+
+@pytest.mark.parametrize("change", ["method", "mutation", "receiver-rebound"])
+def test_warm_document_iteration_does_not_survive_reader_change(
+    tmp_path: Path, change: str
+) -> None:
+    reader = _fixture(
+        tmp_path,
+        "    documents = [ROOT / 'docs/guide.md']\n"
+        "    for document in documents:\n"
+        "        assert document.read_text()\n",
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        assert _linked(
+            codemap.tasks.verification_ownership_graph("Verify docs/guide.md")
+        )
+        before = reader.read_text()
+        if change == "method":
+            after = before.replace(".read_text()", ".as_posix()")
+        elif change == "mutation":
+            after = before.replace(
+                "    for document", "    documents.clear()\n    for document"
+            )
+        else:
+            after = before.replace(
+                "        assert",
+                "        document = Path('/tmp/other')\n        assert",
+            )
+        reader.write_text(after)
+        assert not _linked(
+            codemap.tasks.verification_ownership_graph("Verify docs/guide.md")
+        )
+
+
+def test_module_iteration_does_not_bind_a_deferred_test_reader(tmp_path: Path) -> None:
+    reader = _fixture(
+        tmp_path,
+        "    for document in (ROOT / 'docs/guide.md', ROOT / 'docs/other.md'):\n"
+        "        assert document.read_text()\n",
+    )
+    (tmp_path / "docs/other.md").write_text("# Other\n")
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        assert _linked(
+            codemap.tasks.verification_ownership_graph("Verify docs/guide.md")
+        )
+        reader.write_text(
+            "from pathlib import Path\n"
+            "ROOT = Path(__file__).resolve().parents[1]\n"
+            "for document in (ROOT / 'docs/guide.md', ROOT / 'docs/other.md'):\n"
+            "    def test_commands():\n"
+            "        return document.read_text()\n"
+        )
+        assert not _linked(
+            codemap.tasks.verification_ownership_graph("Verify docs/guide.md")
+        )
+
+
 @pytest.mark.parametrize("change", ["rewrite", "delete", "branch-return"])
 def test_warm_document_relation_does_not_survive_reader_change(
     tmp_path: Path, change: str
