@@ -58,7 +58,8 @@ original repository binding and identities. Use existing adapters and
 retained projection; it does not create a fresh observation from old claims.
 
 Package selectors require exact `ecosystem` and `name` and optionally exact
-`version` and declared `context`. Names use the adapter's normalized component
+`version`, a typed `version_predicate`, and declared `context`. Exact `version`
+and `version_predicate` are mutually exclusive. Names use the adapter's normalized component
 identity; the core does not guess import names or apply ecosystem-specific
 name normalization. Unknown contexts and unknown selector fields are rejected.
 Requests normalize, sort and deduplicate selectors and repository-relative paths.
@@ -67,6 +68,90 @@ Python consumers use the existing `uv_lock_dependency_observation()` adapter,
 including explicitly supplied `METADATA` and `RECORD` when module ownership is
 needed. The projection reuses those same qualified observations and
 `dependencies.consumers()`; it does not introduce a parallel Python path.
+
+## Ecosystem-qualified version predicates
+
+For an already-qualified Python dependency observation, select a predicate with
+the same public projection call:
+
+```python
+filtered = repository.dependencies.projection(
+    observation,
+    packages=[
+        {
+            "ecosystem": "pypi",
+            "name": "example-package",
+            "version_predicate": {
+                "dialect": "pep440",
+                "expression": ">=1.2,<2",
+                "prereleases": False,
+            },
+        }
+    ],
+    limit=10,
+)
+```
+
+Python/`pypi` uses PyPA `packaging`'s `SpecifierSet` and `Version` semantics.
+The `pep440` predicate has an explicit `prereleases` boolean, defaulting to
+`False`; set it to `True` when prereleases belong in the selected predicate.
+Epochs, post-releases, local versions and compatible-release operators retain
+those library semantics. JavaScript/`npm` uses the separate `npm-semver` dialect
+and the selected `node-semver` library's `Range.test`; its native prerelease rules apply and a
+`prereleases` field is invalid. An empty expression uses the selected library's
+unrestricted-range syntax under that dialect's prerelease rules.
+
+The npm interpreter uses a qualified Node-compatible port profile: version and
+endpoint text is at most 256 characters, while numeric version components and
+numeric prerelease identifiers are at most JavaScript's safe integer limit
+(`2**53 - 1`). Native Node can accept larger numeric prerelease identifiers;
+those inputs remain unclassified here because their comparison is outside the
+qualified port profile. Versions with extra numeric release components and
+other out-of-profile inputs also remain unclassified. The producer does not
+repair unsupported port arithmetic with a separate comparator.
+
+Every package candidate is classified before result bounds. `matches` contains
+bounded matching selections and `match_count` counts all observed matches.
+The package's `version_predicate` packet retains the exact expression, dialect,
+ecosystem, prerelease policy, interpreter contract and library version in its
+`predicate_identity`. It reports full `match`, `nonmatch` and `unclassified`
+counts, bounded per-selection classifications and their raw versions, omitted
+selection count and disclosure truncation. A matching version beyond the first
+page of nonmatching versions is therefore still returned in `matches`.
+
+Unknown ecosystems, mismatched dialects, unsupported syntax and versions that
+the selected library cannot interpret remain `unclassified`. Invalid request
+types or undeclared fields are rejected. Raw observed version strings are
+preserved. The predicate's selection-scope completeness and its classification
+availability remain separate from projection truncation and source currentness.
+Its `negative_evidence` is always `not-admissible`.
+
+Package `contexts` and `current_inventory` use the complete package-presence
+candidate set before predicate filtering. A version nonmatch does not turn a
+present package into an absent one. Source consumers cover only the returned
+matching nodes; the full counts retain unclassified and omitted selections.
+Overall consumer scope remains incomplete.
+
+Requalification checks the retained predicate and engine evidence before reading
+current Source inputs and verifies the same interpretation after projecting
+the selections. A changed library version or interpretation contract requires
+a fresh projection. Source-input drift keeps the original selected versions
+as historical facts while current membership and consumer qualification retain
+their normal stale/unknown behavior.
+
+### Observer ownership
+
+Observed repository fact/evidence: whether each supplied dependency selection's
+version satisfies an explicit ecosystem-qualified predicate.
+Authority source: qualified v3 selection/context facts and established native
+library semantics, bound by the predicate's content identity.
+Completeness/freshness behavior: classify the declared package universe before
+projection; preserve source correspondence, unclassified versions and omissions.
+Existing Hashmarks owner extended: dependency package queries and retained
+projection/requalification; the pure predicate interpreter owns no inventory.
+Consumer/execution responsibility: advisory choice, severity, remediation, Fleet
+population, admission and execution remain external.
+Decision: **OBSERVER**.
 
 ## Packet and independent authorities
 

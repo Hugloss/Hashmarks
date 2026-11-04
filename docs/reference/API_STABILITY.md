@@ -252,6 +252,15 @@ See [Dependency projection](DEPENDENCY_PROJECTION.md) for exact bounds, scope an
 unknown/unsupported behavior. These are direct Python APIs, with no new service,
 CLI or MCP routes.
 
+Package selectors optionally accept a typed `version_predicate` in place of exact
+`version`. The supported `pep440`/`pypi` and `npm-semver`/`npm` dialects classify
+all retained candidates before bounds and preserve match, nonmatch and
+unclassified counts. Existing selectors without a predicate keep their exact
+selection behavior. A retained predicate binds its explicit policy and native
+library version; changed interpreter semantics require a fresh projection before
+current-source requalification. Package-presence and current-inventory evidence
+remain independent of predicate nonmatch.
+
 `RepositoryIdentity.observe_directory()` is a local-only contents observation
 with native `snapshot("*")` identity and separately named physical materialization
 counts. Literal `exclude_paths` constrain both scopes. Producer-owned state is

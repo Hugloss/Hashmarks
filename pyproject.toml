@@ -5,13 +5,16 @@ backend-path = ["."]
 
 [project]
 name = "hashmarks"
-version = "0.34.2"
+version = "0.35.0"
 description = "Local repository intelligence and a read-only MCP server for coding agents: codebase search, repository context, code navigation, ownership, change impact, freshness, and verification evidence."
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "node-semver>=0.9.1",
+    "packaging>=26.3",
+]
 keywords = [
     "repository-intelligence",
     "mcp",

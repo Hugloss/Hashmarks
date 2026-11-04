@@ -14,6 +14,7 @@ from hashmarks.paths import normalize_relative_path
 
 from .dependency_resolution_evidence import _identity
 from .dependency_resolution_query import _package_selector, dependency_package_query
+from .dependency_version_predicates import prepare_version_predicate
 
 if TYPE_CHECKING:
     from .repository_dependencies import RepositoryDependencies
@@ -69,7 +70,7 @@ def _encoded(packet: object) -> bytes:
 
 @dataclass(frozen=True)
 class _Request:
-    packages: list[dict[str, str]]
+    packages: list[dict[str, object]]
     source_paths: list[str]
     limit: int
     max_depth: int
@@ -100,7 +101,7 @@ def _request(
         or not 1 <= len(packages) <= _MAX_PACKAGES
     ):
         raise ValueError("dependency projection requires between 1 and 64 packages")
-    selectors: dict[bytes, dict[str, str]] = {}
+    selectors: dict[bytes, dict[str, object]] = {}
     for value in packages:
         if not isinstance(value, Mapping):
             raise ValueError("dependency package selector must be an object")
@@ -244,6 +245,67 @@ def _packages(
     return packages
 
 
+def _predicate_evidence_matches(
+    retained: object, current: Mapping[str, object]
+) -> bool:
+    return isinstance(retained, Mapping) and all(
+        retained.get(key) == value for key, value in current.items()
+    )
+
+
+def _retained_predicate_evidence(
+    request: _Request, packages: object
+) -> list[dict[str, object] | None] | None:
+    if not any("version_predicate" in selector for selector in request.packages):
+        return None
+    if not isinstance(packages, list) or len(packages) != len(request.packages):
+        raise ValueError("retained dependency predicate package scope mismatch")
+    result: list[dict[str, object] | None] = []
+    for selector, package in zip(request.packages, packages, strict=True):
+        if not isinstance(package, Mapping) or package.get("selector") != selector:
+            raise ValueError("retained dependency predicate selector mismatch")
+        if "version_predicate" not in selector:
+            result.append(None)
+            continue
+        current = prepare_version_predicate(
+            str(selector["ecosystem"]), selector["version_predicate"]
+        ).evidence
+        if not _predicate_evidence_matches(package.get("version_predicate"), current):
+            raise ValueError(
+                "retained dependency predicate semantics changed; acquire a fresh projection"
+            )
+        result.append(current)
+    return result
+
+
+def _require_predicate_evidence(
+    packages: Sequence[Mapping[str, object]],
+    expected: Sequence[Mapping[str, object] | None] | None,
+) -> None:
+    if expected is None:
+        return
+    for package, evidence in zip(packages, expected, strict=True):
+        if evidence is not None and not _predicate_evidence_matches(
+            package.get("version_predicate"), evidence
+        ):
+            raise ValueError(
+                "dependency predicate semantics changed during requalification"
+            )
+
+
+def _empty_package_consumers(
+    packages: Sequence[Mapping[str, object]],
+) -> dict[str, object]:
+    for package in packages:
+        predicate = package.get("version_predicate")
+        if not isinstance(predicate, Mapping):
+            continue
+        counts = cast("Mapping[str, int]", predicate["counts"])
+        if predicate["availability"] != "supported" or counts["unclassified"]:
+            return {"state": "unavailable", "reason": "version-predicate-unclassified"}
+    return {"state": "no-matching-selection", "reason": "no-returned-package-matches"}
+
+
 class DependencyProjectionMixin:
     """Project existing dependency and Source owners without rebinding old claims."""
 
@@ -292,6 +354,7 @@ class DependencyProjectionMixin:
         request = _request(observation, **requested)
         if request.packet() != requested:
             raise ValueError("retained dependency projection request is not canonical")
+        predicates = _retained_predicate_evidence(request, packet.get("packages"))
         scope = packet["source_scope"]
         if not isinstance(scope, Mapping):
             raise ValueError("invalid retained dependency projection source scope")
@@ -299,7 +362,10 @@ class DependencyProjectionMixin:
             scope.get("retained_members"), request.source_paths
         )
         return self._dependency_projection(
-            observation, request, retained_members=retained
+            observation,
+            request,
+            retained_members=retained,
+            predicate_evidence=predicates,
         )
 
     def _dependency_projection_binding(self) -> dict[str, object]:
@@ -350,9 +416,7 @@ class DependencyProjectionMixin:
         if not request.source_paths:
             packet.update(state="not-requested", reason="no-source-paths")
         elif not nodes:
-            packet.update(
-                state="no-matching-selection", reason="no-returned-package-matches"
-            )
+            packet.update(_empty_package_consumers(packages))
         elif not binding_current:
             packet["reason"] = "retained-repository-binding-stale"
         elif not _inputs_current(assessment):
@@ -397,6 +461,7 @@ class DependencyProjectionMixin:
         request: _Request,
         *,
         retained_members: list[dict[str, object]] | None,
+        predicate_evidence: Sequence[Mapping[str, object] | None] | None = None,
     ) -> dict[str, object]:
         if TYPE_CHECKING:
             self = cast("RepositoryDependencies", self)
@@ -409,6 +474,7 @@ class DependencyProjectionMixin:
             ]
         source_scope = _source_scope(retained_members, sources)
         packages = _packages(observation, request, assessment)
+        _require_predicate_evidence(packages, predicate_evidence)
         binding_current = observation["repository_binding"] == binding
         consumers = self._dependency_projection_consumers(
             observation,

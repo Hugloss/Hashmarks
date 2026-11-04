@@ -367,8 +367,12 @@ wheels = [
 
 [[package]]
 name = "hashmarks"
-version = "0.34.2"
+version = "0.35.0"
 source = { editable = "." }
+dependencies = [
+    { name = "node-semver" },
+    { name = "packaging" },
+]
 
 [package.optional-dependencies]
 mcp = [
@@ -407,6 +411,8 @@ typing = [
 [package.metadata]
 requires-dist = [
     { name = "mcp", marker = "extra == 'mcp'", specifier = ">=2.2.0" },
+    { name = "node-semver", specifier = ">=0.9.1" },
+    { name = "packaging", specifier = ">=26.3" },
     { name = "tree-sitter-language-pack", marker = "extra == 'syntax'", specifier = ">=0.13,<1" },
 ]
 provides-extras = ["mcp", "syntax"]
@@ -560,6 +566,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/ae/91/762d7755d971aff8a28d75f7961656148edf27875c8026e6385aaab08ae7/mcp_types-2.2.0.tar.gz", hash = "sha256:d3ed53703ddd10d9c6399f29d322bb66f3f67ab41348ac8556ba23e07fedefad", size = 65892, upload-time = "2026-09-07T16:06:25.187Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/8f/d7/6ffba5d8cd5dd9b8a19478875c50e04945314ba5074e84d749283f27f62d/mcp_types-2.2.0-py3-none-any.whl", hash = "sha256:ea476b73ee86709ab5abc9452385ed36cc05907e582355622e294595c9a04f13", size = 69106, upload-time = "2026-09-07T16:06:21.461Z" },
+]
+
+[[package]]
+name = "node-semver"
+version = "0.9.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/80/46/83d4ff2e6ee95a2395c9695f92b83c7aec16a8341cf4b50be08d67f59deb/node_semver-0.9.1.tar.gz", hash = "sha256:f052dbdcbc42dd5a0c04b22829a3af98c1f29e4675cc6d88db24250a3f7f8ec7", size = 12828, upload-time = "2026-06-23T03:06:50.862Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/05/82/aee31be77e4539deb4b1305f2b42ed5f92a2ff7b8057ada67a0c3ba12187/node_semver-0.9.1-py3-none-any.whl", hash = "sha256:47669dc0f7e104cc482f69fda53c04fbe34ce9b7c9d6990e43c99a028d1628bd", size = 12051, upload-time = "2026-06-23T03:06:49.633Z" },
 ]
 
 [[package]]

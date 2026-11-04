@@ -224,6 +224,18 @@ cannot establish absence. The source budget is 8 MiB per input; unavailable sour
 retains its native reason. Revalidation rejects an input changing during the call.
 The result is request-local evidence, not a stored observation or execution policy.
 
+### Ecosystem-qualified version predicates
+
+The existing package projection accepts an optional typed `version_predicate`
+instead of an exact `version`. It delegates Python/PEP440 and npm range meaning
+to their selected library dialects and records match/nonmatch/unclassified facts
+for the full observed package candidate set before output bounds. Native package
+presence, source currentness, predicate interpretation and consumer completeness
+remain separate. Predicate/interpreter evidence participates in retained
+projection identity and is rechecked before current-source requalification.
+See [Dependency projection](DEPENDENCY_PROJECTION.md#ecosystem-qualified-version-predicates)
+for request shape, supported dialects, bounds and unknown behavior.
+
 ### Explain projection
 
 `CodeMap.dependencies.explain(observation)` is a pure read-only explanation of one already-qualified dependency endpoint. It returns schema `hashmarks.dependency-resolution-explain.v1` and contains:

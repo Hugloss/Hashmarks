@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.35.0 — Qualified dependency version predicates
+
+- Observe Python/PEP 440 and npm version predicates through the existing dependency package projection. Preserve raw versions, ecosystem/context identity, match/nonmatch/unclassified counts and bounded selection evidence; range nonmatch does not become package absence.
+- Bind retained predicates to the loaded native library, explicit prerelease policy and supported input profile. Requalification rejects changed interpreter meaning, while unsupported syntax, unsafe numeric precision and incomplete observations remain explicit.
+- Publish bounded Make/shell static binding candidates from the existing source owner, retaining expansion, ordering and runtime uncertainty.
+- Preserve required runtime dependency metadata in wheels, source distributions and editable builds, and retain that metadata in standalone artifacts. Canonicalize source-archive permissions across checkouts while preserving executable intent. Python and npm predicate engines remain library-owned; package resolution, advisory decisions and execution remain external.
+
 ## 0.34.2 — Expanded source binding evidence
 
 - Extend `hashmarks.source-bindings.v1` through binding interpreter v2 with ordered native call arguments, authored import and module syntax, Python class bases, and literal-to-call-argument containment. Preserve exact source ranges and independent qualification for every detail.

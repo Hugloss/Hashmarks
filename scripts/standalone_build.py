@@ -16,6 +16,8 @@ PYINSTALLER_ARGS = (
     "hashmarks",
     "--collect-all",
     "hashmarks",
+    "--recursive-copy-metadata",
+    "hashmarks",
     "scripts/hashmarks_entrypoint.py",
 )
 

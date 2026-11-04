@@ -25,5 +25,7 @@ def test_standalone_build_owns_packager_version_and_exact_argv() -> None:
         "hashmarks",
         "--collect-all",
         "hashmarks",
+        "--recursive-copy-metadata",
+        "hashmarks",
         "scripts/hashmarks_entrypoint.py",
     )

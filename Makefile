@@ -404,10 +404,10 @@ artifact-check:
 	test "$$#" -eq 1 && test -f "$$1"; \
 	sdist=$$1; \
 	$(UV) venv --python $(ARTIFACT_PYTHON) "$$artifact_check_dir/wheel-env" >/dev/null; \
-	$(UV) pip install --offline --python "$$artifact_check_dir/wheel-env/bin/python" "$$wheel" >/dev/null; \
+	$(UV) pip install --python "$$artifact_check_dir/wheel-env/bin/python" "$$wheel" >/dev/null; \
 	"$$artifact_check_dir/wheel-env/bin/python" -I scripts/installed_artifact_smoke.py; \
 	$(UV) venv --python $(ARTIFACT_PYTHON) "$$artifact_check_dir/sdist-env" >/dev/null; \
-	$(UV) pip install --offline --python "$$artifact_check_dir/sdist-env/bin/python" "$$sdist" >/dev/null; \
+	$(UV) pip install --python "$$artifact_check_dir/sdist-env/bin/python" "$$sdist" >/dev/null; \
 	"$$artifact_check_dir/sdist-env/bin/python" -I scripts/installed_artifact_smoke.py; \
 	printf '%s\n' 'Hashmarks installed-artifact qualification: PASS (wheel + sdist).'
 
