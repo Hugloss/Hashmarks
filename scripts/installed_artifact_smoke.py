@@ -1,7 +1,8 @@
 """Smoke-test an installed Hashmarks artifact from an isolated interpreter.
 
-Run this with ``python -I`` from a clean environment containing only the built
-artifact. The source checkout must not be able to satisfy Hashmarks imports.
+Run this with ``python -I`` from a clean environment containing the built
+artifact and its declared runtime dependencies. The source checkout must not
+be able to satisfy Hashmarks imports.
 """
 
 from __future__ import annotations
