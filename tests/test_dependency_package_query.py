@@ -4,13 +4,14 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from copy import deepcopy
+from pathlib import Path
 from typing import cast
 
 import pytest
 from contract_assertions import assert_array, assert_object, assert_records
 from test_dependency_resolution_evidence import _snapshot_v3
 
-from hashmarks import CodeMap
+from hashmarks import CodeMap, dependency_package_query_identity
 from hashmarks.codemap.dependency_resolution_query import dependency_package_query
 
 
@@ -234,6 +235,152 @@ def test_package_projection_bound_requires_supported_integer(
             {"ecosystem": "test", "name": "library"},
             max_results=cast("int", bound),
         )
+
+
+def _name_snapshot() -> dict[str, object]:
+    snapshot = _snapshot_v3()
+    component = next(
+        row
+        for row in assert_records(snapshot["components"])
+        if row["component_id"] == "library"
+    )
+    component.update(ecosystem="pypi", name="mlflow")
+    for identifier, ecosystem, name in (
+        ("py-separated", "pypi", "ML_Flow"),
+        ("npm-same", "npm", "mlflow"),
+        ("npm-scoped", "npm", "@scope/ml_flow"),
+    ):
+        assert_array(snapshot["components"]).append(
+            {"component_id": identifier, "ecosystem": ecosystem, "name": name}
+        )
+        assert_array(snapshot["selections"]).append(
+            {
+                "node_id": identifier + "@1",
+                "component_id": identifier,
+                "version": "1",
+                "source": "registry",
+                "contexts": ["compile"],
+                "evidence_sources": ["tree:compile"],
+            }
+        )
+        assert_array(snapshot["inventory"]).append(
+            {
+                "node_id": identifier + "@1",
+                "context": "compile",
+                "evidence_sources": ["list:compile"],
+            }
+        )
+    return snapshot
+
+
+@pytest.mark.parametrize(
+    "ecosystem,name,canonical,expected",
+    [
+        ("pypi", "MLFlow", "mlflow", "library@1"),
+        ("pypi", "ML_Flow", "ml-flow", "py-separated@1"),
+        ("pypi", "ml.__--flow", "ml-flow", "py-separated@1"),
+        ("npm", "mlflow", "mlflow", "npm-same@1"),
+        ("npm", "MLFlow", "MLFlow", None),
+        ("npm", "@scope/ml_flow", "@scope/ml_flow", "npm-scoped@1"),
+        ("npm", "@scope/ml-flow", "@scope/ml-flow", None),
+    ],
+)
+def test_query_names_use_only_the_selected_ecosystem_without_rewriting_ids(
+    tmp_path: Path, ecosystem: str, name: str, canonical: str, expected: str | None
+) -> None:
+    with CodeMap(tmp_path) as repository:
+        observed = repository.dependencies.observe(_name_snapshot())
+        original = deepcopy(observed)
+        package = dependency_package_query(
+            observed, {"ecosystem": ecosystem, "name": name, "context": "compile"}
+        )
+    assert observed == original
+    identity = assert_object(package["package_identity"])
+    assert identity == dependency_package_query_identity(ecosystem, name)
+    assert identity["requested_name"] == name
+    assert identity["canonical_name"] == canonical
+    assert package["selector"] == {
+        "ecosystem": ecosystem,
+        "name": name,
+        "context": "compile",
+    }
+    matches = assert_records(package["matches"])
+    assert [assert_object(row["selection"])["node_id"] for row in matches] == (
+        [expected] if expected else []
+    )
+    for row in matches:
+        selection = assert_object(row["selection"])
+        assert selection in assert_records(original["selections"])
+        assert assert_object(row["component"]) in assert_records(original["components"])
+    context = assert_records(package["contexts"])[0]
+    assert context["membership"] == ("present" if expected else "absent")
+    assert context["negative_evidence"] == (
+        "not-applicable" if expected else "admissible-within-declared-scope"
+    )
+
+
+def test_public_query_identity_retains_caller_spelling_and_native_provenance() -> None:
+    identity = dependency_package_query_identity("pypi", " ML_Flow ")
+    assert identity["requested_name"] == " ML_Flow "
+    assert identity["canonical_name"] == "ml-flow"
+    assert (
+        assert_object(identity["engine"])["operation"]
+        == "packaging.utils.canonicalize_name"
+    )
+    assert identity["coordinate_existence"] == "not-observed"
+    assert (
+        identity["identity"]
+        != dependency_package_query_identity("pypi", "ml-flow")["identity"]
+    )
+    assert (
+        dependency_package_query_identity("npm", "@scope/ML_Flow")["canonical_name"]
+        == "@scope/ML_Flow"
+    )
+
+
+def test_query_identity_bounds_the_original_spelling_before_retaining_it() -> None:
+    with pytest.raises(ValueError, match="text bound"):
+        dependency_package_query_identity("pypi", " " * 4096 + "x")
+
+
+def test_canonical_name_equivalence_preserves_declared_ambiguity_and_bounds(
+    tmp_path: Path,
+) -> None:
+    snapshot = _name_snapshot()
+    assert_array(snapshot["components"]).append(
+        {"component_id": "py-alias", "ecosystem": "pypi", "name": "MLFLOW"}
+    )
+    assert_array(snapshot["selections"]).append(
+        {
+            "node_id": "py-alias@1",
+            "component_id": "py-alias",
+            "version": "1",
+            "source": "registry",
+            "contexts": ["compile"],
+            "evidence_sources": ["tree:compile"],
+        }
+    )
+    assert_array(snapshot["inventory"]).append(
+        {
+            "node_id": "py-alias@1",
+            "context": "compile",
+            "evidence_sources": ["list:compile"],
+        }
+    )
+    with CodeMap(tmp_path) as repository:
+        observed = repository.dependencies.observe(snapshot)
+        original = deepcopy(observed)
+        result = dependency_package_query(
+            observed,
+            {"ecosystem": "pypi", "name": "MLFlow", "context": "compile"},
+            max_results=1,
+        )
+    assert observed == original
+    assert result["match_count"] == 2 and len(assert_records(result["matches"])) == 1
+    assert assert_object(result["ambiguity"])["multiple_selections"] is True
+    assert assert_object(result["ambiguity"])["uniqueness"] == "not-established"
+    assert result["truncation"] == "truncated"
+    assert assert_records(result["contexts"])[0]["membership"] == "present"
 
 
 def test_package_projection_detaches_nested_retained_claims(

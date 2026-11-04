@@ -5,11 +5,12 @@ from __future__ import annotations
 import csv
 import hashlib
 import io
-import re
 from collections.abc import Mapping, Sequence
 from email.parser import Parser
 from pathlib import PurePosixPath
 from typing import cast
+
+from packaging.utils import canonicalize_name
 
 _MAX_ARTIFACT_BYTES = 4_194_304
 _MAX_METADATA_BYTES = 8_388_608
@@ -35,10 +36,6 @@ def _distribution_identity(raw: object) -> tuple[bytes, str, str]:
             raise ValueError(f"Python distribution metadata requires one {name}")
         values.append(headers[0].strip())
     return data, values[0], values[1]
-
-
-def _distribution_name(value: object) -> str:
-    return re.sub(r"[-_.]+", "-", str(value)).lower()
 
 
 def _record_modules(text: str) -> set[str]:
@@ -90,7 +87,7 @@ def _ownership_inputs(
 ) -> tuple[set[str], list[dict[str, object]]]:
     metadata, name, version = _distribution_identity(raw.get("metadata"))
     if (
-        _distribution_name(name) != _distribution_name(selection["component_id"])
+        canonicalize_name(name) != canonicalize_name(str(selection["component_id"]))
         or version != selection["version"]
     ):
         raise ValueError(

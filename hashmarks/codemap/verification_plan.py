@@ -18,6 +18,7 @@ from .go_module_declaration import declared_go_module
 from .providers import SourceSyntaxError, SourceSyntaxProvider, source_grammar
 from .repository_domains import RepositoryDomain, classify_repository_path
 from .repository_observation import evidence_identity
+from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
 
 if TYPE_CHECKING:
     from .evidence_verification import RepositoryVerification
@@ -207,8 +208,22 @@ class VerificationPlanMixin:
         """Read one current supporting input through the canonical source owner."""
         if TYPE_CHECKING:
             self = cast("RepositoryVerification", self)
-        self.source.ensure_current(rel)
-        observation, raw = self.source.member(rel, include_bytes=True)
+        observation, raw = self.source._bounded_source_observation(
+            rel, VERIFICATION_RELEVANCE_DEFAULTS.source_member_bytes
+        )
+        # Refuse a known oversized/denied input before reconciliation can parse
+        # it. Native refresh remains responsible for safe, absent/new or changed
+        # contributors that the bounded source observation can admit.
+        if (
+            observation.get("state") == "known-absent"
+            or observation.get("state") == "known-present"
+            and observation.get("index_state") == "unindexed"
+            or observation.get("reason") == "member-revision-mismatch"
+        ):
+            self.source.ensure_current(rel)
+            observation, raw = self.source._bounded_source_observation(
+                rel, VERIFICATION_RELEVANCE_DEFAULTS.source_member_bytes
+            )
         state = observation.get("state")
         if state == "known-absent":
             members.append({"path": rel, "state": "known-absent"})
@@ -220,6 +235,7 @@ class VerificationPlanMixin:
             or not revision
             or raw is None
         ):
+            members.append(observation)
             raise _UnqualifiedNominationMember(rel)
         members.append(
             {"path": rel, "state": "known-present", "member_revision": revision}
@@ -319,19 +335,31 @@ class VerificationPlanMixin:
             raise _UnqualifiedNominationMember("node-test-source-syntax") from exc
 
     @staticmethod
-    def _pytest_manifest_declaration(raw: bytes) -> bool:
-        """Qualify authored pytest configuration by TOML syntax, not text hints."""
+    def _pytest_manifest_options(raw: bytes) -> Mapping[str, object] | None:
+        """Observe authored pytest options without interpreting native discovery."""
         try:
             manifest = tomllib.loads(raw.decode("utf-8"))
         except (UnicodeError, tomllib.TOMLDecodeError) as exc:
             raise _UnqualifiedNominationMember("pyproject.toml") from exc
         tool = manifest.get("tool")
         if not isinstance(tool, Mapping):
-            return False
-        pytest = tool.get("pytest")
-        return isinstance(pytest, Mapping) and isinstance(
-            pytest.get("ini_options"), Mapping
-        )
+            return None
+        options = tool.get("pytest")
+        if options is not None and not isinstance(options, Mapping):
+            raise _UnqualifiedNominationMember("pytest-configuration-options")
+        if not isinstance(options, Mapping):
+            return None
+        if "ini_options" not in options:
+            return options
+        ini = options["ini_options"]
+        if len(options) != 1 or not isinstance(ini, Mapping):
+            raise _UnqualifiedNominationMember("pytest-configuration-options")
+        return ini
+
+    @staticmethod
+    def _pytest_manifest_declaration(raw: bytes) -> bool:
+        """Qualify authored pytest configuration by TOML syntax, not text hints."""
+        return VerificationPlanMixin._pytest_manifest_options(raw) is not None
 
     @staticmethod
     def _qualify_python_test_node(source: bytes, name: str) -> None:

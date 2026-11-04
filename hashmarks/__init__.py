@@ -52,6 +52,9 @@ if TYPE_CHECKING:
     from .codemap import (
         RepositoryDeclarationProviderResult as RepositoryDeclarationProviderResult,
     )
+    from .codemap.dependency_resolution_query import (
+        dependency_package_query_identity as dependency_package_query_identity,
+    )
     from .consumer_conformance import (
         NativeVerificationMember as NativeVerificationMember,
     )
@@ -107,18 +110,25 @@ __all__ = [
     "NativeVerificationMember",
     "NativeVerificationSelectionProjection",
     "validate_repository_intelligence_evidence",
+    "dependency_package_query_identity",
 ]
 
 
 def __getattr__(name: str) -> object:
     """Lazily expose component APIs without loading unrelated engines eagerly."""
-    if name in {"CodeMap", "RepositoryIdentity", "RepositoryIdentityMode"}:
+    if name in {
+        "CodeMap",
+        "RepositoryIdentity",
+        "RepositoryIdentityMode",
+        "dependency_package_query_identity",
+    }:
         from importlib import import_module
 
         owner = {
             "CodeMap": ".codemap",
             "RepositoryIdentity": ".identity",
             "RepositoryIdentityMode": ".client",
+            "dependency_package_query_identity": ".codemap.dependency_resolution_query",
         }[name]
         return getattr(import_module(owner, __name__), name)
     if name == "native_producer_implementation_identity":

@@ -23,6 +23,7 @@ from .source_binding_contract import (
     MAX_ALIAS_DEPTH,
     MAX_BINDING_DETAILS,
     MAX_BINDING_EXPRESSION_DEPTH,
+    MAX_BINDING_RESULTS,
     MAX_BINDING_SUPPORTING_RANGES,
     MAX_LITERAL_BYTES,
     BindingObservationBound,
@@ -139,6 +140,7 @@ class _PythonBindings:
         self.lines = _line_offsets(raw)
         self.syntax = PythonScopes(tree)
         self.rows: list[dict[str, object]] = []
+        self._parameter_calls: dict[ast.AST, list[tuple[ast.Call, _Value]]] = {}
         self._property_mutations: dict[_ImportKey, ast.AST] = {}
         self._symbolic_mutations: dict[_SymbolicKey, ast.AST] = {}
         self._observe_property_writes()
@@ -201,7 +203,13 @@ class _PythonBindings:
     ) -> _Value:
         binding = self.syntax.lookup(node.id, scope)
         if binding is None:
-            return self._unknown("unresolved-lexical-name")
+            return _Value(
+                reasons=("unresolved-lexical-name",),
+                support=(node,),
+                symbolic=_SymbolicReference(
+                    PythonBinding(node.id, node, scope, "unresolved-name")
+                ),
+            )
         if binding.kind == "unknown":
             return self._unknown(binding.reason or "unknown-binding", binding)
         if _immediate_read(binding, scope) and _publication_position(
@@ -599,7 +607,7 @@ class _PythonBindings:
             return None
         return {
             "root": {
-                "kind": "parameter",
+                "kind": symbolic.root.kind,
                 "name": symbolic.root.name,
                 "range": self.range(symbolic.root.node),
                 "scope": self.scope(symbolic.root.scope),
@@ -713,6 +721,105 @@ class _PythonBindings:
             else "not-truncated",
         )
         self.rows.append(row)
+        self._remember_parameter_call(node, value)
+
+    def _remember_parameter_call(self, node: ast.Call, value: _Value) -> None:
+        symbolic = value.symbolic
+        if symbolic is not None and symbolic.root.kind == "parameter":
+            self._parameter_calls.setdefault(symbolic.root.node, []).append(
+                (node, value)
+            )
+
+    def _conditional_call_rows(
+        self, binding: dict[str, object], parameter: ast.arg, value: _Value
+    ) -> None:
+        if value.qualification != "conditional":
+            return
+        uses = self._parameter_calls.get(parameter, [])
+        if len(uses) > MAX_BINDING_DETAILS:
+            raise BindingObservationBound("conditional-parameter-call-use-bound")
+        for call, use in uses:
+            if len(self.rows) >= MAX_BINDING_RESULTS:
+                raise BindingObservationBound("conditional-call-row-bound")
+            row = self._conditional_call_row(binding, parameter, value, call, use)
+            self.rows.append(row)
+
+    def _conditional_call_value(self, value: _Value, use: _Value) -> _Value:
+        symbolic = use.symbolic
+        assert symbolic is not None
+        if symbolic.reasons:
+            return replace(
+                self._unknown("conditional-parameter-use-unqualified"),
+                reasons=symbolic.reasons,
+            )
+        candidate = value
+        for property_name in symbolic.properties:
+            candidate = self._property(candidate, property_name)
+        return candidate
+
+    def _conditional_call_row(
+        self,
+        binding: dict[str, object],
+        parameter: ast.arg,
+        value: _Value,
+        call: ast.Call,
+        use: _Value,
+    ) -> dict[str, object]:
+        candidate = self._conditional_call_value(value, use)
+        conditions = tuple(
+            dict.fromkeys(
+                (
+                    *value.conditions,
+                    *use.conditions,
+                    "conditional-parameter-input",
+                    "external-callers-not-observed",
+                    "call-site-execution-not-established",
+                )
+            )
+        )
+        candidate = self._supported(
+            candidate,
+            value.support,
+            use.support,
+            (parameter, call),
+        )
+        candidate = replace(candidate, conditions=conditions)
+        row = self.row("conditional-call-binding", call, candidate)
+        row.update(
+            expression=self.expression(call.func),
+            parameter=binding["parameter"],
+            input_binding={
+                key: binding[key]
+                for key in (
+                    "kind",
+                    "range",
+                    "scope",
+                    "qualification",
+                    "target",
+                    "literal",
+                    "conditions",
+                    "reasons",
+                    "runtime_target",
+                )
+            },
+            input_call=binding.get("call"),
+            parameter_use={
+                "call_range": self.range(call),
+                "callee_range": self.range(call.func),
+                "qualification": use.qualification,
+                "target": use.target,
+                "symbolic_reference": self._symbolic_reference(
+                    use, list(use.conditions)
+                ),
+                "conditions": list(use.conditions),
+                "reasons": list(use.reasons),
+                "runtime_target": "not-established",
+            },
+            helper_edges=1 if binding["kind"] == "argument-binding" else 0,
+            semantic_coverage="incomplete",
+            negative_evidence="not-admissible",
+        )
+        return row
 
     def _argument_detail(self, argument: ast.AST, index: int) -> dict[str, object]:
         kind, name, expression = _argument_parts(argument)
@@ -805,6 +912,7 @@ class _PythonBindings:
                 parameter=self._parameter(argument, scope),
             )
             self.rows.append(row)
+            self._conditional_call_rows(row, argument, value)
 
     def _helper_calls(
         self,
@@ -853,6 +961,7 @@ class _PythonBindings:
             if expression is None:
                 row["expression"] = None
             self.rows.append(row)
+            self._conditional_call_rows(row, parameter, value)
 
     def observe(self) -> list[dict[str, object]]:
         for node in self.syntax.nodes:

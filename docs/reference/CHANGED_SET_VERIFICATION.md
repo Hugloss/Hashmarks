@@ -81,6 +81,27 @@ packet preserves unknown consumer coverage and observed unsupported features.
 Ordinary imported factories/helpers reuse import evidence; structurally proven
 repository file reads reuse the existing literal-read owner.
 
+### Authored Python roles and native selection
+
+Each role retains `native_collection="not-observed"`, external collection
+authority and `negative_evidence_admissible=false`. A `source` or support role
+describes the observed source subset; it never proves that native pytest will
+not collect that member. Plugins, hooks, command-line overrides and native
+configuration resolution remain outside this source observation.
+
+`native_selection` preserves bounded ancestor configuration declarations and
+their exact source-member ledger, including authored Python name patterns,
+`testpaths`, `norecursedirs` and `addopts`. It does not choose a configuration
+winner, apply patterns or interpret arguments. Explicit Python name-pattern
+declarations and source `__test__` flags leave the role unknown rather than
+manufacturing a default-test or ordinary-source verdict. Other options remain
+raw source evidence; even `addopts` may change native selection.
+
+Consumers that require actual changed-test membership obtain a source-bound
+native collection observation through their existing external collection owner.
+Unknown source roles or a missing nomination cannot substitute for that native
+membership or establish native test absence.
+
 ## Repository assets
 
 For an observed asset, `changes[i]["asset"]` describes its content kind,

@@ -6,11 +6,13 @@ from collections.abc import Iterator, Mapping
 from copy import deepcopy
 from pathlib import Path
 
+import packaging
 import pytest
 from contract_assertions import assert_object, assert_records
 
 from hashmarks import CodeMap, hash_file
 from hashmarks.adapters import uv_lock_dependency_observation
+from hashmarks.codemap.dependency_resolution_evidence import _identity
 from hashmarks.evidence_presentation import (
     present_repository_evidence,
     presentation_response,
@@ -686,3 +688,81 @@ def test_complete_inventory_does_not_strengthen_other_projection_domains(
         }
         assert coverage_by_kind["module-ownership"] == "incomplete"
         assert coverage_by_kind["resolution-graph"] == "unknown"
+
+
+def test_pypi_query_identity_round_trips_without_changing_retained_components(
+    repository: CodeMap,
+) -> None:
+    observed = repository.dependencies.observe(_snapshot(repository.workspace))
+    original = deepcopy(observed)
+    packet = repository.dependencies.projection(
+        observed, packages=[{"ecosystem": "pypi", "name": "Sample_Distribution"}]
+    )
+    package = assert_records(packet["packages"])[0]
+    assert assert_object(package["selector"])["name"] == "Sample_Distribution"
+    identity = assert_object(package["package_identity"])
+    assert identity["requested_name"] == "Sample_Distribution"
+    assert identity["canonical_name"] == "sample-distribution"
+    assert package["match_count"] == 1
+    for match in assert_records(package["matches"]):
+        assert assert_object(match["component"]) in assert_records(
+            original["components"]
+        )
+        assert assert_object(match["selection"]) in assert_records(
+            original["selections"]
+        )
+    assert repository.dependencies.requalify(packet) == packet
+    assert packet["observation"] == observed == original
+
+
+def test_name_semantics_drift_refuses_retained_projection_before_source_work(
+    repository: CodeMap,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    retained = _projection(repository)
+    monkeypatch.setattr(repository.dependencies, "assessment", _forbid_source)
+    monkeypatch.setattr(packaging, "__version__", "changed-native-name-engine")
+    with pytest.raises(ValueError, match="query identity semantics changed"):
+        repository.dependencies.requalify(retained)
+
+
+@pytest.mark.parametrize("mutation", ["missing", "changed"])
+def test_unbound_retained_query_identity_cannot_be_reinterpreted(
+    repository: CodeMap,
+    monkeypatch: pytest.MonkeyPatch,
+    mutation: str,
+) -> None:
+    retained = _projection(repository)
+    assert repository.dependencies.requalify(retained) == retained
+    forged = deepcopy(retained)
+    package = assert_records(forged["packages"])[0]
+    if mutation == "missing":
+        package.pop("package_identity")
+    else:
+        assert_object(package["package_identity"])["canonical_name"] = "another-package"
+    forged.pop("projection_identity")
+    forged["projection_identity"] = _identity(str(forged["schema"]), forged)
+    monkeypatch.setattr(repository.dependencies, "assessment", _forbid_source)
+    with pytest.raises(ValueError, match="query identity semantics changed"):
+        repository.dependencies.requalify(forged)
+
+
+def test_name_semantics_drift_during_source_work_cannot_mix_qualifications(
+    repository: CodeMap,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    retained = _projection(repository)
+    native_assessment = repository.dependencies.assessment
+
+    def change_engine(observation: dict[str, object]) -> dict[str, object]:
+        result = native_assessment(observation)
+        monkeypatch.setattr(
+            packaging, "__version__", "changed-during-source-assessment"
+        )
+        return result
+
+    monkeypatch.setattr(repository.dependencies, "assessment", change_engine)
+    with pytest.raises(
+        ValueError, match="query identity semantics changed during requalification"
+    ):
+        repository.dependencies.requalify(retained)

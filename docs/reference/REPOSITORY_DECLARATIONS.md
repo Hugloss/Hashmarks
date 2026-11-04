@@ -12,40 +12,36 @@ This capability is intentionally not a universal service/configuration ontology.
 
 ## Qualified static Make/shell binding candidates
 
-`MakeShellDeclarations` observes explicitly selected Makefiles and shell sources
-through the existing bounded lexical declaration owner. Its
-`hashmarks.make-shell-syntax.v2` producer retains raw expressions, assignment
-operators, source order, declaration references, Make target/recipe associations,
-canonical member revisions, provenance and incomplete semantic coverage.
+`MakeShellDeclarations` observes explicitly selected sources through its one
+bounded lexical/parser and binding owner. The
+`hashmarks.make-shell-syntax.v3` producer retains authored expressions, operators,
+source contexts, member revisions, uncertainty and incomplete semantic coverage.
 
-A `shell-command-expression` may include `static_binding_observation`.
-`state=conditional-static` means its `words` follow from unique, earlier,
-top-level, single-atom authored declarations in the **selected file**, with each
-supporting declaration's line, raw expression and assignment operator in
-`supporting_declarations`. For example, `RUNNER := python`,
-`TOOL = $(RUNNER)`, and a recipe `MODE="sample" $(TOOL) -m demo`
-produce conditional candidate words `["python", "-m", "demo"]`.
-Command-local assignments remain separately reported as lexical source values.
-Shell single-quoted variable spellings remain literal; double-quoted simple
-references can qualify when their input is unique and already authored.
+A `shell-command-expression` may carry `static_binding_observation`.
+`state=conditional-static` describes simple authored single-word indirection.
+Broader multiword Make fragments, conditional defaults and scoped scalar/array
+forms use `state=conditional-source`. Exact supporting declaration sites,
+conditions, source features and unresolved environment expressions survive the
+projection. These are authored word candidates, never effective argv, selected
+defaults, an observed runtime environment or execution.
 
-This is **not Make expansion or shell execution**. Assumptions include no
-environment/command-line overrides, no externally supplied include/source
-state and no native expansion that changes word boundaries. Only safe
-single-word literals or directly referenced names with at most eight hops
-are included. Cyclic, missing, later, duplicate, conditional, dynamic,
-unsupported-operator and non-atom bindings stay `unclassified`. Includes,
-source/eval, unresolved syntax and control constructs invalidate the
-closed-source derivation. `state=not-needed` means existing literal argv
-already describes the selected text.
+An additional `invocation_binding_observation` can describe positional source
+flow across one literal helper invocation. Call sites and argument expressions
+remain distinct, with one-edge/64-candidate bounds; recursive or unqualified
+flows stay unclassified. Observing one caller cannot qualify all invocations.
 
-Every qualified result retains `effective_command=not-established`,
+The default provider layout preserves individual declaration groups. An explicit
+Python `layout="file"` projection retains up to 4,096 source facts in one group
+per selected member without changing the shared 128-group or one-MiB result
+limits. Whole-member evidence and per-fact physical sites remain bound. Stopped
+or bounded source observation cannot establish absence.
+
+Every candidate keeps `effective_command=not-established`,
 `execution=not-established`, `semantic_coverage=incomplete` and
-`negative_evidence_admissible=false`. The existing `literal_argv`,
-`variable_references`, declaration candidates and raw source remain
-unchanged. Consumers must not use candidate words to assert executable
-identity, runtime environment, success, policy compliance or qualified
-absence. OH-Goon owns policy, admission, execution and its own migration.
+`negative_evidence_admissible=false`. Native Make/Bash behavior, external
+configuration, consumer policy and execution remain outside this source view.
+The [Make/shell evidence contract](MAKE_SHELL_EVIDENCE.md) specifies supported
+forms, qualifiers and unsupported boundaries.
 
 ## Selected backend schema and environment syntax
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.35.2 — 2026-11-04
+
+- Preserve authored unresolved Python alias origins and conditional parameter-use provenance without claiming a resolved runtime target, including lexical shadowing and rebinding barriers.
+- Observe bounded Make/shell source-word candidates and their declaration/invocation provenance, with an opt-in file projection for larger authored files. Conditional, dynamic and native execution semantics remain explicitly unproven.
+- Expose ecosystem-qualified dependency query identity through the public Python API. PyPI uses native packaging name semantics; npm names retain exact spelling. Retained projections reject incompatible name-identity semantics before source work, preserving opaque component and resolution identities.
+- Retain source-bound pytest selection declarations and uncertainty for custom verifier patterns. Repository-source roles never claim native test collection or test absence; native pytest remains collection authority.
+
 ## 0.35.1 — Refresh-safe observation diagnostics
 
 - Enable native diagnostics directly on `CodeMap.reads.observe()` while preserving generation-bound reads, source reconciliation and the original callback result. Explicit nested opt-in fails before the callback; ordinary nested observations inherit the outer profile.
