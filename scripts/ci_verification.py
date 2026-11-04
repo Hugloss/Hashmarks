@@ -37,6 +37,7 @@ CRITICAL_VERIFICATION_TESTS = (
     "tests/test_agent_start_provenance.py",
     "tests/test_verification_observation_freshness.py",
     "tests/test_verification_nomination_binding.py",
+    "tests/test_verification_workspace_context.py",
     "tests/test_changed_set_verification.py",
     "tests/test_changed_set_membership.py",
 )
