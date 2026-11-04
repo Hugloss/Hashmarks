@@ -88,7 +88,7 @@ bounded candidate derivation retains its exact supporting declarations; it never
 
 ## Conditional authored binding candidates
 
-The `hashmarks.make-shell-syntax.v3` producer retains the existing
+The `hashmarks.make-shell-syntax.v4` producer retains the existing
 `static_binding_observation`. `state="conditional-static"` continues to name
 simple source indirection. Broader supported forms use
 `state="conditional-source"`: multiword Make fragments, `?=` authored defaults,
@@ -98,6 +98,24 @@ Their `words` are source candidates, not effective argv. `conditions`,
 `command_local_environment` retain the limitations of that projection.
 Unknown environment values stay unresolved even when adjacent command words
 have a conditional source candidate.
+
+An unobserved `source`, dynamic namespace operation or unsupported statement
+does not erase independent authored declaration/use syntax. Such candidates
+explicitly require the authored declarations to take effect, with no intervening
+rebinding or readonly conflict; unobserved source state may change bindings.
+These are conditional source relationships, never effective expansion or command
+binding. Known conflicting declarations still prevent a unique candidate.
+
+If any command word remains unresolved, the whole observation stays
+`state="unclassified"` and has no `words` value. `authored_words` may retain
+literal source candidates beside intact unresolved `source_word` expressions.
+An alias or array may transport an opaque source expression without evaluating
+it; an unknown interpreter, substitution or path never becomes a synthetic
+runtime value. This partial view is emitted only when the complete word
+candidate is unavailable and retains the same word, support and packet bounds.
+`authored_environment_bindings` similarly retains authored export sites and
+conditional declaration/use evidence, without observing the effective or
+ambient process environment. Imports from sourced files remain unobserved.
 
 A `?=` candidate is conditional on the variable not already being defined;
 Hashmarks does not inspect the ambient environment or select the default.
@@ -161,6 +179,9 @@ Make functions, inline Make recipes, target-specific assignments and effective
 external overrides remain unresolved or uninterpreted source expressions.
 Simple line-oriented conditional/function contexts are retained; general
 compound-language interpretation remains outside this provider.
+Unsupported statement facts retain the original raw expression and the existing
+tokenizer's comment-free `token_expressions`. Quoted comment characters remain
+data; the token projection does not establish command or control execution.
 
 Make `define` bodies are uninterpreted macro source. A custom `.RECIPEPREFIX`
 prevents later tabbed lines from being promoted to established recipes.

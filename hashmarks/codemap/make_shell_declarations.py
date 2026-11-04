@@ -502,6 +502,7 @@ class _ShellReader:
             line,
             {
                 "expression": line.text,
+                "token_expressions": list(tokens),
                 "reason": "unsupported-control-redirection-or-expansion",
                 "remaining_file_observation": "not-observed"
                 if "<<" in active
@@ -801,7 +802,7 @@ def _group(
                 "value": _source_value(fact, facts),
                 "producer": {
                     "provider": provider,
-                    "parser": "bounded-make-shell-syntax.v3",
+                    "parser": "bounded-make-shell-syntax.v4",
                 },
                 "evidence": [
                     {
@@ -923,7 +924,7 @@ class MakeShellDeclarations:
             groups=tuple(groups),
             provenance={
                 "provider": self.name,
-                "semantics": "hashmarks.make-shell-syntax.v3",
+                "semantics": "hashmarks.make-shell-syntax.v4",
                 "layout": self.layout,
                 "make_paths": sorted(self.make_paths),
                 "shell_paths": sorted(self.shell_paths),

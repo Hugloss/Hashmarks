@@ -23,8 +23,13 @@ _SIMPLE_ATOM = re.compile(r"[A-Za-z_0-9./+-]+", re.ASCII)
 
 
 @dataclass(frozen=True, slots=True)
+class _UnresolvedWord:
+    source: Mapping[str, object]
+
+
+@dataclass(frozen=True, slots=True)
 class _Candidate:
-    words: tuple[str, ...]
+    words: tuple[str | _UnresolvedWord, ...]
     declarations: tuple[_Fact, ...] = ()
     conditions: tuple[str, ...] = ()
     features: tuple[str, ...] = ()
@@ -189,6 +194,7 @@ class _BindingContext:
     definitions: Mapping[str, list[_Fact]]
     visited: frozenset[str] = frozenset()
     invocation: _Fact | None = None
+    retain_unresolved: bool = False
 
     def declaration(self, fact: _Fact, name: str) -> _BindingContext:
         scope = _functions(fact)
@@ -223,7 +229,10 @@ def _make_value(
     if len(candidate.words) != 1:
         conditions += ("authored-make-word-fragment-only",)
         features += ("make-source-fragment",)
-    if any(not _SIMPLE_ATOM.fullmatch(word) for word in candidate.words):
+    if any(
+        not isinstance(word, str) or not _SIMPLE_ATOM.fullmatch(word)
+        for word in candidate.words
+    ):
         conditions += ("native-make-shell-word-boundaries-unestablished",)
         features += ("non-atom-make-fragment",)
     environment = (
@@ -270,7 +279,8 @@ def _scalar_value(declaration: _Fact, context: _BindingContext) -> _Candidate | 
         return None
     candidate = _derive_word(value, context, command_head=False)
     if candidate is not None and any(
-        not _SIMPLE_ATOM.fullmatch(word) for word in candidate.words
+        not isinstance(word, str) or not _SIMPLE_ATOM.fullmatch(word)
+        for word in candidate.words
     ):
         candidate = _combine((_Candidate((), features=("non-atom-scalar",)), candidate))
     return candidate
@@ -400,7 +410,10 @@ def _positional(
     if selected is None:
         return None
     caller = _BindingContext(
-        context.invocation, context.invocation.line.start, context.definitions
+        context.invocation,
+        context.invocation.line.start,
+        context.definitions,
+        retain_unresolved=context.retain_unresolved,
     )
     candidate = _derive_words(selected, caller, command_head=command_head)
     if candidate is None:
@@ -458,9 +471,18 @@ def _derive_word(
     literal = word.get("literal")
     if word.get("state") == "literal" and isinstance(literal, str):
         return _Candidate((literal,))
-    if context.fact.language == "make":
-        return _make_reference(word, context, command_head=command_head)
-    return _shell_reference(word, context, command_head=command_head)
+    candidate = (
+        _make_reference(word, context, command_head=command_head)
+        if context.fact.language == "make"
+        else _shell_reference(word, context, command_head=command_head)
+    )
+    if candidate is None and context.retain_unresolved:
+        return _Candidate(
+            (_UnresolvedWord(word),),
+            conditions=("unresolved-source-word-not-a-runtime-value",),
+            features=("unresolved-authored-word",),
+        )
+    return candidate
 
 
 def _derive_words(
@@ -498,6 +520,103 @@ def _evidence(facts: Sequence[_Fact]) -> list[dict[str, object]]:
     ]
 
 
+def _export_names(row: _Fact) -> list[str]:
+    from .make_shell_declarations import _NAME
+
+    if (
+        row.kind == "shell-variable-declaration"
+        and row.value.get("modifier") == "export"
+    ):
+        return [str(row.value["name"])]
+    if row.kind != "shell-command-expression":
+        return []
+    words = row.value.get("literal_argv")
+    if (
+        not isinstance(words, list)
+        or words[:1] != ["export"]
+        or any(isinstance(word, str) and word.startswith("-") for word in words[1:])
+    ):
+        return []
+    return [
+        word
+        for word in words[1:]
+        if isinstance(word, str) and re.fullmatch(_NAME, word)
+    ]
+
+
+def _authored_exports(
+    fact: _Fact,
+    facts: Sequence[_Fact],
+    definitions: Mapping[str, list[_Fact]],
+    *,
+    invocation: _Fact | None = None,
+) -> list[dict[str, object]]:
+    from .make_shell_declarations import MAX_STATEMENT_WORDS
+
+    before = invocation.line.start if invocation is not None else fact.line.start
+    sites: dict[str, list[_Fact]] = {}
+    scope = _functions(fact)
+    for row in facts:
+        if row.language != "shell" or row.line.start >= before:
+            continue
+        if _functions(row) and _functions(row) != scope:
+            continue
+        for name in _export_names(row):
+            sites.setdefault(name, []).append(row)
+        if len(sites) > MAX_STATEMENT_WORDS:
+            raise ValueError("Make/shell source exports exceed word bound")
+    result: list[dict[str, object]] = []
+    context = _BindingContext(
+        fact, before, definitions, invocation=invocation, retain_unresolved=True
+    )
+    for name, exports in sorted(sites.items()):
+        candidate = _resolve(name, context, command_head=False)
+        result.append(
+            {
+                "name": name,
+                "export_sites": [
+                    {
+                        "start_line": row.line.start,
+                        "end_line": row.line.end,
+                        "context": list(row.context),
+                    }
+                    for row in exports
+                ],
+                "binding": _candidate_observation(candidate),
+                "conditions": [
+                    "authored-export-and-declaration-must-take-effect",
+                    "unobserved-source-state-may-change-bindings",
+                    "no-unobserved-rebinding-or-readonly-conflict",
+                ],
+                "effective_environment": "not-established",
+                "execution": "not-established",
+            }
+        )
+    return result
+
+
+def _candidate_observation(candidate: _Candidate | None) -> dict[str, object]:
+    if candidate is None:
+        return {"state": "unclassified", "reason": "no-unique-source-definition"}
+    return {
+        "state": "conditional-source-only",
+        "authored_words": [
+            {
+                "state": "unresolved-source-expression",
+                "source_word": dict(word.source),
+                "runtime_value": "not-established",
+            }
+            if isinstance(word, _UnresolvedWord)
+            else {"state": "literal-source-candidate", "literal": word}
+            for word in candidate.words
+        ],
+        "supporting_declarations": _evidence(candidate.declarations),
+        "conditions": list(candidate.conditions),
+        "source_features": list(candidate.features),
+        "effective_value": "not-established",
+    }
+
+
 def _observe_command(
     fact: _Fact,
     definitions: Mapping[str, list[_Fact]],
@@ -505,14 +624,18 @@ def _observe_command(
     *,
     invocation: _Fact | None = None,
 ) -> dict[str, object]:
-    if barrier is not None:
-        return {"state": "unclassified", "reason": barrier}
     words = fact.value.get("words")
     if not isinstance(words, list) or not words:
         return {"state": "unclassified", "reason": "no-command-words"}
     candidate = _derive_words(
         words,
-        _BindingContext(fact, fact.line.start, definitions, invocation=invocation),
+        _BindingContext(
+            fact,
+            fact.line.start,
+            definitions,
+            invocation=invocation,
+            retain_unresolved=True,
+        ),
     )
     if candidate is None:
         return {"state": "unclassified", "reason": "unresolved-word-or-binding"}
@@ -521,15 +644,30 @@ def _observe_command(
     conditions = (
         *candidate.conditions,
         *("source-context-applies:" + part for part in fact.context),
+        *(
+            (
+                "unobserved-source-state-may-change-bindings",
+                "authored-declarations-must-take-effect",
+                "no-unobserved-rebinding-or-readonly-conflict",
+                "uninterpreted-source-condition:" + barrier,
+            )
+            if barrier is not None
+            else ()
+        ),
     )
     broad = bool(
         candidate.features
+        or barrier is not None
         or fact.context
         and any(not part.startswith("make-recipe:") for part in fact.context)
     )
-    return {
-        "state": "conditional-source" if broad else "conditional-static",
-        "words": list(candidate.words),
+    unresolved = any(isinstance(word, _UnresolvedWord) for word in candidate.words)
+    result: dict[str, object] = {
+        "state": "unclassified"
+        if unresolved
+        else "conditional-source"
+        if broad
+        else "conditional-static",
         "supporting_declarations": _evidence(candidate.declarations),
         "command_local_environment": list(candidate.environment),
         "conditions": list(dict.fromkeys(conditions)),
@@ -547,6 +685,18 @@ def _observe_command(
         "semantic_coverage": "incomplete",
         "negative_evidence_admissible": False,
     }
+    if unresolved:
+        authored = _candidate_observation(candidate)
+        result.update(
+            {
+                "reason": "unresolved-word-or-binding",
+                "authored_words": authored["authored_words"],
+                "authored_words_qualification": "conditional-source-only",
+            }
+        )
+    else:
+        result["words"] = list(candidate.words)
+    return result
 
 
 def _invocation_candidates(
@@ -657,6 +807,9 @@ def add_static_binding_observations(facts: Sequence[_Fact]) -> None:
     for fact in facts:
         if fact.kind == "shell-command-expression":
             observed = _observe_command(fact, definitions, barrier)
+            exports = _authored_exports(fact, facts, definitions)
+            if exports:
+                observed["authored_environment_bindings"] = exports
             observation_bytes += encoded_json_bytes(
                 observed, name="source binding candidate"
             )

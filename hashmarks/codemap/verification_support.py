@@ -161,7 +161,7 @@ class VerificationSupportMixin:
         )
 
     def _pytest_selection_declarations(
-        self, path: str, members: list[dict[str, object]]
+        self, path: str, members: list[dict[str, object]], *, reconcile: bool
     ) -> dict[str, object]:
         """Retain source declarations, never reproduce pytest's selection rules."""
         if TYPE_CHECKING:
@@ -179,7 +179,9 @@ class VerificationSupportMixin:
                     *_INI_CONFIG,
                 ):
                     manifest = (ancestor / filename).as_posix()
-                    raw = self._nomination_source_member(manifest, members)
+                    raw = self._nomination_source_member(
+                        manifest, members, reconcile=reconcile
+                    )
                     if raw is None:
                         continue
                     selected = self._pytest_selection_options(filename, raw)
@@ -266,7 +268,9 @@ class VerificationSupportMixin:
         if member.get("state") == "known-present" and raw is not None:
             kind, reason, unsupported = self._support_path_details(rel, raw)
             if PurePosixPath(rel).suffix == ".py":
-                selection = self._pytest_selection_declarations(rel, supporting)
+                selection = self._pytest_selection_declarations(
+                    rel, supporting, reconcile=reconcile
+                )
                 if selection["state"] == "unknown" or selection.get(
                     "custom_name_patterns"
                 ):

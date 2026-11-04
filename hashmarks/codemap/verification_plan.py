@@ -203,7 +203,7 @@ class VerificationPlanMixin:
         return None
 
     def _nomination_source_member(
-        self, rel: str, members: list[dict[str, object]]
+        self, rel: str, members: list[dict[str, object]], *, reconcile: bool = True
     ) -> bytes | None:
         """Read one current supporting input through the canonical source owner."""
         if TYPE_CHECKING:
@@ -214,7 +214,7 @@ class VerificationPlanMixin:
         # Refuse a known oversized/denied input before reconciliation can parse
         # it. Native refresh remains responsible for safe, absent/new or changed
         # contributors that the bounded source observation can admit.
-        if (
+        if reconcile and (
             observation.get("state") == "known-absent"
             or observation.get("state") == "known-present"
             and observation.get("index_state") == "unindexed"
@@ -335,7 +335,9 @@ class VerificationPlanMixin:
             raise _UnqualifiedNominationMember("node-test-source-syntax") from exc
 
     @staticmethod
-    def _pytest_manifest_options(raw: bytes) -> Mapping[str, object] | None:
+    def _pytest_manifest_options(
+        raw: bytes, *, ini_options_only: bool = False
+    ) -> Mapping[str, object] | None:
         """Observe authored pytest options without interpreting native discovery."""
         try:
             manifest = tomllib.loads(raw.decode("utf-8"))
@@ -350,7 +352,7 @@ class VerificationPlanMixin:
         if not isinstance(options, Mapping):
             return None
         if "ini_options" not in options:
-            return options
+            return None if ini_options_only else options
         ini = options["ini_options"]
         if len(options) != 1 or not isinstance(ini, Mapping):
             raise _UnqualifiedNominationMember("pytest-configuration-options")
@@ -359,7 +361,10 @@ class VerificationPlanMixin:
     @staticmethod
     def _pytest_manifest_declaration(raw: bytes) -> bool:
         """Qualify authored pytest configuration by TOML syntax, not text hints."""
-        return VerificationPlanMixin._pytest_manifest_options(raw) is not None
+        return (
+            VerificationPlanMixin._pytest_manifest_options(raw, ini_options_only=True)
+            is not None
+        )
 
     @staticmethod
     def _qualify_python_test_node(source: bytes, name: str) -> None:

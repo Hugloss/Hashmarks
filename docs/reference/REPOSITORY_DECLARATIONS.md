@@ -14,7 +14,7 @@ This capability is intentionally not a universal service/configuration ontology.
 
 `MakeShellDeclarations` observes explicitly selected sources through its one
 bounded lexical/parser and binding owner. The
-`hashmarks.make-shell-syntax.v3` producer retains authored expressions, operators,
+`hashmarks.make-shell-syntax.v4` producer retains authored expressions, operators,
 source contexts, member revisions, uncertainty and incomplete semantic coverage.
 
 A `shell-command-expression` may carry `static_binding_observation`.

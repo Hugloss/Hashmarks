@@ -374,7 +374,7 @@ def test_make_indirection_is_conditional_static_words_not_execution(
     assert command["execution"] == "not-established"
     assert observation["negative_evidence_admissible"] is False
     assert packet["providers"][0]["provenance"]["semantics"] == (
-        "hashmarks.make-shell-syntax.v3"
+        "hashmarks.make-shell-syntax.v4"
     )
 
 
