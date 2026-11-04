@@ -323,9 +323,25 @@ Repeated repository-intelligence surfaces can call `task_change_impact()` severa
 
 ### Decision-session composition diagnostics
 
-Use `with codemap.reads.session(diagnostics=True): ...` when measuring repository-intelligence composition. After the session, `codemap.reads.diagnostics()` returns `hashmarks.decision-session-diagnostics.v1` with a bounded producer span tree, inclusive and exclusive nanoseconds, unique semantic request counts, duplicate calls, cache hit/miss counters, and authoritative store-read counters already exposed by the session.
+Use `codemap.reads.observe(operation, diagnostics=True)` to measure a composed repository read while preserving native source reconciliation and complete-operation recomputation:
 
-The receipt is runtime diagnostics only (`authority=runtime-diagnostics-only`, `storage=derived-not-persisted`, `execution_effect=none`). It must not become repository evidence, persistent telemetry, scheduling input, or an exporter platform. Normal decision sessions do not collect spans.
+```python
+result = codemap.reads.observe(
+    lambda scope: codemap.verification.changed_set(changed_paths),
+    diagnostics=True,
+)
+receipt = codemap.reads.diagnostics()
+```
+
+Request these diagnostics at the outermost observation. Wrapping `observe()` in `reads.session(diagnostics=True)` instead creates a fixed-generation read scope: source drift must escape that scope before reconciliation can occur. A nested `observe(..., diagnostics=True)` is rejected rather than silently changing its outer owner's diagnostics or recomputation behavior. Explicit fixed-generation composition can still use `with codemap.reads.session(diagnostics=True): ...`.
+
+After completion or failure, `reads.diagnostics()` returns the detached `hashmarks.decision-session-diagnostics.v1` receipt, when a diagnostic session produced one. Its bounded producer span tree, inclusive and exclusive nanoseconds, unique semantic request counts, duplicate calls, cache hit/miss counters, and authoritative store-read counters describe the final entered session. They are not cumulative across abandoned attempts.
+
+The receipt's `observation` summary contains scalar `attempts`, `abandoned_attempts`, successful `reconciliations`, `wall_time_ns`, and `reconciliation_time_ns` totals. Reconciliation time also includes unsuccessful reconciliation calls. Its `outcome` is `accepted` or `failed`; `session_outcome` classifies the final entered session as `accepted`, `abandoned`, or `failed`. A result is accepted only after the final session exits and checks its generation; returning from the callback alone is insufficient. Failed session entry clears the previous receipt so an earlier success cannot stand in for an unentered attempt. If no receipt was produced for the latest attempt, `diagnostics()` returns `None`.
+
+The observation timing covers the whole `observe()` call, including readiness, session entry, supplied callback, and native reconciliation. The callback may perform external work, so this elapsed time is not Hashmarks CPU attribution. The final session's `wall_time_ns` excludes readiness before that session starts; its producer spans cover only instrumented operations in that session. Neither scope measures caller work performed before `observe()`, such as `tasks.prepare()`, an earlier `index.sync()`, source capture, or process startup. Measure those separately when explaining end-to-end latency; diagnostics do not establish a latency improvement by themselves.
+
+This extends the existing read owner with **OBSERVER** measurement of repository-intelligence economics. The receipt is runtime diagnostics only (`authority=runtime-diagnostics-only`, `storage=derived-not-persisted`, `execution_effect=none`). It does not change repository evidence, freshness, selection, execution-result authority, or the consumer's retry policy. It must not become persistent telemetry, scheduling input, or an exporter platform. Normal observations and decision sessions do not collect spans.
 
 ### Producer implementation provenance
 

@@ -6,7 +6,11 @@ import pytest
 from contract_assertions import assert_integer, assert_object, assert_records
 
 from hashmarks import CodeMap
-from hashmarks.codemap.decision_session import diagnostic_producer
+from hashmarks.codemap.decision_session import (
+    DecisionRefreshRequired,
+    ReadScope,
+    diagnostic_producer,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -234,3 +238,349 @@ def test_diagnostic_span_truncation_reports_actual_omission(
     assert (
         assert_object(assert_object(receipt["producers"])["bounded"])["calls"] == count
     )
+
+
+def test_wrapping_observe_in_a_diagnostic_session_cannot_reconcile_source_drift(
+    tmp_path: Path,
+) -> None:
+    _repo(tmp_path)
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        generation = codemap.store.generation()
+        with codemap.reads.session(diagnostics=True):
+            (tmp_path / "src" / "owner.py").write_text(
+                "def widget(value: str) -> str:\n    return value + '-new'\n",
+                encoding="utf-8",
+            )
+            with pytest.raises(DecisionRefreshRequired):
+                codemap.reads.observe(
+                    lambda _scope: codemap.source.ensure_current("src/owner.py")
+                )
+            assert codemap.store.generation() == generation
+        assert codemap.index.needs_reconcile("src/owner.py")
+
+
+def test_observe_diagnostics_preserve_result_and_remain_opt_in(tmp_path: Path) -> None:
+    task, paths = _repo(tmp_path)
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        plain = codemap.reads.observe(lambda _scope: codemap.changes.brief(task, paths))
+        assert codemap.reads.diagnostics() is None
+        observed = codemap.reads.observe(
+            lambda _scope: codemap.changes.brief(task, paths), diagnostics=True
+        )
+        receipt = codemap.reads.diagnostics()
+
+    assert observed == plain
+    assert receipt is not None
+    observation = assert_object(receipt["observation"])
+    assert observation["outcome"] == "accepted"
+    assert observation["session_outcome"] == "accepted"
+    assert observation["attempts"] == 1
+    assert observation["abandoned_attempts"] == 0
+    assert observation["reconciliations"] == 0
+    assert observation["reconciliation_time_ns"] == 0
+    assert assert_integer(observation["wall_time_ns"]) >= assert_integer(
+        receipt["wall_time_ns"]
+    )
+    assert assert_object(receipt["producers"])
+
+
+def test_profiled_observe_reconciles_and_only_retains_the_accepted_session(
+    tmp_path: Path,
+) -> None:
+    task, _paths = _repo(tmp_path)
+    calls = 0
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        generation = codemap.store.generation()
+
+        def operation(_scope: ReadScope) -> dict[str, object]:
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                (tmp_path / "src" / "owner.py").write_text(
+                    "def widget(value: str) -> str:\n    return value + '-new'\n",
+                    encoding="utf-8",
+                )
+            codemap.source.ensure_current("src/owner.py")
+            codemap.tasks.action_map(task)
+            return codemap.source.observe("src/owner.py")
+
+        observed = codemap.reads.observe(operation, diagnostics=True)
+        receipt = codemap.reads.diagnostics()
+        assert observed == codemap.source.observe("src/owner.py")
+        assert codemap.store.generation() > generation
+        assert receipt is not None
+        assert receipt["generation"] == codemap.store.generation()
+        assert codemap.reads.depth == 0
+
+    assert calls == 2
+    observation = assert_object(receipt["observation"])
+    assert observation["outcome"] == "accepted"
+    assert observation["session_outcome"] == "accepted"
+    assert observation["attempts"] == 2
+    assert observation["abandoned_attempts"] == 1
+    assert observation["reconciliations"] == 1
+    assert assert_integer(observation["reconciliation_time_ns"]) > 0
+    action = assert_object(
+        assert_object(receipt["producers"])[
+            "hashmarks.codemap.repository_tasks.RepositoryTasks.action_map"
+        ]
+    )
+    assert action["calls"] == 1
+
+
+def test_failed_observe_replaces_previous_successful_diagnostics(
+    tmp_path: Path,
+) -> None:
+    task, _paths = _repo(tmp_path)
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        codemap.reads.observe(lambda _scope: "previous success", diagnostics=True)
+
+        def fail(_scope: ReadScope) -> None:
+            codemap.tasks.action_map(task)
+            raise LookupError("callback failure")
+
+        with pytest.raises(LookupError, match="callback failure"):
+            codemap.reads.observe(fail, diagnostics=True)
+        receipt = codemap.reads.diagnostics()
+        assert codemap.reads.depth == 0
+
+    assert receipt is not None
+    observation = assert_object(receipt["observation"])
+    assert observation["outcome"] == "failed"
+    assert observation["session_outcome"] == "failed"
+    assert observation["attempts"] == 1
+    assert assert_object(receipt["producers"])
+
+
+def test_callback_return_does_not_accept_a_generation_change_on_session_exit(
+    tmp_path: Path,
+) -> None:
+    _repo(tmp_path)
+    returned = object()
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+
+        def change_generation(_scope: ReadScope) -> object:
+            codemap.store.bump_generation()
+            return returned
+
+        with pytest.raises(RuntimeError, match="changed during decision session"):
+            codemap.reads.observe(change_generation, diagnostics=True)
+        receipt = codemap.reads.diagnostics()
+        assert codemap.reads.depth == 0
+
+    assert receipt is not None
+    observation = assert_object(receipt["observation"])
+    assert observation["outcome"] == "failed"
+    assert observation["session_outcome"] == "failed"
+    assert observation["abandoned_attempts"] == 0
+
+
+def test_failed_reconciliation_keeps_the_session_explicitly_abandoned(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _repo(tmp_path)
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+
+        def fail_reconciliation(
+            _path: str, *, expected_generation: int | None = None
+        ) -> int:
+            raise OSError("publication unavailable")
+
+        monkeypatch.setattr(codemap.index, "reconcile_path", fail_reconciliation)
+
+        def drift(_scope: ReadScope) -> None:
+            (tmp_path / "src" / "owner.py").write_text(
+                "def widget(value): return value + '-new'\n", encoding="utf-8"
+            )
+            codemap.source.ensure_current("src/owner.py")
+
+        with pytest.raises(OSError, match="publication unavailable"):
+            codemap.reads.observe(drift, diagnostics=True)
+        receipt = codemap.reads.diagnostics()
+
+    assert receipt is not None
+    observation = assert_object(receipt["observation"])
+    assert observation["outcome"] == "failed"
+    assert observation["session_outcome"] == "abandoned"
+    assert observation["attempts"] == 1
+    assert observation["abandoned_attempts"] == 1
+    assert observation["reconciliations"] == 0
+    assert assert_integer(observation["reconciliation_time_ns"]) > 0
+
+
+def test_repeated_source_drift_still_stops_after_one_reconciliation(
+    tmp_path: Path,
+) -> None:
+    _repo(tmp_path)
+    calls = 0
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+
+        def drift(_scope: ReadScope) -> None:
+            nonlocal calls
+            calls += 1
+            (tmp_path / "src" / "owner.py").write_text(
+                f"def widget(value): return value + {calls}\n", encoding="utf-8"
+            )
+            codemap.source.ensure_current("src/owner.py")
+
+        with pytest.raises(RuntimeError, match="path remained stale after refresh"):
+            codemap.reads.observe(drift, diagnostics=True)
+        receipt = codemap.reads.diagnostics()
+        assert codemap.reads.depth == 0
+
+    assert calls == 2
+    assert receipt is not None
+    observation = assert_object(receipt["observation"])
+    assert observation["outcome"] == "failed"
+    assert observation["session_outcome"] == "abandoned"
+    assert observation["attempts"] == 2
+    assert observation["abandoned_attempts"] == 2
+    assert observation["reconciliations"] == 1
+
+
+@pytest.mark.parametrize("outer_diagnostics", [False, True])
+def test_nested_explicit_profiling_fails_before_the_callback(
+    tmp_path: Path, outer_diagnostics: bool
+) -> None:
+    _repo(tmp_path)
+    called = False
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+
+        def callback(_scope: ReadScope) -> None:
+            nonlocal called
+            called = True
+
+        codemap.reads.observe(callback, diagnostics=True)
+        previous = codemap.reads.diagnostics()
+        called = False
+        with codemap.reads.session(diagnostics=outer_diagnostics):
+            with pytest.raises(ValueError, match="outermost read owner"):
+                codemap.reads.observe(callback, diagnostics=True)
+            assert codemap.reads.depth == 1
+            assert codemap.reads.diagnostics() == previous
+
+    assert not called
+
+
+def test_default_nested_observation_inherits_outer_producer_instrumentation(
+    tmp_path: Path,
+) -> None:
+    task, _paths = _repo(tmp_path)
+    expected = object()
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+
+        def inner(_scope: ReadScope) -> object:
+            codemap.tasks.action_map(task)
+            return expected
+
+        result = codemap.reads.observe(
+            lambda _scope: codemap.reads.observe(inner), diagnostics=True
+        )
+        receipt = codemap.reads.diagnostics()
+
+    assert result is expected
+    assert receipt is not None
+    observation = assert_object(receipt["observation"])
+    assert observation["outcome"] == "accepted"
+    assert observation["attempts"] == 1
+    assert assert_object(receipt["producers"])
+
+
+def test_readiness_failure_cannot_return_a_previous_successful_profile(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _repo(tmp_path)
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        codemap.reads.observe(lambda _scope: "previous success", diagnostics=True)
+
+        def fail_readiness(*, _allow_incomplete: bool = False) -> None:
+            raise RuntimeError("readiness unavailable")
+
+        monkeypatch.setattr(codemap.index, "ensure_ready", fail_readiness)
+        with pytest.raises(RuntimeError, match="readiness unavailable"):
+            codemap.reads.observe(lambda _scope: "never called", diagnostics=True)
+        assert codemap.reads.diagnostics() is None
+        assert codemap.reads.depth == 0
+
+
+def test_foreign_publication_after_refresh_is_rejected_when_profiled(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _repo(tmp_path)
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        reconcile = codemap.index.reconcile_path
+
+        def publish_another_generation(
+            path: str, *, expected_generation: int | None = None
+        ) -> int:
+            generation = reconcile(path, expected_generation=expected_generation)
+            codemap.store.bump_generation()
+            return generation
+
+        monkeypatch.setattr(codemap.index, "reconcile_path", publish_another_generation)
+
+        def drift(_scope: ReadScope) -> None:
+            (tmp_path / "src" / "owner.py").write_text(
+                "def widget(value): return value + '-new'\n", encoding="utf-8"
+            )
+            codemap.source.ensure_current("src/owner.py")
+
+        with pytest.raises(RuntimeError, match="changed before expected decision"):
+            codemap.reads.observe(drift, diagnostics=True)
+        receipt = codemap.reads.diagnostics()
+
+    assert receipt is not None
+    observation = assert_object(receipt["observation"])
+    assert observation["outcome"] == "failed"
+    assert observation["session_outcome"] == "failed"
+    assert observation["attempts"] == 2
+    assert observation["abandoned_attempts"] == 1
+    assert observation["reconciliations"] == 1
+
+
+def test_distinct_refreshes_retain_only_the_final_profile_and_scalar_costs(
+    tmp_path: Path,
+) -> None:
+    _repo(tmp_path)
+    paths = ["src/owner.py", "src/other.py", "src/third.py"]
+    for path in paths[1:]:
+        (tmp_path / path).write_text("VALUE = 'old'\n", encoding="utf-8")
+    calls = 0
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+
+        def observe_paths(_scope: ReadScope) -> int:
+            nonlocal calls
+            if calls < len(paths):
+                (tmp_path / paths[calls]).write_text(
+                    "VALUE = 'changed'\n", encoding="utf-8"
+                )
+            calls += 1
+            for path in paths:
+                codemap.source.ensure_current(path)
+            return calls
+
+        result = codemap.reads.observe(observe_paths, diagnostics=True)
+        receipt = codemap.reads.diagnostics()
+        assert receipt is not None
+        assert receipt["generation"] == codemap.store.generation()
+
+    assert result == 4
+    observation = assert_object(receipt["observation"])
+    assert observation["outcome"] == "accepted"
+    assert observation["session_outcome"] == "accepted"
+    assert observation["attempts"] == 4
+    assert observation["abandoned_attempts"] == 3
+    assert observation["reconciliations"] == 3
+    assert all(isinstance(value, (int, str)) for value in observation.values())

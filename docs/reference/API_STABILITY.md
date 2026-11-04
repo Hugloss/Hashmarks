@@ -45,6 +45,16 @@ qualified class name followed by the method name. Source and Bindings `observe`
 calls therefore remain separate measurements. These labels and timings describe
 runtime diagnostics only and carry no repository or execution authority.
 
+`CodeMap.reads.observe(operation, diagnostics=True)` opts the outermost composed
+read into those diagnostics without replacing native source reconciliation or
+recomputation. The final entered session's bounded measurements remain separate
+from the observation's cumulative scalar summary; acceptance follows the final
+session's generation check. Failed entry cannot reuse a previous receipt. Nested
+opt-in observations are rejected. These disposable diagnostics retain no history
+and do not measure caller preparation outside `observe()`. See
+[decision-session composition diagnostics](../maintainers/CODEMAP.md#decision-session-composition-diagnostics)
+for timing scope and use with fixed-generation sessions.
+
 Source operations use `CodeMap.source.outline()`, `.symbol()`, `.read()`, `.grep()`,
 `.observe()`, `.range_receipt()`, `.ecmascript()`, `.bindings()`, `.scoped_occurrences()` and
 `.scoped_literals()`. The source component
