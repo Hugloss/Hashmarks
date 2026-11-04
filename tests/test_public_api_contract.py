@@ -40,6 +40,7 @@ EXPECTED_PUBLIC = {
     "NativeVerificationMember",
     "NativeVerificationSelectionProjection",
     "validate_repository_intelligence_evidence",
+    "dependency_package_query_identity",
 }
 
 REMOVED_BOUNDARY_DEBT = {
