@@ -11,6 +11,7 @@ from test_repository_source_component import _source
 
 from hashmarks.codemap.evidence_correlation import RepositoryCorrelation
 from hashmarks.codemap.evidence_graph import RepositoryRelationships
+from hashmarks.codemap.evidence_verification import RepositoryVerification
 from hashmarks.codemap.import_resolution import RepositoryImports
 from hashmarks.codemap.indexing_lifecycle import RepositoryIndex
 from hashmarks.codemap.native_evidence import RepositoryNativeEvidence
@@ -23,7 +24,9 @@ def _dependencies(index: RepositoryIndex) -> RepositoryDependencies:
     imports = RepositoryImports(source)
     correlation = RepositoryCorrelation(RepositoryBindings(source))
     relationships = RepositoryRelationships(imports, RepositoryNativeEvidence(source))
-    return RepositoryDependencies(source, imports, correlation, relationships)
+    return RepositoryDependencies(
+        source, imports, correlation, relationships, RepositoryVerification(imports)
+    )
 
 
 def test_dependency_inputs_observe_source_revision_without_changing_resolution(

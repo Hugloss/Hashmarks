@@ -593,3 +593,96 @@ def test_nonlocal_lexical_binding_is_qualified_without_resolving_module_names() 
         "    def use():\n        nonlocal launch\n        launch([])\n"
     )
     assert _import(_call(rows, "launch"))["properties"] == ["Popen"]
+
+
+@pytest.mark.parametrize("annotation", ["Evidence | None", "package.Evidence | None"])
+def test_quoted_annotation_retains_the_unquoted_authored_import_origin(
+    annotation: str,
+) -> None:
+    prefix = "from example import Evidence\nimport example as package\nclass Model:\n"
+    ordinary = _observe(prefix + f"    data: {annotation} = None\n")
+    quoted = _observe(prefix + f"    data: {annotation!r} = None\n")
+    references = _facts(ordinary, "reference")
+    forward = _facts(quoted, "forward-annotation-reference")
+    assert forward
+    assert [row["target"] for row in forward] == [row["target"] for row in references]
+    assert all(row["qualification"] == "conditional" for row in forward)
+    assert all(row["conditions"] == ["type-syntax"] for row in forward)
+    assert all(row["runtime_target"] == "not-established" for row in forward)
+
+
+def test_quoted_annotation_preserves_source_container_and_decoded_byte_coordinates() -> (
+    None
+):
+    source = (
+        "import example as package\r\n"
+        "class Model:\r\n"
+        "    data: 'package.\\u00c5' = None\r\n"
+    )
+    raw = source.encode()
+    rows = _facts(_observe(raw), "forward-annotation-reference")
+    attribute = next(
+        row
+        for row in rows
+        if cast(dict[str, object], row["parsed_expression"])["syntax_type"]
+        == "Attribute"
+    )
+    span = cast(dict[str, int], attribute["range"])
+    assert raw[span["start_byte"] : span["end_byte"]] == b"'package.\\u00c5'"
+    annotation = cast(dict[str, object], attribute["annotation"])
+    assert annotation["range"] == span
+    assert annotation["decoded_text"] == "package.Å"
+    assert annotation["evaluation"] == "not-performed"
+    parsed = cast(dict[str, object], attribute["parsed_expression"])
+    assert parsed["coordinate_system"] == "decoded-annotation-utf8-bytes"
+    assert parsed["range"] == {"start_byte": 0, "end_byte": len("package.Å".encode())}
+    assert parsed["text"] == "package.Å"
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "    Evidence = unknown\n    data: 'Evidence | None' = None\n",
+        "    Evidence = object\n    data: 'Evidence | None' = None\n",
+        "    if enabled:\n        Evidence = unknown\n    data: 'Evidence' = None\n",
+    ],
+)
+def test_quoted_annotation_rebinding_never_falls_back_to_an_outer_import(
+    body: str,
+) -> None:
+    rows = _observe("from example import Evidence\nclass Model:\n" + body)
+    forward = _facts(rows, "forward-annotation-reference")
+    assert forward
+    assert all(row["qualification"] == "unknown" for row in forward)
+    assert all(row["target"] is None and row["reasons"] for row in forward)
+
+
+@pytest.mark.parametrize("annotation", ["Evidence[", "Evidence; other", "x" * 257])
+def test_invalid_or_bounded_quoted_annotation_remains_explicitly_unknown(
+    annotation: str,
+) -> None:
+    rows = _observe(
+        f"from example import Evidence\nclass Model:\n    data: {annotation!r} = None\n"
+    )
+    forward = _facts(rows, "forward-annotation-reference")
+    assert len(forward) == 1
+    assert forward[0]["qualification"] == "unknown"
+    assert forward[0]["target"] is None
+    assert forward[0]["reasons"]
+    assert forward[0]["parsed_expression"] is None
+
+
+def test_string_values_inside_literal_annotations_are_not_forward_annotations() -> None:
+    rows = _observe(
+        "from typing import Literal\nfrom example import Evidence\n"
+        "class Model:\n    data: Literal['Evidence'] = 'Evidence'\n"
+    )
+    assert _facts(rows, "forward-annotation-reference") == []
+
+
+def test_forward_annotation_interpretation_bound_never_returns_partial_origins() -> (
+    None
+):
+    annotation = "|".join("E" for _ in range(100))
+    with pytest.raises(BindingObservationBound, match="forward-annotation-node-bound"):
+        _observe(f"from example import E\nclass Model:\n    data: {annotation!r}\n")

@@ -43,6 +43,35 @@ configuration, consumer policy and execution remain outside this source view.
 The [Make/shell evidence contract](MAKE_SHELL_EVIDENCE.md) specifies supported
 forms, qualifiers and unsupported boundaries.
 
+## Selected npm manifest declarations
+
+The public Python `NpmManifestDeclarations(paths=("frontend/package.json",
+"frontend/package-lock.json"))` provider uses this same declaration discovery
+boundary for exact selected inputs. It observes authored script bodies, separate
+dependency declaration fields, manifest `bin` syntax and lock-recorded bin slots.
+Slots retain their literal package location, optional name/version/integrity/link
+fields and original string-or-object bin shape. Multiple providers of one bin,
+nested locations and string bins remain separate source declarations. No package
+name is inferred from a slot or a string bin, and no script is selected or run.
+
+The provider does not choose a package owner, interpret lifecycle aliases, expand
+shell text, resolve dependencies, prove installation, match a lock to authored
+intent, or grant executable permission. Its coverage remains incomplete and
+negative evidence inadmissible. Missing selected inputs and changed source
+revisions use the original provider evidence/freshness boundary. Duplicate JSON
+keys, unsupported field shapes and input/entry bounds fail without partial
+declarations. Unknown JSON fields are outside the declared supported source view.
+An explicit `fields=("consumerPolicy",)` option transports only those selected
+root JSON values as opaque `selected_fields`; it does not interpret caller
+configuration or disclose other unselected fields.
+
+Observed repository fact/evidence: exact selected npm script, dependency and bin declarations.
+Authority source: admitted `package.json` and `package-lock.json` bytes.
+Completeness/freshness behavior: bounded supported syntax only; original revision binding; no native or absence claim.
+Existing Hashmarks owner extended: repository declaration provider/discovery.
+Consumer/execution responsibility explicitly not acquired: npm resolution, script/bin selection, environment, capability ceilings, execution and materialization custody.
+Decision: OBSERVER.
+
 ## Selected backend schema and environment syntax
 
 An explicitly nominated `StaticPythonBackendDeclarations` provider can now
@@ -593,6 +622,14 @@ member revisions observed by the provider and revalidates those inputs across
 declaration qualification. If a provider input changes during discovery, the
 call fails closed instead of pairing a stale normalized value with newer
 repository evidence.
+
+Providers may request `context.read_bytes(path, max_bytes=limit)`. The canonical
+Source and file-store owners enforce that transfer budget before accumulating
+the payload, including growth after metadata preflight. Exact bounded bytes
+retain their ordinary member revision; an oversized read returns no partial
+content or revision claim. The selected bound is recorded on the provider input
+and reused for its qualification rechecks, rather than rereading it without a
+budget. Omitting the bound retains the existing caller-selected transfer behavior.
 
 Dynamic file discovery uses `context.paths(prefix)`, which enumerates admitted
 repository files through the same policy/pruning/symlink-safe discovery owner

@@ -3,9 +3,11 @@ from __future__ import annotations
 import copy
 from pathlib import Path
 
+import pytest
 from contract_assertions import assert_object, assert_records
 
 from hashmarks.codemap.engine import CodeMap
+from hashmarks.dependency_delta_validation import validate_dependency_delta
 
 
 def _snapshot(
@@ -156,6 +158,16 @@ def test_dependency_delta_projects_component_selection_transition(
         }
     ]
     assert delta["causation"] == "not-inferred"
+    facts = assert_object(delta["selection_changes"])
+    added = assert_records(facts["added"])[0]
+    removed = assert_records(facts["removed"])[0]
+    assert added["component"] == assert_records(after["components"])[0]
+    assert added["selection"] == assert_records(after["selections"])[0]
+    assert added["inventory"] == after["inventory"]
+    assert removed["selection"] == assert_records(before["selections"])[0]
+    assert added["component_selection_count"] == 1
+    assert added["incoming_relationships"] == added["root_relationships"] == []
+    assert facts["changed"] == []
 
 
 def test_dependency_delta_projects_same_node_semantic_change(
@@ -197,6 +209,40 @@ def test_dependency_delta_projects_same_node_semantic_change(
             },
         }
     ]
+
+
+@pytest.mark.parametrize(
+    "mutation", ["component", "inventory", "roots", "boolean", "fields", "endpoints"]
+)
+def test_retained_delta_replay_rejects_changed_projection_authority(
+    tmp_path: Path, mutation: str
+) -> None:
+    before_raw = _snapshot()
+    after_raw = copy.deepcopy(before_raw)
+    selected = assert_records(after_raw["selections"])[0]
+    selected["node_id"], selected["version"] = "example@2", "2"
+    assert_records(after_raw["inventory"])[0]["node_id"] = "example@2"
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        before = _qualify(codemap, before_raw)
+        after = _qualify(codemap, after_raw)
+        delta = codemap.dependencies.delta(before, after)
+    # The pure replay still works after native repository resources are closed.
+    assert validate_dependency_delta(delta, before, after)["valid"] is True
+    row = assert_records(assert_object(delta["selection_changes"])["added"])[0]
+    if mutation == "component":
+        assert_object(row["component"])["name"] = "inferred-package"
+    elif mutation == "inventory":
+        row["inventory"] = []
+    elif mutation == "roots":
+        row["roots"] = [{"node_id": "example@2", "context": "runtime"}]
+    elif mutation == "boolean":
+        row["component_selection_count"] = True
+    elif mutation == "fields":
+        delta["accepted"] = True
+    else:
+        before, after = after, before
+    assert validate_dependency_delta(delta, before, after)["valid"] is False
 
 
 def test_dependency_delta_separates_adapter_semantics_from_repository_meaning(
@@ -358,6 +404,7 @@ def test_dependency_delta_marks_definition_change_non_comparable(
     assert delta["comparability"] == "not-comparable"
     assert delta["reason"] == "definition-changed"
     assert "component_selection_transitions" not in delta
+    assert "selection_changes" not in delta
     assert assert_object(delta["change_axes"])["semantic_definition"] == "changed"
     assert (
         assert_object(delta["change_axes"])["semantic_resolution"] == "not-comparable"

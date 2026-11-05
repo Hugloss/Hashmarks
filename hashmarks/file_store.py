@@ -27,6 +27,10 @@ class UnstableFileError(RuntimeError):
     """Raised when a file keeps changing while its bytes are being hashed."""
 
 
+class FileReadBoundError(ValueError):
+    """A byte-returning observation exceeded its explicit transfer budget."""
+
+
 class FileDigestStore:
     """Persistent file-content digest cache.
 
@@ -186,17 +190,30 @@ class FileDigestStore:
         path: str | Path,
         *,
         max_attempts: int = 3,
+        max_bytes: int | None = None,
     ) -> tuple[bytes, Digest]:
         """Read bytes from one stable filesystem observation.
 
         This is the byte-returning counterpart of the canonical stable hash path:
         metadata is sampled before and after the read, and moving bytes fail
         closed rather than being returned under a stale repository revision.
+        An explicit byte budget bounds the read itself, including file growth
+        after metadata preflight; an oversized prefix never receives a digest.
         """
+        if max_bytes is not None and (type(max_bytes) is not int or max_bytes < 0):
+            raise ValueError("max_bytes must be a non-negative integer or None")
         path = Path(path)
         before = self._metadata(path)
         for _ in range(max_attempts):
-            data = path.read_bytes()
+            if max_bytes is None:
+                data = path.read_bytes()
+            else:
+                if before[2] > max_bytes:
+                    raise FileReadBoundError("source bytes exceed the transfer bound")
+                with path.open("rb") as stream:
+                    data = stream.read(max_bytes + 1)
+                if len(data) > max_bytes:
+                    raise FileReadBoundError("source bytes exceed the transfer bound")
             after = self._metadata(path)
             if after == before:
                 return data, hash_bytes(data, domain=FILE_DOMAIN)

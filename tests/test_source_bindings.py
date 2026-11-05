@@ -98,6 +98,30 @@ def test_public_bindings_expose_exact_ranges_and_separate_authority(
     assert packet["observation_identity"] == repeated["observation_identity"]
 
 
+def test_public_forward_annotation_origins_remain_bound_to_the_source_member(
+    tmp_path: Path,
+) -> None:
+    raw = (
+        b"from example import Evidence as E\nclass Model:\n"
+        b"    data: 'E | None' = None\n"
+    )
+    (tmp_path / "member.py").write_bytes(raw)
+    with CodeMap(tmp_path) as codemap:
+        packet = codemap.source.bindings("member.py")
+        repeated = codemap.source.bindings("member.py")
+    assert packet["availability"] == "observed"
+    assert packet["completeness"] == "complete"
+    facts = assert_records(packet["facts"])
+    forward = [row for row in facts if row["kind"] == "forward-annotation-reference"]
+    assert len(forward) == 1
+    _assert_fact(forward[0], raw)
+    assert forward[0]["conditions"] == ["type-syntax"]
+    assert forward[0]["qualification"] == "conditional"
+    assert assert_object(forward[0]["target"])["name"] == "Evidence"
+    assert packet["negative_evidence"] == "not-admissible"
+    assert packet["observation_identity"] == repeated["observation_identity"]
+
+
 @pytest.mark.parametrize(("path", "source"), SOURCES)
 def test_binding_result_limit_clips_after_qualification(
     tmp_path: Path, path: str, source: str

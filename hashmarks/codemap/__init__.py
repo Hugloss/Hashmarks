@@ -19,6 +19,9 @@ if TYPE_CHECKING:
     from .model import EvidenceVisibility as EvidenceVisibility
     from .model import SearchHit as SearchHit
     from .model import SyncResult as SyncResult
+    from .npm_manifest_declarations import (
+        NpmManifestDeclarations as NpmManifestDeclarations,
+    )
     from .policy import ContextPolicy as ContextPolicy
     from .post_change import PostChangeOptions as PostChangeOptions
     from .project_impact_codec import (
@@ -66,6 +69,7 @@ _EXPORTS: dict[str, str] = {
     "RepositoryDeclarationProviderResult": "repository_declaration_provider",
     "MakeShellDeclarations": "make_shell_declarations",
     "PythonUvManifestDeclarations": "python_uv_manifest_declarations",
+    "NpmManifestDeclarations": "npm_manifest_declarations",
     "CodeMapService": "service",
     "CodeMapServiceClient": "service",
     "default_codemap_socket": "service",
@@ -96,6 +100,7 @@ __all__ = [
     "RepositoryDeclarationProviderResult",
     "MakeShellDeclarations",
     "PythonUvManifestDeclarations",
+    "NpmManifestDeclarations",
     "CodeMapService",
     "CodeMapServiceClient",
     "default_codemap_socket",

@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass, field
-from typing import Literal, NotRequired, TypedDict
+from typing import Literal, NotRequired, TypedDict, cast
 
 from hashmarks.paths import normalize_relative_path
 
@@ -763,6 +763,27 @@ def _make_comment(text: str) -> str:
     return text.rstrip()
 
 
+def _literal_prerequisite_tokens(expression: str) -> list[dict[str, object]] | None:
+    """Observe only plain literal Make prerequisite syntax, without expansion."""
+    if re.fullmatch(r"[A-Za-z0-9_./+@| \t-]*", expression) is None:
+        return None
+    tokens = expression.split()
+    if len(tokens) > MAX_STATEMENT_WORDS:
+        raise ValueError("Make prerequisites exceed source word bound")
+    if tokens.count("|") > 1:
+        return None
+    result: list[dict[str, object]] = []
+    order_only = False
+    for token in tokens:
+        if token == "|":
+            order_only = True
+        elif re.fullmatch(r"[A-Za-z0-9_./+@-]+", token):
+            result.append({"literal": token, "order_only_syntax": order_only})
+        else:
+            return None
+    return result
+
+
 @dataclass(slots=True)
 class _MakeReader:
     facts: list[_Fact] = field(default_factory=list)
@@ -916,6 +937,9 @@ class _MakeReader:
             {
                 "targets": list(targets),
                 "prerequisite_expression": prerequisites,
+                "literal_prerequisite_tokens": _literal_prerequisite_tokens(
+                    prerequisites
+                ),
                 "effective_prerequisites": "not-established",
             },
         )
@@ -1059,8 +1083,147 @@ def _group(
     }
 
 
+class _LiteralPrerequisite(TypedDict):
+    literal: str
+    order_only_syntax: bool
+
+
+class _TargetEdge(TypedDict):
+    source: str
+    target: str
+    declaration_fact_index: int
+    token_ordinal: int
+    order_only_syntax: bool
+
+
+def _target_declarations(facts: Sequence[_Fact]) -> dict[str, list[int]]:
+    declarations: dict[str, list[int]] = {}
+    for index, fact in enumerate(facts):
+        if fact.kind == "make-target-declaration":
+            for name in cast("list[str]", fact.value["targets"]):
+                declarations.setdefault(name, []).append(index)
+    return declarations
+
+
+def _literal_target_edges(
+    target: str, indices: Sequence[int], facts: Sequence[_Fact]
+) -> tuple[list[_TargetEdge], list[dict[str, object]]]:
+    edges: list[_TargetEdge] = []
+    unresolved: list[dict[str, object]] = []
+    for index in indices:
+        prerequisites = facts[index].value.get("literal_prerequisite_tokens")
+        if prerequisites is None:
+            unresolved.append(
+                {
+                    "target": target,
+                    "fact_index": index,
+                    "reason": "nonliteral-prerequisite-expression",
+                }
+            )
+            continue
+        for ordinal, token in enumerate(
+            cast("list[_LiteralPrerequisite]", prerequisites)
+        ):
+            edges.append(
+                {
+                    "source": target,
+                    "target": token["literal"],
+                    "declaration_fact_index": index,
+                    "token_ordinal": ordinal,
+                    "order_only_syntax": token["order_only_syntax"],
+                }
+            )
+    return edges, unresolved
+
+
+def _selected_target_source(
+    facts: Sequence[_Fact], targets: tuple[str, ...], *, stopped: bool
+) -> dict[str, object]:
+    """Follow only authored literal prerequisite edges, never effective Make work."""
+    declarations = _target_declarations(facts)
+    paths: dict[str, tuple[str, ...]] = {}
+    edges: list[_TargetEdge] = []
+    cycles: list[list[str]] = []
+    unresolved: list[dict[str, object]] = []
+    pending: list[tuple[str, tuple[str, ...]]] = [
+        (target, ()) for target in reversed(targets)
+    ]
+    while pending:
+        name, ancestors = pending.pop()
+        path = (*ancestors, name)
+        if name in ancestors:
+            cycles.append(list(path))
+            continue
+        if name not in declarations:
+            unresolved.append(
+                {
+                    "target": name,
+                    "source_path": list(path),
+                    "reason": "no-selected-file-target-declaration",
+                }
+            )
+            continue
+        if name in paths:
+            continue
+        paths[name] = path
+        observed, unknown = _literal_target_edges(name, declarations[name], facts)
+        edges.extend(observed)
+        unresolved.extend(unknown)
+        pending.extend((edge["target"], path) for edge in reversed(observed))
+    candidates = {
+        str(index): [
+            list(paths[name])
+            for name in cast("list[str]", fact.value.get("make_targets", []))
+            if name in paths
+        ]
+        for index, fact in enumerate(facts)
+        if any(
+            name in paths
+            for name in cast("list[str]", fact.value.get("make_targets", []))
+        )
+    }
+    return {
+        "schema": "hashmarks.make-selected-target-source.v1",
+        "selected_targets": list(targets),
+        "target_occurrences": [
+            {
+                "target": name,
+                "declaration_fact_indices": declarations[name],
+                "source_path": list(path),
+            }
+            for name, path in paths.items()
+        ],
+        "prerequisite_edges": edges,
+        "source_candidate_indices": [int(index) for index in candidates],
+        "candidate_paths": candidates,
+        "cycles": cycles,
+        "unresolved": unresolved,
+        "unresolved_source_indices": [
+            index
+            for index, fact in enumerate(facts)
+            if fact.kind
+            in {
+                "make-unresolved-statement",
+                "make-unresolved-recipe",
+                "make-include-declaration",
+                "make-unresolved-directive",
+            }
+        ],
+        "source_truncation": "stopped" if stopped else "not-truncated",
+        "semantic_coverage": "incomplete",
+        "effective_target_selection": "not-established",
+        "execution": "not-established",
+        "negative_evidence_admissible": False,
+    }
+
+
 def _file_fact(
-    raw: str, facts: Sequence[_Fact], language: str, *, stopped: bool
+    raw: str,
+    facts: Sequence[_Fact],
+    language: str,
+    *,
+    stopped: bool,
+    selected_targets: tuple[str, ...] = (),
 ) -> _Fact:
     return _Fact(
         "make-shell-file-observation",
@@ -1084,6 +1247,22 @@ def _file_fact(
             "remaining_source": "not-observed" if stopped else "selected-file-observed",
             "max_source_facts": MAX_MAKE_SHELL_FACTS,
             "semantic_coverage": "incomplete",
+            **(
+                {
+                    "selected_target_source": {
+                        "schema": "hashmarks.make-selected-target-sources.v1",
+                        "selected_targets": list(selected_targets),
+                        "by_target": {
+                            target: _selected_target_source(
+                                facts, (target,), stopped=stopped
+                            )
+                            for target in selected_targets
+                        },
+                    }
+                }
+                if selected_targets
+                else {}
+            ),
         },
         language=language,
     )
@@ -1097,6 +1276,7 @@ class MakeShellDeclarations:
     shell_paths: tuple[str, ...] = ()
     name: str = "make-shell-syntax"
     layout: Literal["groups", "file"] = "groups"
+    selected_targets: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if self.layout not in {"groups", "file"}:
@@ -1112,6 +1292,24 @@ class MakeShellDeclarations:
             for path in paths
         ):
             raise ValueError("Make/shell provider requires canonical repository paths")
+        if self.selected_targets:
+            self._validate_target_selection()
+
+    def _validate_target_selection(self) -> None:
+        if len(self.make_paths) != 1 or self.shell_paths or self.layout != "file":
+            raise ValueError(
+                "Make target source selection requires one Make file and file layout"
+            )
+        if len(self.selected_targets) > 64 or len(set(self.selected_targets)) != len(
+            self.selected_targets
+        ):
+            raise ValueError("Make source targets require at most 64 unique names")
+        if any(
+            not isinstance(name, str)
+            or re.fullmatch(r"[A-Za-z0-9_./+@-]+", name) is None
+            for name in self.selected_targets
+        ):
+            raise ValueError("Make source targets require exact literal names")
 
     def detect(self, context: RepositoryDeclarationProviderContext) -> bool:
         return True
@@ -1129,7 +1327,7 @@ class MakeShellDeclarations:
             if not context.exists(path):
                 missing.append(path)
                 continue
-            raw = context.read_bytes(path)
+            raw = context.read_bytes(path, max_bytes=MAX_MAKE_SHELL_BYTES)
             if len(raw) > MAX_MAKE_SHELL_BYTES:
                 raise ValueError("Make/shell source exceeds bounded input")
             max_facts = MAX_MAKE_SHELL_FACTS if self.layout == "file" else MAX_GROUPS
@@ -1153,7 +1351,15 @@ class MakeShellDeclarations:
                 reader.finish()
             add_static_binding_observations(reader.facts)
             projected = (
-                [_file_fact(text, reader.facts, language, stopped=reader.stopped)]
+                [
+                    _file_fact(
+                        text,
+                        reader.facts,
+                        language,
+                        stopped=reader.stopped,
+                        selected_targets=self.selected_targets,
+                    )
+                ]
                 if self.layout == "file"
                 else reader.facts
             )
@@ -1171,6 +1377,7 @@ class MakeShellDeclarations:
                 "layout": self.layout,
                 "make_paths": sorted(self.make_paths),
                 "shell_paths": sorted(self.shell_paths),
+                "selected_targets": list(self.selected_targets),
                 "missing_selected_paths": missing,
                 "coverage": "selected-supported-source-syntax-only",
                 "semantic_coverage": "incomplete",

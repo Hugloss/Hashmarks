@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 import pytest
 
@@ -148,6 +148,49 @@ def test_make_escaped_and_pattern_targets_leave_recipe_ownership_unresolved(
     assert len(_values(packet, "make-unresolved-recipe")) == 1
 
 
+def test_literal_prerequisite_tokens_retain_source_order_and_order_only_syntax(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path, "Makefile", "all: first second first | build/cache\n\techo ready\n"
+    )
+    packet = _observe(tmp_path, MakeShellDeclarations(make_paths=("Makefile",)))
+    target = _values(packet, "make-target-declaration")[0]
+    assert target["literal_prerequisite_tokens"] == [
+        {"literal": "first", "order_only_syntax": False},
+        {"literal": "second", "order_only_syntax": False},
+        {"literal": "first", "order_only_syntax": False},
+        {"literal": "build/cache", "order_only_syntax": True},
+    ]
+    assert target["effective_prerequisites"] == "not-established"
+    assert target["negative_evidence_admissible"] is False
+    assert _values(packet, "shell-command-expression")[0]["make_targets"] == ["all"]
+
+
+@pytest.mark.parametrize(
+    "expression",
+    [
+        "$(INPUT)",
+        "source\\ file",
+        "*.py",
+        "target%",
+        "VAR=value",
+        "first ; tool",
+        "a | b | c",
+        "first\u00a0second",
+    ],
+)
+def test_dynamic_prerequisites_cannot_become_literal_source_tokens(
+    tmp_path: Path, expression: str
+) -> None:
+    _write(tmp_path, "Makefile", f"all: {expression}\n\techo ready\n")
+    packet = _observe(tmp_path, MakeShellDeclarations(make_paths=("Makefile",)))
+    target = _values(packet, "make-target-declaration")[0]
+    assert target["literal_prerequisite_tokens"] is None
+    assert target["prerequisite_expression"].strip() == expression
+    assert target["effective_prerequisites"] == "not-established"
+
+
 def test_make_recipe_whitespace_precedes_prefix_processing(tmp_path: Path) -> None:
     _write(tmp_path, "Makefile", "all:\n\t  @-+echo ready\n")
     packet = _observe(tmp_path, MakeShellDeclarations(make_paths=("Makefile",)))
@@ -157,6 +200,86 @@ def test_make_recipe_whitespace_precedes_prefix_processing(tmp_path: Path) -> No
     assert command["make_targets"] == ["all"]
     evidence = _evidence(packet, _groups(packet, "shell-command-expression")[0])[0]
     assert (evidence["start_line"], evidence["end_line"]) == (2, 2)
+
+
+def test_selected_make_target_source_preserves_edges_and_recipe_provenance(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path,
+        "Makefile",
+        "all: check check | prepare\ncheck: prepare\n\tgit --version\nprepare:\n\tmkdir -p build\nunrelated:\n\tcurl remote\n",
+    )
+    packet = _observe(
+        tmp_path,
+        MakeShellDeclarations(
+            make_paths=("Makefile",), layout="file", selected_targets=("all",)
+        ),
+    )
+    file = _values(packet, "make-shell-file-observation")[0]
+    source = file["selected_target_source"]["by_target"]["all"]
+    assert source["selected_targets"] == ["all"]
+    assert [
+        (edge["source"], edge["target"]) for edge in source["prerequisite_edges"]
+    ].count(("all", "check")) == 2
+    assert source["cycles"] == source["unresolved"] == []
+    commands = [file["facts"][index] for index in source["source_candidate_indices"]]
+    assert [fact["value"]["literal_argv"][0] for fact in commands] == ["git", "mkdir"]
+    for index in source["source_candidate_indices"]:
+        assert source["candidate_paths"][str(index)][0][0] == "all"
+    assert source["effective_target_selection"] == "not-established"
+    assert source["semantic_coverage"] == "incomplete"
+    assert source["negative_evidence_admissible"] is False
+
+
+def test_selected_make_source_retains_cycles_and_unresolved_prerequisites(
+    tmp_path: Path,
+) -> None:
+    _write(
+        tmp_path,
+        "Makefile",
+        "all: child missing\nchild: all\n\tgit --version\ndynamic: $(GENERATED)\n\tuv sync\n",
+    )
+    packet = _observe(
+        tmp_path,
+        MakeShellDeclarations(
+            make_paths=("Makefile",), layout="file", selected_targets=("all", "dynamic")
+        ),
+    )
+    file = _values(packet, "make-shell-file-observation")[0]
+    source = file["selected_target_source"]["by_target"]
+    assert source["all"]["cycles"] == [["all", "child", "all"]]
+    assert {
+        row["reason"] for selected in source.values() for row in selected["unresolved"]
+    } == {
+        "no-selected-file-target-declaration",
+        "nonliteral-prerequisite-expression",
+    }
+    assert all(
+        selected["negative_evidence_admissible"] is False
+        for selected in source.values()
+    )
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        {"make_paths": ("Makefile",)},
+        {"make_paths": ("Makefile", "other.mk"), "layout": "file"},
+        {"shell_paths": ("script.sh",), "layout": "file"},
+        {
+            "make_paths": ("Makefile",),
+            "layout": "file",
+            "selected_targets": ("$(TARGET)",),
+        },
+    ],
+)
+def test_selected_make_source_requires_one_explicit_file_and_literal_targets(
+    options: dict[str, Any],
+) -> None:
+    arguments: dict[str, Any] = {"selected_targets": ("all",), **options}
+    with pytest.raises(ValueError):
+        MakeShellDeclarations(**arguments)
 
 
 def test_ambiguous_alias_declarations_do_not_acquire_precedence(tmp_path: Path) -> None:

@@ -6,6 +6,50 @@ the authorities described here and retains each authority's original scope.
 
 ## Python distribution metadata and source consumers
 
+### Composed dependency and verifier evidence
+
+**OBSERVER:** `CodeMap.dependencies.verification()` observes relationships from
+caller-selected dependency nodes through current static imports to source-qualified
+verification nominations. It composes existing dependency, source and verification
+owners; it does not decide whether a dependency change or test scope is sufficient.
+
+Supply the qualified dependency observation, explicit `source_paths` (1–64),
+`node_ids` (1–64), optional `context`, and `verification_limit` (1–1000 per unique
+consumer source, default 2). Optional `dependency_pairs` contains at most 64 exact
+`{source_node_id, target_node_id}` endpoints from the selected nodes. These are
+query claims: only the existing dependency query owner can establish the direct,
+unconditional dependency path between them. Conditional/incomplete paths remain
+retained observations and do not create composed chains.
+An explicit context also limits chains to consumer ownership observed in that
+context; the intact consumer packet retains all originally observed contexts.
+
+The registered `hashmarks.dependency-verification.v1` response retains one
+`consumer_packet`, one `verification_packets` entry per unique unambiguous
+consumer source, and intact native `path_queries` batches. Its `chains` bind
+`node_id`, `consumer_node_id`, `source_path`, `dependency_path`, and zero-based
+`consumer_index`, `verification_index`, `target_index`, `query_index` references.
+`relationship_indices` addresses the exact source-qualified relationship rows
+inside the referenced changed-source packet. Direct and bounded indirect
+references retain their canonical relationship identities and both endpoint
+revisions; a verifier that imports the dependency itself retains its native
+`changed-verifier` relationship. Unsupported, stale or inconsistent relationships
+cannot create a chain merely because a target nomination is available.
+The query index addresses the flattened native query results; direct imports
+have a one-node path and `query_index: null`. A dependency of an imported package
+is never relabeled as a direct import. Consumer, path and verifier uncertainty
+remain in the retained packets. Empty results do not prove absence; overall
+consumer completeness remains incomplete and negative evidence is inadmissible.
+The packet is bounded to 8 MiB and 16,384 chains; exceeding either bound refuses
+the observation and requires a smaller explicit scope, without dropping members.
+All source contributions are rechecked inside the existing read lifetime.
+
+`hashmarks.dependency_verification_validation.validate_dependency_verification(
+packet, observation)` replays retained composition, native dependency paths,
+nomination identities and exact logical membership without repository reads.
+This is content integrity and correspondence, not authentication, live freshness,
+native test collection, execution admission or certification. Current-source
+qualification requires a fresh call through the existing observer owners.
+
 The uv adapter accepts optional `distribution_metadata` entries containing an
 exact selected `node_id`, `METADATA` bytes as `metadata`, and optional `RECORD`
 bytes as `record`. The caller selects and captures those artifacts; Hashmarks
@@ -298,6 +342,26 @@ render the unambiguous one-removed/one-added case as `old -> new`, while
 simultaneous versions, variants, sources, markers, and context changes remain
 explicit lists. Relationship-only changes produce no component-selection
 transition, and non-comparable definitions expose no transition projection.
+
+**OBSERVER:** comparable deltas also expose `selection_changes` with `added`, `removed` and
+`changed` endpoint facts; changed entries retain separate `before` and `after`
+rows. Each row carries the exact normalized `component`, `selection`,
+`component_selection_count`, `inventory`, `roots` (root-evidence rows),
+`incoming_relationships` and `root_relationships` (incoming relationships from
+declared root nodes). Consumers can read an endpoint's package name, version and
+scoped incoming facts without joining raw tables or reconstructing root meaning.
+Markers, contexts and evidence-source references remain intact. The existing
+delta binds both qualified endpoint observation identities and repository
+bindings. These projections describe declared facts within those endpoints;
+empty rows do not upgrade coverage, prove global absence, or decide which
+dependency changes are acceptable. Existing dependency queries retain path and
+negative-evidence qualification authority.
+
+`hashmarks.dependency_delta_validation.validate_dependency_delta(delta, before,
+after)` replays the existing native delta owner over the two qualified retained
+endpoints and compares the exact canonical result, including all selected facts.
+It performs no repository reads and does not authenticate the caller, refresh an
+endpoint, or decide whether the change is acceptable.
 
 ### MCP projection modes
 

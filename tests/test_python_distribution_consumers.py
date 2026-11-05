@@ -253,6 +253,7 @@ def test_dependency_consumers_cannot_borrow_foreign_relationship_authority(
                 left.relationships.imports,
                 left.correlation,
                 right.relationships,
+                left.verification,
             )
 
 

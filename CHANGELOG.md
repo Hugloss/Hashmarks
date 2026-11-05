@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.36.0 — 2026-11-05
+
+- Compose qualified dependency, importing-source and verifier relationships through one bounded producer observation. Retain exact source, target and relationship provenance; ambiguous, stale or conditional evidence cannot become a positive verification claim. Execution and sufficiency remain external.
+- Expose dependency selection changes with their endpoint component, inventory and relationship facts, plus pure retained-delta and verification validators. Consumers can preserve producer meaning without reconstructing graph joins.
+- Observe quoted Python annotation references with separate source and decoded-expression coordinates. Preserve lexical shadows, unsupported syntax and type-only conditions without evaluating annotations or importing their targets.
+- Observe explicitly selected npm manifest fields and lock bin declarations, and bounded Make target/prerequisite/source-candidate relationships. Native expansion, installation, effective executable selection and execution remain unestablished.
+- Enforce explicit byte-transfer limits in FileStore, Source and declaration-provider rechecks before payload accumulation. Oversized or growing inputs cannot publish partial byte or digest evidence.
+
 ## 0.35.4 — 2026-11-05
 
 - Observe Python module data and named type aliases through the canonical declaration, export and binding owners. Unsupported native Python syntax stays unavailable, without a parser fallback.
