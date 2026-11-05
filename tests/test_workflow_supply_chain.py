@@ -514,6 +514,15 @@ def test_fast_ci_remains_a_native_pytest_gate() -> None:
     assert "Preserve non-authoritative pytest duration diagnostics" in fast
     assert "Recheck all native collected tests" in fast
     assert "Run process-sensitive tests in singleton native pytest processes" in fast
+    full_shards = fast.split("  full-shards:\n", 1)[1].split(
+        "  qualification-convergence:\n", 1
+    )[0]
+    assert "fail-fast: false" in full_shards
+    ordinary = full_shards.split("Execute native ordinary pytest membership", 1)[
+        1
+    ].split("Run process-sensitive tests in singleton native pytest processes", 1)[0]
+    assert "--maxfail" not in ordinary
+    assert '--maxfail=1 "$nodeid"' in full_shards
 
 
 def test_full_regression_remains_daily_and_manual_without_pr_cancellation() -> None:
