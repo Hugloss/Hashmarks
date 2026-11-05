@@ -46,6 +46,9 @@ All source contributions are rechecked inside the existing read lifetime.
 `hashmarks.dependency_verification_validation.validate_dependency_verification(
 packet, observation)` replays retained composition, native dependency paths,
 nomination identities and exact logical membership without repository reads.
+Replayed structured values retain their JSON scalar types: booleans and integral
+floats cannot substitute for integer query bounds, generation counters or membership counts,
+even after a caller recomputes packet content identities.
 This is content integrity and correspondence, not authentication, live freshness,
 native test collection, execution admission or certification. Current-source
 qualification requires a fresh call through the existing observer owners.

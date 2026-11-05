@@ -12,6 +12,7 @@ from typing import cast
 from hashmarks.codemap.dependency_resolution_correlation import _ownership_summary
 from hashmarks.codemap.dependency_resolution_evidence import (
     DependencyResolutionEvidenceMixin,
+    _canonical,
 )
 from hashmarks.codemap.dependency_resolution_query import (
     MAX_QUERIES,
@@ -80,6 +81,11 @@ def _records(value: object, label: str, maximum: int) -> list[dict[str, object]]
     return [_record(row, label) for row in value]
 
 
+def _same_json_value(left: object, right: object) -> bool:
+    """Retain structural equality and distinguish JSON scalar value types."""
+    return left == right and _canonical(left) == _canonical(right)
+
+
 def _target_members(
     targets: Sequence[Mapping[str, object]],
     relationships: Sequence[Mapping[str, object]],
@@ -93,7 +99,7 @@ def _target_members(
         if not any(row.get("target") == path for row in relationships):
             raise ValueError("verifier lacks a source relationship")
         member = verification_member(str(path)) if nomination["available"] else None
-        if target.get("member") != member:
+        if not _same_json_value(target.get("member"), member):
             raise ValueError("verifier member differs from nomination")
         nominated = (
             _record(nomination["verification_target"], "verification target")
@@ -121,7 +127,7 @@ def _changed_packet(
     repository = _record(value.get("repository"), "verification repository")
     endpoint = _record(binding, "dependency repository binding")
     if any(
-        repository.get(key) != endpoint.get(key)
+        not _same_json_value(repository.get(key), endpoint.get(key))
         for key in ("repository_identity", "codemap_generation")
     ):
         raise ValueError("verification repository differs from dependency observation")
@@ -134,7 +140,7 @@ def _changed_packet(
     )
     members = _target_members(targets, relationships)
     expected = verification_membership(members) if members else None
-    if value.get("membership") != expected:
+    if not _same_json_value(value.get("membership"), expected):
         raise ValueError("verification membership differs from returned nominations")
 
 
@@ -146,7 +152,9 @@ def _consumers(
     if (
         packet.get("schema") != operation_schema("dependency_consumers")
         or packet.get("observation_identity") != observation["observation_identity"]
-        or packet.get("repository_binding") != observation["repository_binding"]
+        or not _same_json_value(
+            packet.get("repository_binding"), observation["repository_binding"]
+        )
         or packet.get("selected_node_ids") != request["node_ids"]
     ):
         raise ValueError("dependency consumer packet binding mismatch")
@@ -163,7 +171,9 @@ def _consumers(
         "dependency consumers",
         cast("int", request["consumer_limit"]),
     ):
-        if row.get("source_member") != members.get(str(row.get("source_path"))):
+        if not _same_json_value(
+            row.get("source_member"), members.get(str(row.get("source_path")))
+        ):
             raise ValueError("consumer source revision differs from source scope")
         _consumer_ownership(row, observation)
         if row.get("distribution_state") == "resolved-unique":
@@ -179,14 +189,19 @@ def _consumer_ownership(
 ) -> None:
     matches = _records(row.get("matched_modules"), "module ownership", 4096)
     if any(
-        match not in cast("list[dict[str, object]]", observation["module_ownership"])
+        not any(
+            _same_json_value(match, declared)
+            for declared in cast(
+                "list[dict[str, object]]", observation["module_ownership"]
+            )
+        )
         for match in matches
     ):
         raise ValueError(
             "consumer ownership differs from qualified dependency observation"
         )
     summary = _ownership_summary(matches)
-    if any(row.get(key) != item for key, item in summary.items()):
+    if any(not _same_json_value(row.get(key), item) for key, item in summary.items()):
         raise ValueError("consumer ownership projection differs from producer rows")
 
 
@@ -200,17 +215,19 @@ def _request(
             type(request[key]) is not int
             for key in ("max_dependency_depth", "consumer_limit")
         )
-        or verification_request(
-            observation,
-            source_paths=cast("Sequence[str]", request["source_paths"]),
-            node_ids=cast("Sequence[str]", request["node_ids"]),
-            context=cast("str | None", request["context"]),
-            verification_limit=cast("int", request["verification_limit"]),
-            dependency_pairs=cast(
-                "Sequence[Mapping[str, str]]", request["dependency_pairs"]
+        or not _same_json_value(
+            verification_request(
+                observation,
+                source_paths=cast("Sequence[str]", request["source_paths"]),
+                node_ids=cast("Sequence[str]", request["node_ids"]),
+                context=cast("str | None", request["context"]),
+                verification_limit=cast("int", request["verification_limit"]),
+                dependency_pairs=cast(
+                    "Sequence[Mapping[str, str]]", request["dependency_pairs"]
+                ),
             ),
+            request,
         )
-        != request
     ):
         raise ValueError("dependency verification request mismatch")
     return request
@@ -236,9 +253,8 @@ def _verification_packets(
         change = cast("list[dict[str, object]]", verification["changes"])[0]
         member = _record(change["source"], "changed source")["member"]
         for consumer in cast("list[dict[str, object]]", consumers["consumers"]):
-            if (
-                consumer["source_path"] == source
-                and consumer["source_member"] != member
+            if consumer["source_path"] == source and not _same_json_value(
+                consumer["source_member"], member
             ):
                 raise ValueError(
                     "consumer and verifier observe different source revisions"
@@ -292,15 +308,20 @@ def _validate(value: object, observation: Mapping[str, object]) -> str:
         dependency_queries(observation, requests[offset : offset + MAX_QUERIES])
         for offset in range(0, len(requests), MAX_QUERIES)
     ]
-    if packet["path_requests"] != requests or packet["path_queries"] != queries:
+    if not _same_json_value(packet["path_requests"], requests) or not _same_json_value(
+        packet["path_queries"], queries
+    ):
         raise ValueError("dependency paths differ from qualified observation")
     _chain_indices(packet)
-    if packet["chains"] != verification_chains(
-        consumers,
-        verifications,
-        requests,
-        queries,
-        cast("str | None", request["context"]),
+    if not _same_json_value(
+        packet["chains"],
+        verification_chains(
+            consumers,
+            verifications,
+            requests,
+            queries,
+            cast("str | None", request["context"]),
+        ),
     ):
         raise ValueError("dependency verifier chains differ from producer evidence")
     constants = {
