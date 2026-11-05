@@ -649,6 +649,8 @@ class _Observations:
                 and node.type == "identifier"
                 and name is not None
                 and "A" <= name[:1] <= "Z"
+                and value.target is not None
+                and value.target["kind"] in {"import", "declaration"}
             )
             if not component_name:
                 value = _unknown("jsx-name-interpretation-not-performed", node)
