@@ -683,11 +683,21 @@ class OwnershipCandidateEvidenceMixin:
             config_candidates.append(local_row)
             existing_paths.add(local_path)
 
-    @staticmethod
+    @classmethod
     def _config_locality_key(
-        anchor: dict[str, object], row: dict[str, object]
+        cls, anchor: dict[str, object], row: dict[str, object]
     ) -> tuple[int, float, int]:
         generic_parts = {"src", "tests", "checks", "frontend", "backend"}
+        anchor_path = Path(str(anchor["path"]))
+        config_parent = Path(str(row["path"])).parent
+        # Directory ancestry supplies locality even when a root configuration
+        # shares no filename token with the source; runtime binding stays unknown.
+        ancestor_depth = (
+            len(config_parent.parts) + 1
+            if config_parent in anchor_path.parents
+            and cls._concrete_local_configs((row,))
+            else 0
+        )
         anchor_parts = {
             part.lower()
             for part in Path(str(anchor["path"])).parts
@@ -699,7 +709,7 @@ class OwnershipCandidateEvidenceMixin:
             if part.lower() not in generic_parts
         }
         return (
-            len(anchor_parts & row_parts),
+            len(anchor_parts & row_parts) + ancestor_depth,
             _task_row_score(row),
             -_task_row_rank(row),
         )

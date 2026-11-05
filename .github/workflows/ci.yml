@@ -150,7 +150,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         shard: [0, 1, 2, 3]
     steps:
@@ -187,7 +187,7 @@ jobs:
         run: |
           set -euo pipefail
           xargs -0 -r uv run --frozen --offline --no-sync --group test \
-            python -m pytest -p scripts.ci_full_shards -q --maxfail=1 --durations=10 \
+            python -m pytest -p scripts.ci_full_shards -q --durations=10 \
             < "$RUNNER_TEMP/normal-tests.nul"
       - name: Run process-sensitive tests in singleton native pytest processes
         shell: bash

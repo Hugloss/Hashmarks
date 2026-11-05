@@ -185,7 +185,7 @@ def test_public_conditional_rows_bind_original_member_parser_and_fact_identity(
     assert _mapping(packet["member"])["member_revision"]
     assert (
         _mapping(packet["producer"])["binding_interpreter"]
-        == "hashmarks.source-binding-interpreter.v4"
+        == "hashmarks.source-binding-interpreter.v5"
     )
     assert "conditional-call-binding" in _strings(
         _mapping(packet["coverage"])["fact_kinds"]

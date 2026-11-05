@@ -58,12 +58,40 @@ contributors and then obtains strict current target nominations.
 ## Relationships and support scope
 
 Ordinary source relationships reuse the existing bounded reference owner.
-Direct references and one-intermediate indirect references retain their
+Direct references and bounded indirect references retain their
 qualified import identity, reference strength and supporting source revisions.
 Re-export facades and intermediate import declarations are retained from the
 same import walk, not rediscovered by another graph. Syntax-qualified test
 helpers can be intermediate source consumers; they are not themselves promoted
 to test membership merely because their path is under `tests/`.
+
+Python module data bindings and named type aliases participate in that same
+source relationship owner. They identify authored declarations, not callable
+targets or runtime values. A native Python parser that cannot interpret an
+alias's syntax leaves the observation unavailable. An explicit, source-qualified
+pytest `pythonpath` declaration may qualify test imports within that observation;
+it does not change packaging roots or select pytest's effective configuration.
+The relationship retains the configuration inputs and their observed absences,
+including the separate contexts of participating test helpers.
+
+JavaScript/TypeScript relationships combine canonical source binding uses with
+native TypeScript module resolution. Nested configuration references, compiler
+identity and the exact admitted configuration inputs remain provenance; ordinary
+lexical matches, unused imports and unresolved bindings do not become direct
+references. A simple uppercase JSX component name may identify its lexical
+binding without establishing an element factory or runtime target.
+Used-import intermediates retain each source member in the relation. This
+request-local walk is bounded at eight source hops and 256 visits; an exhausted
+bound preserves incomplete observation, never consumer absence or coverage.
+
+`classification.static_project` separately describes a fully observed TypeScript
+type-only source and its native project membership. It does not invent a runtime
+test relationship, establish consumer coverage or decide which static check is
+sufficient. Missing syntax/compiler capability, recovery, unsupported source or
+unqualified project inputs leave the field absent. A qualified fact carries the
+exact source member, parser capability/signature, native project membership,
+configuration source members and the selected compiler entry-file digest. That
+digest describes the loaded compiler entry file only, not its dependency closure.
 
 A changed verifier has an explicit `changed-verifier` relationship to itself.
 Python verifier roles require source declarations in a canonical test domain;

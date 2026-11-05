@@ -29,6 +29,7 @@ class _OwnerWalk:
     """Request-local re-export traversal with one ambiguity owner."""
 
     resolver: RepositoryImports
+    pythonpath: tuple[str, ...] = ()
     leaves: set[str] = field(default_factory=set)
     symbol_leaves: set[tuple[str, str]] = field(default_factory=set)
     visited: set[tuple[str, str]] = field(default_factory=set)
@@ -93,7 +94,9 @@ class _OwnerWalk:
     def _follow_target(self, facade_path: str, target: str, depth: int) -> bool:
         nested_name = target.lstrip(".").rsplit(".", 1)[-1]
         resolver = self.resolver
-        owners = resolver._resolve_import_paths(facade_path, target)[:20]
+        owners = resolver._resolve_import_paths(
+            facade_path, target, pythonpath=self.pythonpath
+        )[:20]
         if len(owners) > 1:
             self.unresolved = True
         progress = False
@@ -390,7 +393,12 @@ class RepositoryImports:
         )
 
     def _resolve_import_owner_evidence(
-        self, source_path: str, target: str, *, supporting_paths: set[str] | None = None
+        self,
+        source_path: str,
+        target: str,
+        *,
+        supporting_paths: set[str] | None = None,
+        pythonpath: tuple[str, ...] = (),
     ) -> tuple[list[str], bool]:
         """Resolve bounded import-owner evidence and report unresolved identity.
 
@@ -399,7 +407,9 @@ class RepositoryImports:
         make safety decisions must preserve that uncertainty rather than treating
         a facade-only resolution as proof of the underlying owner.
         """
-        resolved = list(self._resolve_import_paths(source_path, target))
+        resolved = list(
+            self._resolve_import_paths(source_path, target, pythonpath=pythonpath)
+        )
         if supporting_paths is not None:
             supporting_paths.update((source_path, *resolved))
         module_candidates = self._python_import_module_candidates(source_path, target)
@@ -418,7 +428,7 @@ class RepositoryImports:
             ) and self._python_import_identity_ambiguous(source_path, target)
             return resolved, ambiguous
 
-        walk = _OwnerWalk(self)
+        walk = _OwnerWalk(self, pythonpath=pythonpath)
         for facade_path in resolved[:20]:
             walk.visit(facade_path, short, 0)
         if supporting_paths is not None:
@@ -471,7 +481,9 @@ class RepositoryImports:
             candidate = candidate.rsplit(".", 1)[0] if "." in candidate else ""
         return tuple(ordered)
 
-    def _resolve_python_import_paths(self, source_path: str, target: str) -> list[str]:
+    def _resolve_python_import_paths(
+        self, source_path: str, target: str, *, pythonpath: tuple[str, ...] = ()
+    ) -> list[str]:
         """Resolve only uniquely owned Python module evidence.
 
         Multiple repository paths exposing the same qualified import identity are
@@ -479,10 +491,26 @@ class RepositoryImports:
         evidence but must never choose an owner.
         """
         for candidate in self._python_import_module_candidates(source_path, target):
-            resolved = self.reads.module_paths(candidate)
+            resolved = set(self.reads.module_paths(candidate))
+            # An explicit caller-qualified native import context only applies to
+            # this observation. It never changes Index's packaging/module roots.
+            if pythonpath and not target.startswith("."):
+                resolved.update(self._pythonpath_module_paths(candidate, pythonpath))
             if resolved:
-                return resolved if len(resolved) == 1 else []
+                return sorted(resolved) if pythonpath or len(resolved) == 1 else []
         return []
+
+    def _pythonpath_module_paths(
+        self, module: str, pythonpath: tuple[str, ...]
+    ) -> list[str]:
+        """Observe exact module members in an explicit source-qualified context."""
+        member = module.replace(".", "/")
+        paths = [
+            (PurePosixPath(root) / (member + suffix)).as_posix()
+            for root in pythonpath
+            for suffix in (".py", ".pyi", "/__init__.py", "/__init__.pyi")
+        ]
+        return sorted(self.reads.file_rows(paths))
 
     def _python_import_identity_ambiguous(self, source_path: str, target: str) -> bool:
         """Report whether the first resolvable Python module identity has >1 owner."""
@@ -570,7 +598,9 @@ class RepositoryImports:
         ]
         return sorted(candidates)
 
-    def _resolve_import_paths(self, source_path: str, target: str) -> list[str]:
+    def _resolve_import_paths(
+        self, source_path: str, target: str, *, pythonpath: tuple[str, ...] = ()
+    ) -> list[str]:
         """Resolve import evidence by language while preserving exact resolver semantics."""
         target = target.strip()
         if not target:
@@ -578,7 +608,9 @@ class RepositoryImports:
         source_row = self.reads.file_row(source_path)
         language = None if source_row is None else str(source_row["language"])
         if language == "python":
-            return self._resolve_python_import_paths(source_path, target)
+            return self._resolve_python_import_paths(
+                source_path, target, pythonpath=pythonpath
+            )
         if language in {"javascript", "typescript"}:
             return self._resolve_js_import_paths(source_path, target)
         if language == "go":

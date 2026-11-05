@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections import Counter
 from pathlib import Path
 
+import pytest
+
 from hashmarks.codemap.engine import CodeMap
 from hashmarks.codemap.ownership_candidate_evidence import (
     OwnershipCandidateEvidenceMixin,
@@ -107,3 +109,66 @@ def test_locally_admitted_config_siblings_have_scoring_evidence(tmp_path: Path) 
     assert edit["path"] == "service/a.toml"
     assert "locality_projection" in edit
     assert edit["locality_projection"] is True
+
+
+@pytest.mark.parametrize("setting", ["retry", "buffer", "interval"])
+def test_config_ancestor_remains_local_when_source_has_an_indexed_data_symbol(
+    tmp_path: Path, setting: str
+) -> None:
+    _write(tmp_path, "pyproject.toml", f"[tool.sample]\n{setting} = 30\n")
+    _write(tmp_path, "src/reader.py", f"DEFAULT_{setting.upper()} = 30\n")
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        result = codemap.tasks.action_map(f"update {setting} config")
+        symbols = codemap.store.symbols_for_path("src/reader.py")
+
+    edit, ambiguity = result["edit"], result["ambiguity"]
+    assert isinstance(edit, dict) and edit["path"] == "pyproject.toml"
+    assert isinstance(ambiguity, dict) and ambiguity["ambiguous"] is False
+    assert any(row["name"] == f"DEFAULT_{setting.upper()}" for row in symbols)
+
+
+def test_nearer_configuration_ancestor_precedes_the_repository_root(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "pyproject.toml", "[tool.demo]\ntimeout = 10\n")
+    _write(tmp_path, "component/settings.toml", "[demo]\ntimeout = 30\n")
+    _write(tmp_path, "component/src/main.py", "DEFAULT_TIMEOUT = 30\n")
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        result = codemap.tasks.action_map("update timeout config")
+
+    edit = result["edit"]
+    assert isinstance(edit, dict) and edit["path"] == "component/settings.toml"
+
+
+def test_explicit_source_path_keeps_authority_over_configuration_locality(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "pyproject.toml", "[tool.demo]\ntimeout = 30\n")
+    _write(tmp_path, "src/main.py", "DEFAULT_TIMEOUT = 30\n")
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        result = codemap.tasks.action_map("update timeout config in src/main.py")
+
+    edit = result["edit"]
+    assert isinstance(edit, dict) and edit["path"] == "src/main.py"
+
+
+def test_ancestor_contract_prose_does_not_become_configuration(tmp_path: Path) -> None:
+    _write(
+        tmp_path,
+        "POLICY.md",
+        "# Timeout configuration\nTimeout settings are described here.\n",
+    )
+    _write(tmp_path, "src/main.py", "DEFAULT_TIMEOUT = 30\n")
+
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        result = codemap.tasks.action_map("update timeout config")
+
+    edit = result["edit"]
+    assert isinstance(edit, dict) and edit["path"] == "src/main.py"

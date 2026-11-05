@@ -220,7 +220,41 @@ class _Collector(ast.NodeVisitor):
             )
         self.generic_visit(node)
 
+    def _module_binding(self, node: ast.AST, name: str, kind: str) -> None:
+        if self.current is not None:
+            return
+        start = int(getattr(node, "lineno", 1))
+        end = int(getattr(node, "end_lineno", start))
+        lines = self.source.splitlines()
+        signature = lines[start - 1].strip()[:400]
+        self.symbols.append(
+            SymbolRecord(
+                name=name,
+                qualname=name,
+                kind=kind,
+                signature=signature,
+                start_line=start,
+                end_line=end,
+                signature_tokens=estimate_tokens(signature),
+                body_tokens=estimate_tokens("\n".join(lines[start - 1 : end])),
+            )
+        )
+
+    def visit_Assign(self, node: ast.Assign) -> None:
+        for target in node.targets:
+            if isinstance(target, ast.Name):
+                self._module_binding(node, target.id, "binding")
+        self.generic_visit(node)
+
+    def visit_TypeAlias(self, node: ast.AST) -> None:
+        name = getattr(node, "name", None)
+        if isinstance(name, ast.Name):
+            self._module_binding(node, name.id, "type")
+        self.generic_visit(node)
+
     def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
+        if node.value is not None and isinstance(node.target, ast.Name):
+            self._module_binding(node, node.target.id, "binding")
         for target in _annotation_targets(node.annotation):
             self.edges.append(
                 EdgeRecord(

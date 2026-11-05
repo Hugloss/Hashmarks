@@ -236,7 +236,7 @@ class _PythonBindings:
                     support=(binding.node,),
                 )
             )
-        if binding.kind == "declaration":
+        if binding.kind in {"declaration", "type-alias"}:
             return self._declaration_value(binding)
         if binding in trail:
             return self._unknown("alias-cycle", binding)
@@ -253,6 +253,12 @@ class _PythonBindings:
         )
 
     def _declaration_value(self, binding: PythonBinding) -> _Value:
+        if binding.kind == "type-alias":
+            return _Value(
+                target=self._declaration_target(binding.node, binding.name),
+                binding=binding.node,
+                support=(binding.node,),
+            )
         node = cast(ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef, binding.node)
         if node.decorator_list:
             return self._unknown("decorated-declaration", binding)
@@ -882,6 +888,18 @@ class _PythonBindings:
             )
         self.rows.append(row)
 
+    def _type_alias_row(self, node: ast.AST) -> None:
+        name = getattr(node, "name", None)
+        assert isinstance(name, ast.Name)
+        value = _Value(
+            target=self._declaration_target(node, name.id),
+            binding=node,
+            support=(node,),
+        )
+        row = self.row("declaration", node, value, name.id)
+        row.update(expression=None, declaration_kind="type-alias")
+        self.rows.append(row)
+
     def _parameter(self, argument: ast.arg, scope: PythonScope) -> dict[str, object]:
         return {
             "name": argument.arg,
@@ -992,6 +1010,8 @@ class _PythonBindings:
             self._literal_row(node)
         elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
             self._declaration_row(node)
+        elif isinstance(node, getattr(ast, "TypeAlias", ())):
+            self._type_alias_row(node)
 
 
 def _supplied_arguments(

@@ -523,6 +523,12 @@ class _Observations:
             (entry.node.start_byte, entry.node.end_byte): entry
             for entry in inventory.functions.values()
         }
+        self.exports: dict[tuple[int, int, str], list[dict[str, object]]] = {}
+        for visit in inventory.visits:
+            if visit.node.type == "export_specifier" and visit.module is not None:
+                fact = self.projection.fact(visit)
+                if fact is not None:
+                    self.exports.setdefault(node_key(visit.module), []).append(fact)
 
     def _row(
         self,
@@ -635,7 +641,19 @@ class _Observations:
         scope = self.inventory.scope(node)
         value = self.resolver.resolve(node, _Context(scope, node.start_byte))
         if visit.parent is not None and visit.parent.type.startswith("jsx_"):
-            value = _unknown("jsx-name-interpretation-not-performed", node)
+            tag = visit.parent.child_by_field_name("name")
+            name = self.projection.name(node)
+            component_name = (
+                tag is not None
+                and node_key(tag) == node_key(node)
+                and node.type == "identifier"
+                and name is not None
+                and "A" <= name[:1] <= "Z"
+                and value.target is not None
+                and value.target["kind"] in {"import", "declaration"}
+            )
+            if not component_name:
+                value = _unknown("jsx-name-interpretation-not-performed", node)
         self.rows.append(self._row("reference", node, scope, value))
 
     def _helper(
@@ -801,6 +819,7 @@ class _Observations:
             source=syntax["source"],
             type_only=syntax["type_only"],
             module_resolution="not-performed",
+            export_bindings=self.exports.get(node_key(visit.node), []),
         )
         self.rows.append(row)
 

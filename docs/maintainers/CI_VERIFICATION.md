@@ -70,6 +70,14 @@ Both early tests and the PR's normal selected pytest phase use
 every selected test. Nightly and release qualification remain unchanged and
 continue to report the complete suite's failures.
 
+The four full-suite runners collect independent ordinary test failures in one
+campaign: the matrix uses `fail-fast: false` and ordinary full-shard pytest has
+no first-failure limit. Early and relevant checks still stop at their first
+failure; singleton native-process policy is unchanged. All four shards still
+have to pass the same convergence check, and an obsolete head still cancels its
+run. Red runs may do more work, avoiding repeated campaigns that hide unrelated
+failures; green membership and critical-path scheduling are unchanged.
+
 The selection plan is JSON, bound to base SHA, effective checkout SHA, changed
 paths and a deterministic plan digest. CI preserves it as a run artifact. A
 `focused` plan is an **admission to run a subset**, not a completed verification
