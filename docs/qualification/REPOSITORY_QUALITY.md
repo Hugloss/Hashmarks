@@ -18,6 +18,47 @@ Quality is compared lexicographically:
 
 A lower level never compensates for failure at a higher level.
 
+## Five-question QA for declarations and relationships
+
+Use these questions when an agent claims a repository-intelligence defect,
+especially with limited reasoning or context. This is source-review guidance,
+not a new scorer, corpus definition or CI/release gate.
+
+1. **Which producer result exists?** Identify the exact Hashmarks revision,
+   public API, declaration/relationship packet, selected member and observed
+   generation. Inspect the producer implementation and existing contracts,
+   not only a consumer snippet or the presence of a parser.
+2. **What does the result actually claim?** Separate authored Python/uv/Make/
+   shell declarations from *effective* native uv, Make or shell execution;
+   distinguish static source/dependency relationships from runtime call truth.
+   Preserve producer identity, evidence scope, freshness, value state,
+   ambiguity, correspondence, completeness, truncation and negative-evidence
+   limits. Similar hashes across consumers do not prove shared semantics.
+3. **Where would a consumer misuse it?** Trace producer -> public adapter ->
+   downstream decision. Ask whether a consumer treats an incomplete source
+   observation as repository-wide absence, a producer relationship as its own
+   reconstructed graph, or a verification nomination as execution authority.
+   Hashmarks supplies repository facts; Oh-Goon or the harness owns admission,
+   process work and results.
+4. **What is the safe neighboring case?** Check a valid refined declaration,
+   unresolved/ambiguous value, unavailable source, stale observation, a
+   bounded relationship and a legitimate native-tool execution witness.
+   Existing validation, typed projections and upstream format guarantees may
+   refute a claimed defect. A grep hit or repeated syntax is not a reproducer.
+5. **What verdict and repair are justified?** Report a `FINDING` only when
+   the producer or consumer actually violates its contract with a material
+   consequence. Otherwise `LEAVE ALONE` or mark missing proof
+   `INSUFFICIENT EVIDENCE`; a `CLEAN` claim is limited to the completed
+   inspected scope. Repair the responsible owner, preserving unknown states,
+   with one focused positive and safe-control regression. Do not transfer
+   Git/worktree execution or certification authority into Hashmarks.
+
+This complements, but does not replace, the existing repository-quality
+measurement ordering below and the consumer's own qualification. AgentsCookbook
+owns portable finding derivation; EvalShot owns model-backed skill evaluation.
+A text instruction or a passing source scan does not prove a weak-thinking
+agent will distinguish these cases reliably.
+
 ## Ground truth and corpus readiness
 
 A case separates repository semantic truth from the evidence admitted to Hashmarks. A unique owner with insufficient admitted evidence is expected to remain unresolved; that is not a missed-resolution defect.
