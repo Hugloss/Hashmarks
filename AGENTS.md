@@ -288,6 +288,14 @@ Hashmarks ownership/cache/import/verification/concurrency diagnostics are reposi
 
 ## Responsibility-first refactoring gate
 
+For review findings on declarations, source/dependency relationships, or
+possible shadow repository intelligence, use the
+[five-question evidence QA](docs/qualification/REPOSITORY_QUALITY.md#five-question-qa-for-declarations-and-relationships)
+before proposing implementation work. Demonstrate a real conflicting accepted
+fact/consumer consequence and a safe neighboring case; do not mistake an
+external Git execution witness or a shared hashing algorithm for repository
+intelligence. This is guidance, not another release or PR gate.
+
 Before file-size, naming, or complexity cleanup, apply `docs/maintainers/RESPONSIBILITY_REFACTORING.md`. Large LOC and Ruff debt are investigation signals, not extraction requirements. Every candidate must be classified KEEP COHESIVE, REFACTOR INTERNALLY, EXTRACT RESPONSIBILITY, or DECOMPOSE MULTIPLE RESPONSIBILITIES before code movement. Interoperability transfers information, never authority.
 
 ## CLI responsibility ownership
