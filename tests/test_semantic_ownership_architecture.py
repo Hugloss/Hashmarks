@@ -202,6 +202,15 @@ def test_source_composition_may_construct_the_configured_provider_only() -> None
     )
 
 
+def _native_annotation_parse(node: ast.Call, bindings: dict[str, str]) -> bool:
+    return _syntax_call_target(node.func, bindings) == "ast.parse" and any(
+        keyword.arg == "mode"
+        and isinstance(keyword.value, ast.Constant)
+        and keyword.value.value == "eval"
+        for keyword in node.keywords
+    )
+
+
 def _python_module_parse_bypasses(tree: ast.Module) -> list[int]:
     bindings = dict(
         pair
@@ -214,12 +223,7 @@ def _python_module_parse_bypasses(tree: ast.Module) -> list[int]:
         for node in ast.walk(tree)
         if isinstance(node, ast.Call)
         and _syntax_call_target(node.func, bindings) == "ast.parse"
-        and not any(
-            keyword.arg == "mode"
-            and isinstance(keyword.value, ast.Constant)
-            and keyword.value.value == "eval"
-            for keyword in node.keywords
-        )
+        and not _native_annotation_parse(node, bindings)
     ]
 
 
@@ -269,18 +273,23 @@ def test_binding_interpreters_consume_supplied_syntax_without_source_io() -> Non
         *CODEMAP.glob("python_binding*.py"),
         *CODEMAP.glob("ecmascript_binding*.py"),
     ]
-    violations = [
-        f"{path.name}:{node.lineno}"
-        for path in paths
-        for node in ast.walk(_tree(path))
-        if isinstance(node, ast.Call)
-        and (
-            isinstance(node.func, ast.Attribute)
-            and node.func.attr in forbidden
-            or isinstance(node.func, ast.Name)
-            and node.func.id in forbidden
+    violations = []
+    for path in paths:
+        tree = _tree(path)
+        bindings = dict(
+            pair
+            for node in ast.walk(tree)
+            if isinstance(node, (ast.Import, ast.ImportFrom))
+            for pair in _syntax_import_bindings(node, "hashmarks.codemap")
         )
-    ]
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            forbidden_call = (
+                isinstance(node.func, ast.Attribute) and node.func.attr in forbidden
+            ) or (isinstance(node.func, ast.Name) and node.func.id in forbidden)
+            if forbidden_call and not _native_annotation_parse(node, bindings):
+                violations.append(f"{path.name}:{node.lineno}")
     assert violations == [], (
         "binding projectors must use admitted syntax: " + ", ".join(violations)
     )
