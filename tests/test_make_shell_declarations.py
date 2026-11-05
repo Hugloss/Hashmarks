@@ -23,7 +23,7 @@ from hashmarks.codemap.make_shell_declarations import (
 def _write(root: Path, path: str, source: str) -> None:
     target = root / path
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(source, encoding="utf-8")
+    target.write_text(source, encoding="utf-8", newline="")
 
 
 def _observe(root: Path, provider: MakeShellDeclarations) -> dict:
@@ -313,7 +313,7 @@ def test_changed_source_requires_refresh_and_updates_existing_delta(
     [
         "echo " + "arg " * MAX_STATEMENT_WORDS,
         "#" * (MAX_MAKE_SHELL_BYTES + 1),
-        "echo 'multiline\nstring'\n",
+        "echo 'unterminated\nstring\n",
     ],
 )
 def test_bounds_and_unsupported_quoting_fail_without_partial_evidence(
@@ -374,7 +374,7 @@ def test_make_indirection_is_conditional_static_words_not_execution(
     assert command["execution"] == "not-established"
     assert observation["negative_evidence_admissible"] is False
     assert packet["providers"][0]["provenance"]["semantics"] == (
-        "hashmarks.make-shell-syntax.v4"
+        "hashmarks.make-shell-syntax.v5"
     )
 
 

@@ -10,7 +10,7 @@ from hashmarks.codemap import CodeMap, MakeShellDeclarations
 
 
 def _commands(tmp_path: Path, source: str) -> list[dict]:
-    (tmp_path / "demo.sh").write_text(source)
+    (tmp_path / "demo.sh").write_text(source, encoding="utf-8", newline="")
     with CodeMap(tmp_path) as native:
         native.index.sync()
         packet = native.declarations.discover(

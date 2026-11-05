@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.35.3 — 2026-11-05
+
+- Preserve lexical byte ordering for shell declarations and uses on the same physical line, without admitting later or ambiguous assignments.
+- Retain forward references in recursive Make declarations as conditional authored candidates; immediate Make assignments and shell ordering retain their separate uncertainty barriers. Effective native expansion remains unproven.
+- Balance closed single-line shell control syntax in the existing tokenizer owner. This prevents repeated context accumulation while retaining every source fact and the existing packet bounds; unsupported, quoted and unclosed control syntax stays explicit.
+- Capture multiline quoted words and simple quoted here-doc data with exact byte extents, then resume later source statements. Here-strings remain distinct lexical operators; dynamic or unclosed data forms remain incomplete and never become command evidence.
+
 ## 0.35.2 — 2026-11-04
 
 - Preserve authored unresolved Python alias origins and conditional parameter-use provenance without claiming a resolved runtime target, including lexical shadowing and rebinding barriers.

@@ -190,7 +190,7 @@ def _visible_definitions(
 @dataclass(frozen=True, slots=True)
 class _BindingContext:
     fact: _Fact
-    before: int
+    before: tuple[int, int]
     definitions: Mapping[str, list[_Fact]]
     visited: frozenset[str] = frozenset()
     invocation: _Fact | None = None
@@ -201,7 +201,7 @@ class _BindingContext:
         return replace(
             self,
             fact=fact,
-            before=fact.line.start,
+            before=(fact.line.start, fact.line.offset),
             visited=self.visited | {name},
             invocation=self.invocation
             if scope and scope == _functions(self.fact)
@@ -317,8 +317,13 @@ def _resolve(
     declaration = candidates[0]
     before = context.before
     if context.invocation is not None and not _functions(declaration):
-        before = context.invocation.line.start
-    if declaration.line.start >= before:
+        before = (context.invocation.line.start, context.invocation.line.offset)
+    forward = (declaration.line.start, declaration.line.offset) >= before
+    recursive_make = context.fact.language == "make" and (
+        context.fact.kind == "shell-command-expression"
+        or context.fact.value.get("assignment_operator") in {"=", "?="}
+    )
+    if forward and not recursive_make:
         return None
     candidate = _declaration_value(
         declaration,
@@ -330,6 +335,12 @@ def _resolve(
         return None
     conditions = tuple("source-context-applies:" + part for part in declaration.context)
     features = ("scoped-binding",) if declaration.context else ()
+    if forward:
+        conditions += (
+            "recursive-make-source-reference",
+            "native-make-evaluation-time-unestablished",
+        )
+        features += ("forward-make-source-reference",)
     return _combine((_Candidate((), (declaration,), conditions, features), candidate))
 
 
@@ -411,7 +422,7 @@ def _positional(
         return None
     caller = _BindingContext(
         context.invocation,
-        context.invocation.line.start,
+        (context.invocation.line.start, context.invocation.line.offset),
         context.definitions,
         retain_unresolved=context.retain_unresolved,
     )
@@ -504,7 +515,12 @@ def _derive_words(
 
 def _evidence(facts: Sequence[_Fact]) -> list[dict[str, object]]:
     distinct = {
-        (str(fact.value["name"]), fact.line.start, fact.line.end): fact
+        (
+            str(fact.value["name"]),
+            fact.line.start,
+            fact.line.end,
+            fact.line.offset,
+        ): fact
         for fact in facts
     }
     return [
@@ -512,11 +528,12 @@ def _evidence(facts: Sequence[_Fact]) -> list[dict[str, object]]:
             "name": name,
             "start_line": start,
             "end_line": end,
+            "logical_offset": offset,
             "context": list(fact.context),
             "assignment_operator": fact.value.get("assignment_operator", "="),
             "expression": _expression(fact),
         }
-        for (name, start, end), fact in sorted(distinct.items())
+        for (name, start, end, offset), fact in sorted(distinct.items())
     ]
 
 
@@ -553,11 +570,12 @@ def _authored_exports(
 ) -> list[dict[str, object]]:
     from .make_shell_declarations import MAX_STATEMENT_WORDS
 
-    before = invocation.line.start if invocation is not None else fact.line.start
+    boundary = invocation if invocation is not None else fact
+    before = (boundary.line.start, boundary.line.offset)
     sites: dict[str, list[_Fact]] = {}
     scope = _functions(fact)
     for row in facts:
-        if row.language != "shell" or row.line.start >= before:
+        if row.language != "shell" or (row.line.start, row.line.offset) >= before:
             continue
         if _functions(row) and _functions(row) != scope:
             continue
@@ -578,6 +596,7 @@ def _authored_exports(
                     {
                         "start_line": row.line.start,
                         "end_line": row.line.end,
+                        "logical_offset": row.line.offset,
                         "context": list(row.context),
                     }
                     for row in exports
@@ -631,7 +650,7 @@ def _observe_command(
         words,
         _BindingContext(
             fact,
-            fact.line.start,
+            (fact.line.start, fact.line.offset),
             definitions,
             invocation=invocation,
             retain_unresolved=True,
@@ -746,6 +765,7 @@ def _invocation_candidates(
                 "invocation_site": {
                     "start_line": caller.line.start,
                     "end_line": caller.line.end,
+                    "logical_offset": caller.line.offset,
                     "context": list(caller.context),
                 },
                 "function_declaration": {"name": name, "start_line": line},

@@ -7,7 +7,7 @@ source candidates, never effective expansion, runtime binding, or execution.
 from __future__ import annotations
 
 import re
-from collections.abc import Iterator, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass, field
 from typing import Literal, NotRequired, TypedDict
 
@@ -33,15 +33,15 @@ _MAKE_ASSIGNMENT = re.compile(
     re.DOTALL,
 )
 _FUNCTION = re.compile(
-    rf"^(?:function\s+)?({_NAME})\s*\(\s*\)\s*\{{\s*(.*)$", re.DOTALL
+    rf"^(?:function[ \t]+)?({_NAME})[ \t]*\([ \t]*\)[ \t]*\{{[ \t]*(.*)$", re.DOTALL
 )
 _ARRAY_ASSIGNMENT = re.compile(
-    rf"^(?:(local|readonly|export)\s+)?({_NAME})=\((.*)\)\s*$", re.DOTALL
+    rf"^(?:(local|readonly|export)[ \t]+)?({_NAME})=\((.*)\)[ \t]*$", re.DOTALL
 )
 _TOKEN = re.compile(
     r"(?:'[^']*'|\"(?:\\.|[^\"\\])*\"|\\.|\$\("
     + _MAKE_NAME
-    + r"\)|[^\s;&|<>()'\"\\])+|&&|\|\||[;&|<>()]",
+    + r"\)|[^ \t\n;&|<>()'\"\\])+|&&|\|\||<<<|<<|[;&|<>()]",
     re.DOTALL,
 )
 _FRAGMENT = re.compile(r"'[^']*'|\"(?:\\.|[^\"\\])*\"|\\.|[^'\"\\]+", re.DOTALL)
@@ -50,9 +50,18 @@ _SHELL_REFERENCE = re.compile(
 )
 _MAKE_REFERENCE = re.compile(rf"(?<!\$)\$(?:\{{({_MAKE_NAME})\}}|\(({_MAKE_NAME})\))")
 _SEPARATORS = frozenset({";", "&&", "||", "|", "&"})
+_REDIRECTIONS = frozenset({"<", ">", "<<", "<<<"})
 _CONTROL_STARTS = frozenset({"if", "for", "while", "until", "case", "select"})
 _CONTROL_ENDS = frozenset({"fi", "done", "esac"})
 _CONTROL_PARTS = frozenset({"then", "do", "else", "elif", "in"})
+_CONTROL_CLOSERS = {
+    "if": "fi",
+    "for": "done",
+    "while": "done",
+    "until": "done",
+    "case": "esac",
+    "select": "done",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,6 +69,8 @@ class _Line:
     start: int
     end: int
     text: str
+    offset: int = 0
+    byte_span: tuple[int, int] | None = None
 
 
 @dataclass(slots=True)
@@ -85,54 +96,118 @@ class _Assignment(TypedDict):
     value_expression: _Word
 
 
-def _quote_context(text: str) -> str:
-    quote = ""
+def _quote_context(text: str, quote: str = "") -> tuple[str, bool]:
     escaped = False
-    for char in text:
+    for index, char in enumerate(text):
         if escaped:
             escaped = False
         elif char == "\\" and quote != "'":
             escaped = True
         elif char in {"'", '"'} and (not quote or quote == char):
             quote = "" if quote else char
-    return quote
+        elif (
+            not quote
+            and char == "#"
+            and (index == 0 or text[index - 1] in " \t\n;&|<>()")
+        ):
+            return quote, True
+    return quote, False
 
 
-def _logical_lines(source: str, *, language: str) -> Iterator[_Line]:
-    pending = ""
-    start = 1
-    recipe = False
-    continued = False
-    for number, physical in enumerate(source.splitlines(), 1):
-        if not continued:
-            start, recipe = number, physical.startswith("\t")
-        part = (
-            physical[1:]
-            if continued and recipe and physical.startswith("\t")
-            else physical
-        )
-        text = pending + part
-        if len(text) > MAX_STATEMENT_CHARS:
+@dataclass(slots=True)
+class _LogicalCapture:
+    language: str
+    parts: list[str] = field(default_factory=list)
+    start: int = 1
+    start_byte: int = 0
+    recipe: bool = False
+    quote: str = ""
+    characters: int = 0
+
+    def _append(self, part: str) -> None:
+        self.characters += len(part)
+        if self.characters > MAX_STATEMENT_CHARS:
             raise ValueError("Make/shell statement exceeds character bound")
-        trailing = len(text) - len(text.rstrip("\\"))
-        if trailing % 2:
-            if (language == "shell" or recipe) and _quote_context(text) == "'":
-                raise ValueError("multiline single-quoted shell syntax is unsupported")
-            pending = text[:-1] + (" " if language == "make" and not recipe else "")
-            continued = True
-        else:
-            yield _Line(start, number, text)
-            pending = ""
-            continued = False
-    if continued:
-        raise ValueError("unterminated Make/shell line continuation")
+        self.parts.append(part)
+
+    def _continuation(self, part: str, commented: bool) -> bool:
+        trailing = len(part) - len(part.rstrip("\\"))
+        if not trailing % 2 or commented:
+            return False
+        if self.quote == "'":
+            if self.language == "make" and self.recipe:
+                raise ValueError("multiline single-quoted Make recipe is unsupported")
+            return False
+        return True
+
+    def feed(
+        self, physical: str, number: int, byte_span: tuple[int, int]
+    ) -> _Line | None:
+        part = physical.removesuffix("\n")
+        if self.language == "make" and physical.endswith("\r\n"):
+            part = part.removesuffix("\r")
+        if not self.parts:
+            self.start, self.start_byte = number, byte_span[0]
+            self.recipe = self.language == "make" and part.startswith("\t")
+        elif self.recipe and part.startswith("\t"):
+            part = part[1:]
+        commented = False
+        if self.language == "shell" or self.recipe:
+            self.quote, commented = _quote_context(part, self.quote)
+        if self._continuation(part, commented):
+            self._append(
+                part[:-1] + (" " if self.language == "make" and not self.recipe else "")
+            )
+            return None
+        if self.language == "shell" and self.quote:
+            self._append(part + ("\n" if physical.endswith("\n") else ""))
+            return None
+        self._append(part)
+        line = _Line(
+            self.start,
+            number,
+            "".join(self.parts),
+            byte_span=(self.start_byte, byte_span[1]),
+        )
+        self.parts.clear()
+        self.characters, self.quote = 0, ""
+        return line
 
 
-def _tokens(text: str) -> list[str]:
-    words: list[str] = []
+def _physical_lines(source: str) -> Iterator[str]:
+    parts = source.split("\n")
+    for part in parts[:-1]:
+        yield part + "\n"
+    if parts[-1]:
+        yield parts[-1]
+
+
+def _logical_lines(
+    source: str, *, language: str, literal_data: Callable[[], bool] | None = None
+) -> Iterator[_Line]:
+    capture = _LogicalCapture(language)
+    offset = 0
+    for number, physical in enumerate(_physical_lines(source), 1):
+        end = offset + len(physical.encode("utf-8"))
+        if literal_data is not None and literal_data():
+            if len(physical) > MAX_STATEMENT_CHARS:
+                raise ValueError("Make/shell data line exceeds character bound")
+            yield _Line(
+                number, number, physical.removesuffix("\n"), byte_span=(offset, end)
+            )
+        elif (line := capture.feed(physical, number, (offset, end))) is not None:
+            yield line
+        offset = end
+    if capture.parts:
+        reason = "quoting" if capture.quote else "line continuation"
+        raise ValueError("unterminated Make/shell " + reason)
+
+
+def _token_spans(text: str) -> list[tuple[str, int]]:
+    words: list[tuple[str, int]] = []
     offset = 0
     while offset < len(text):
-        if text[offset].isspace():
+        if text[offset] in " \t\n":
             offset += 1
             continue
         if text[offset] == "#":
@@ -140,11 +215,15 @@ def _tokens(text: str) -> list[str]:
         match = _TOKEN.match(text, offset)
         if match is None:
             raise ValueError("unsupported or unterminated Make/shell quoting")
-        words.append(match.group())
+        words.append((match.group(), offset))
         offset = match.end()
         if len(words) > MAX_STATEMENT_WORDS:
             raise ValueError("Make/shell statement exceeds word bound")
     return words
+
+
+def _tokens(text: str) -> list[str]:
+    return [word for word, _offset in _token_spans(text)]
 
 
 def _active_fragments(expression: str, *, language: str) -> tuple[str, str]:
@@ -249,18 +328,38 @@ def _reference_names(words: Sequence[_Word]) -> tuple[str, ...]:
     )
 
 
-def _command_parts(words: Sequence[str]) -> Iterator[tuple[list[str], str]]:
+def _command_parts(words: Sequence[str]) -> Iterator[tuple[list[str], str, int]]:
     current: list[str] = []
     preceding = ""
-    for word in words:
+    start = 0
+    for index, word in enumerate(words):
         if word in _SEPARATORS:
             if current:
-                yield current, preceding
+                yield current, preceding, start
             current, preceding = [], word
         else:
+            if not current:
+                start = index
             current.append(word)
     if current:
-        yield current, preceding
+        yield current, preceding, start
+
+
+def _control_edges(tokens: Sequence[str]) -> tuple[int, int] | None:
+    """Bound only lexical control extent; bodies and execution stay uninterpreted."""
+    pending: list[str] = []
+    closed = 0
+    for words, _preceding, _start in _command_parts(tokens):
+        head = next((word for word in words if word not in {"then", "do", "else"}), "")
+        closing = _CONTROL_CLOSERS.get(head)
+        if closing is not None:
+            pending.append(closing)
+        elif head in _CONTROL_ENDS:
+            if not pending:
+                closed += 1
+            elif pending.pop() != head:
+                return None
+    return closed, len(pending)
 
 
 def _environment_prefix(
@@ -284,6 +383,26 @@ def _assignment_references(assignments: Sequence[_Assignment]) -> tuple[str, ...
     return _reference_names([row["value_expression"] for row in assignments])
 
 
+def _quoted_heredoc_delimiter(tokens: Sequence[str]) -> str | None:
+    positions = [index for index, token in enumerate(tokens) if token == "<<"]
+    if len(positions) != 1 or positions[0] + 1 >= len(tokens):
+        return None
+    token = tokens[positions[0] + 1]
+    if token[:1] not in {"'", '"'} or token[-1:] != token[:1]:
+        return None
+    delimiter = token[1:-1]
+    return delimiter if re.fullmatch(_NAME, delimiter) else None
+
+
+@dataclass(slots=True)
+class _LiteralData:
+    delimiter: str
+    header: _Line
+    header_value: dict[str, object]
+    end_line: int
+    end_byte: int
+
+
 @dataclass(slots=True)
 class _ShellReader:
     language: str = "shell"
@@ -293,6 +412,7 @@ class _ShellReader:
     facts: list[_Fact] = field(default_factory=list)
     stopped: bool = False
     max_facts: int = MAX_GROUPS
+    heredoc: _LiteralData | None = None
 
     @property
     def context(self) -> tuple[str, ...]:
@@ -311,25 +431,34 @@ class _ShellReader:
         if len(self.facts) > self.max_facts:
             raise ValueError("Make/shell declarations exceed group bound")
 
-    def _control(self, line: _Line, word: str) -> bool:
-        if word in _CONTROL_STARTS:
-            self._record("shell-control-syntax", line, {"expression": line.text})
-            self._loop_binding(line, word)
-            self.controls.append(f"conditional-or-loop:{line.start}")
-        elif word in _CONTROL_ENDS:
-            self._record("shell-control-syntax", line, {"expression": line.text})
-            if self.controls:
-                self.controls.pop()
-        elif word in _CONTROL_PARTS:
-            self._record("shell-control-syntax", line, {"expression": line.text})
-        else:
+    def _control(self, line: _Line, tokens: list[str]) -> bool:
+        word = tokens[0]
+        if word not in _CONTROL_STARTS | _CONTROL_ENDS | _CONTROL_PARTS:
             return False
+        value: dict[str, object] = {
+            "expression": line.text,
+            "token_expressions": tokens,
+            "body_observation": "uninterpreted",
+        }
+        self._record("shell-control-syntax", line, value)
+        self._loop_binding(line, word, tokens)
+        if "<<" in tokens:
+            self._start_heredoc(line, tokens, value)
+        edges = _control_edges(tokens)
+        if edges is None:
+            self.controls.append(f"unclassified-control:{line.start}")
+        else:
+            closed, opened = edges
+            if closed:
+                self.controls = self.controls[:-closed]
+            self.controls.extend(
+                f"conditional-or-loop:{line.start}" for _ in range(opened)
+            )
         return True
 
-    def _loop_binding(self, line: _Line, word: str) -> None:
+    def _loop_binding(self, line: _Line, word: str, tokens: Sequence[str]) -> None:
         if word not in {"for", "select"}:
             return
-        tokens = _tokens(line.text)
         name = tokens[1] if len(tokens) > 1 else ""
         self._record(
             "shell-binding-write",
@@ -342,17 +471,25 @@ class _ShellReader:
         )
 
     def _function(self, line: _Line) -> bool:
-        match = _FUNCTION.fullmatch(line.text.strip())
+        match = _FUNCTION.fullmatch(line.text.strip(" \t\n"))
         if match is None:
             return False
         name, body = match.groups()
         self._record("shell-function-declaration", line, {"name": name})
         self.functions.append(f"function:{name}:{line.start}")
-        body_tokens = _tokens(body)
-        inline = bool(body_tokens) and body_tokens[-1] == "}"
-        body = " ".join(body_tokens[:-1] if inline else body_tokens)
-        if body.strip():
-            self.read(_Line(line.start, line.end, body))
+        body_tokens = _token_spans(body)
+        inline = bool(body_tokens) and body_tokens[-1][0] == "}"
+        body = body[: body_tokens[-1][1]] if inline else body
+        if body.strip(" \t\n"):
+            self.read(
+                _Line(
+                    line.start,
+                    line.end,
+                    body,
+                    line.offset + match.start(2),
+                    line.byte_span,
+                )
+            )
         if inline:
             self.functions.pop()
         return True
@@ -436,23 +573,46 @@ class _ShellReader:
         )
 
     def read(self, line: _Line) -> None:
-        text = line.text.strip()
+        if self.heredoc is not None:
+            self._read_literal_data(line)
+        else:
+            self._read_statement(line)
+
+    def has_literal_data(self) -> bool:
+        return self.heredoc is not None
+
+    def _read_statement(self, line: _Line) -> None:
+        text = line.text.strip(" \t\n")
         if self.stopped or not text or text.startswith("#"):
             return
-        first = text.split(maxsplit=1)[0].rstrip(";")
-        if self._control(line, first) or self._function(line):
+        line = _Line(
+            line.start,
+            line.end,
+            text,
+            line.offset + len(line.text) - len(line.text.lstrip(" \t\n")),
+            line.byte_span,
+        )
+        spans = _token_spans(text)
+        tokens = [word for word, _offset in spans]
+        if not tokens:
+            return
+        if self._control(line, tokens) or self._function(line):
             return
         if self._close_function(text):
             return
         if self._array(line, text):
             return
-        tokens = _tokens(text)
-        if not tokens:
-            return
         if self._unsupported(line, tokens):
             return
-        for words, preceding in _command_parts(tokens):
-            self._command(line, words, preceding)
+        for words, preceding, start in _command_parts(tokens):
+            statement = _Line(
+                line.start,
+                line.end,
+                text,
+                line.offset + spans[start][1],
+                line.byte_span,
+            )
+            self._command(statement, words, preceding)
 
     def _close_function(self, text: str) -> bool:
         if text not in {"}", "};"}:
@@ -467,7 +627,7 @@ class _ShellReader:
             return False
         modifier, name, body = array.groups()
         tokens = _tokens(body)
-        if any(token in _SEPARATORS | {"(", ")", "<", ">"} for token in tokens):
+        if any(token in _SEPARATORS | {"(", ")"} | _REDIRECTIONS for token in tokens):
             return False
         elements = [_word(token, language=self.language) for token in tokens]
         self._record(
@@ -486,7 +646,7 @@ class _ShellReader:
 
     def _unsupported(self, line: _Line, tokens: list[str]) -> bool:
         active, _ = _active_fragments(line.text, language=self.language)
-        operators = set(tokens) & {"(", ")", "<", ">", "{", "}"}
+        operators = set(tokens) & ({"(", ")", "{", "}"} | _REDIRECTIONS)
         dynamic_control = tokens[0] in {
             "eval",
             "declare",
@@ -497,24 +657,82 @@ class _ShellReader:
         }
         if not operators and "`" not in active and not dynamic_control:
             return False
-        self._record(
-            "shell-unresolved-statement",
-            line,
-            {
-                "expression": line.text,
-                "token_expressions": list(tokens),
-                "reason": "unsupported-control-redirection-or-expansion",
-                "remaining_file_observation": "not-observed"
-                if "<<" in active
-                else "continues",
-            },
-        )
+        value: dict[str, object] = {
+            "expression": line.text,
+            "token_expressions": list(tokens),
+            "reason": "unsupported-control-redirection-or-expansion",
+            "remaining_file_observation": "not-observed"
+            if "<<" in tokens
+            else "continues",
+        }
+        self._record("shell-unresolved-statement", line, value)
         # A here-document's following physical lines are data, not commands.
-        if "<<" in active:
-            self.stopped = True
+        if "<<" in tokens:
+            self._start_heredoc(line, tokens, value)
         elif "`" not in active:
             self._observe_command_prefix(line, tokens)
         return True
+
+    def _start_heredoc(
+        self, line: _Line, tokens: Sequence[str], value: dict[str, object]
+    ) -> None:
+        delimiter = (
+            _quoted_heredoc_delimiter(tokens) if self.language == "shell" else None
+        )
+        if delimiter is None or line.byte_span is None:
+            value["remaining_file_observation"] = "not-observed"
+            self.stopped = True
+            return
+        value["remaining_file_observation"] = "awaiting-literal-data"
+        self.heredoc = _LiteralData(delimiter, line, value, line.end, line.byte_span[1])
+
+    def _read_literal_data(self, line: _Line) -> None:
+        data = self.heredoc
+        if data is None or line.byte_span is None:
+            raise ValueError("Literal data requires its original source extent")
+        if line.text == data.delimiter:
+            self._finish_literal_data(line)
+        else:
+            data.end_line, data.end_byte = line.end, line.byte_span[1]
+
+    def _finish_literal_data(self, terminator: _Line | None) -> None:
+        data = self.heredoc
+        if data is None or data.header.byte_span is None:
+            raise ValueError("Literal data requires its original header")
+        ending = terminator.byte_span if terminator is not None else None
+        closed = ending is not None
+        data.header_value["remaining_file_observation"] = (
+            "continues" if closed else "not-observed"
+        )
+        value: dict[str, object] = {
+            "delimiter": data.delimiter,
+            "state": "source-extent-observed" if closed else "unterminated",
+            "body_observation": "uninterpreted-data",
+            "body_source_range": {
+                "start_byte": data.header.byte_span[1],
+                "end_byte": data.end_byte,
+            },
+            "coordinate_system": "zero-based-half-open-bytes",
+            "terminator_source_range": None
+            if ending is None
+            else {
+                "start_byte": ending[0],
+                "end_byte": ending[1],
+            },
+        }
+        self._record(
+            "shell-heredoc-data",
+            _Line(
+                data.header.start, terminator.end if terminator else data.end_line, ""
+            ),
+            value,
+        )
+        self.heredoc = None
+        self.stopped = not closed
+
+    def finish(self) -> None:
+        if self.heredoc is not None:
+            self._finish_literal_data(None)
 
     def _observe_command_prefix(self, line: _Line, tokens: list[str]) -> None:
         parts = list(_command_parts(tokens))
@@ -523,10 +741,14 @@ class _ShellReader:
         words = parts[0][0]
         if words[0] in _CONTROL_STARTS | _CONTROL_ENDS | _CONTROL_PARTS:
             return
-        if set(words) & {"(", ")", "<", ">", "{", "}"}:
+        if set(words) & ({"(", ")", "{", "}"} | _REDIRECTIONS):
             return
         self.controls.append(f"uninterpreted-remainder:{line.start}")
-        self._command(_Line(line.start, line.end, " ".join(words)), words, "")
+        self._command(
+            _Line(line.start, line.end, " ".join(words), line.offset, line.byte_span),
+            words,
+            "",
+        )
         self.controls.pop()
         self.facts[-1].value["prefix_of_uninterpreted_statement"] = True
 
@@ -613,7 +835,8 @@ class _MakeReader:
             words = (
                 [_word(token, language="make") for token in tokens]
                 if not any(
-                    token in _SEPARATORS | {"(", ")", "<", ">"} for token in tokens
+                    token in _SEPARATORS | {"(", ")"} | _REDIRECTIONS
+                    for token in tokens
                 )
                 else None
             )
@@ -665,7 +888,14 @@ class _MakeReader:
             base_context=(*self.conditions, f"make-recipe:{line.start}"),
             max_facts=self.max_facts,
         )
-        shell.read(_Line(line.start, line.end, recipe[len(prefix) :]))
+        shell.read(
+            _Line(
+                line.start,
+                line.end,
+                recipe[len(prefix) :],
+                len(line.text) - len(recipe) + len(prefix),
+            )
+        )
         for fact in shell.facts:
             fact.value["make_targets"] = list(self.targets)
             fact.value["recipe_prefixes"] = prefix
@@ -719,6 +949,7 @@ def _candidate(fact: _Fact) -> dict[str, object]:
         "kind": fact.kind,
         "start_line": fact.line.start,
         "end_line": fact.line.end,
+        "logical_offset": fact.line.offset,
         "context": list(fact.context),
         **(
             {"assignment_operator": fact.value["assignment_operator"]}
@@ -775,6 +1006,8 @@ def _source_value(fact: _Fact, facts: Sequence[_Fact]) -> dict[str, object]:
         **_source_references(fact, facts),
         "context": list(fact.context),
         "source_language": fact.language,
+        "logical_offset": fact.line.offset,
+        "logical_offset_coordinate": "zero-based-logical-line-characters",
         "authority": "direct-static-syntax-only",
         "execution": "not-established",
         "coverage": "incomplete",
@@ -802,7 +1035,7 @@ def _group(
                 "value": _source_value(fact, facts),
                 "producer": {
                     "provider": provider,
-                    "parser": "bounded-make-shell-syntax.v4",
+                    "parser": "bounded-make-shell-syntax.v5",
                 },
                 "evidence": [
                     {
@@ -831,7 +1064,7 @@ def _file_fact(
 ) -> _Fact:
     return _Fact(
         "make-shell-file-observation",
-        _Line(1, max(1, len(raw.splitlines())), ""),
+        _Line(1, max(1, raw.count("\n") + (not raw.endswith("\n"))), ""),
         (),
         {
             "facts": [
@@ -906,8 +1139,18 @@ class MakeShellDeclarations:
                 else _ShellReader(max_facts=max_facts)
             )
             text = raw.decode("utf-8")
-            for line in _logical_lines(text, language=language):
+            for line in _logical_lines(
+                text,
+                language=language,
+                literal_data=reader.has_literal_data
+                if isinstance(reader, _ShellReader)
+                else None,
+            ):
                 reader.read(line)
+                if reader.stopped:
+                    break
+            if isinstance(reader, _ShellReader):
+                reader.finish()
             add_static_binding_observations(reader.facts)
             projected = (
                 [_file_fact(text, reader.facts, language, stopped=reader.stopped)]
@@ -924,7 +1167,7 @@ class MakeShellDeclarations:
             groups=tuple(groups),
             provenance={
                 "provider": self.name,
-                "semantics": "hashmarks.make-shell-syntax.v4",
+                "semantics": "hashmarks.make-shell-syntax.v5",
                 "layout": self.layout,
                 "make_paths": sorted(self.make_paths),
                 "shell_paths": sorted(self.shell_paths),
