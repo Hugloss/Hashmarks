@@ -356,6 +356,9 @@ def _assignment_target_binds(target: ast.AST, name: str) -> bool:
 
 
 def _assignment_binds(node: ast.stmt, name: str) -> bool:
+    if isinstance(node, getattr(ast, "TypeAlias", ())):
+        target = getattr(node, "name", None)
+        return isinstance(target, ast.AST) and _assignment_target_binds(target, name)
     if isinstance(node, ast.Assign):
         return any(_assignment_target_binds(target, name) for target in node.targets)
     if isinstance(node, ast.AugAssign) or (

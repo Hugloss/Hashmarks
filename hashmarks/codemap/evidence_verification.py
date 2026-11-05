@@ -24,6 +24,7 @@ from .verification_assets import VerificationAssetsMixin
 from .verification_changes import VerificationChangesMixin
 from .verification_context import VerificationContextMixin
 from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
+from .verification_ecmascript import VerificationEcmascriptMixin
 from .verification_explanation import VerificationExplanationMixin
 from .verification_file_reads import VerificationFileReadsMixin
 from .verification_membership import VerificationMembershipMixin
@@ -92,6 +93,11 @@ class _VerificationRelevanceState:
     reference_path_roles: dict[str, str] = field(default_factory=dict)
     lexical_test_paths: tuple[str, ...] | None = None
     module_test_paths: tuple[str, ...] | None = None
+    ecmascript_reference_evidence: dict[str, dict[str, object]] = field(
+        default_factory=dict
+    )
+    pythonpath_contexts: dict[str, tuple[str, ...]] = field(default_factory=dict)
+    import_context_evidence: dict[str, dict[str, object]] = field(default_factory=dict)
 
     def record_unresolved_reference(self, path: str) -> None:
         """Keep caller uncertainty separate from uncertainty in verifier identity."""
@@ -108,6 +114,7 @@ class _VerificationRelevanceState:
 
 
 class RepositoryVerification(
+    VerificationEcmascriptMixin,
     VerificationAssetsMixin,
     VerificationChangesMixin,
     VerificationContextMixin,
@@ -404,7 +411,10 @@ class RepositoryVerification(
         if observed is None:
             supporting_paths: set[str] = set()
             paths, unresolved = self.imports._resolve_import_owner_evidence(
-                ref_path, target, supporting_paths=supporting_paths
+                ref_path,
+                target,
+                supporting_paths=supporting_paths,
+                pythonpath=self._verification_pythonpath_context(state, ref_path),
             )
             state.import_owner_contributors.setdefault(ref_path, set()).update(
                 supporting_paths
@@ -569,7 +579,12 @@ class RepositoryVerification(
             if imported.startswith(".")
             else imported
         )
-        if suffix != symbol or not self.reads.module_paths(module):
+        if suffix != symbol or not (
+            self.reads.module_paths(module)
+            or self.imports._pythonpath_module_paths(
+                module, self._verification_pythonpath_context(state, ref_path)
+            )
+        ):
             return None
         owners = self._verification_resolved_import_paths(
             state, ref_path, imported + "." + suffix
@@ -981,6 +996,8 @@ class RepositoryVerification(
     ) -> dict[str, object]:
         if TYPE_CHECKING:
             self = cast("RepositoryVerification", self)
+        if state is not None and path in state.ecmascript_reference_evidence:
+            return state.ecmascript_reference_evidence[path]
         if not path.endswith(".py") or not symbols:
             strength = "syntactic" if symbols else "none"
             return {
@@ -1039,6 +1056,7 @@ class RepositoryVerification(
         direct_reference = reference.get("reference_strength") in {
             "reachable-symbol-use",
             "literal-file-read",
+            "qualified-source-reference",
         }
         return {
             "path": path,
@@ -1060,6 +1078,7 @@ class RepositoryVerification(
             "supporting_source_members": self._verification_candidate_members(
                 state, path
             ),
+            **self._verification_candidate_import_context(state, path),
         }
 
     def _verification_nomination_available(self, path: str) -> bool:
@@ -1081,7 +1100,16 @@ class RepositoryVerification(
         for ref_path in tuple(paths):
             paths.update(state.import_owner_contributors.get(ref_path, ()))
         members: list[dict[str, object]] = []
-        for member_path in sorted(paths - {""}):
+        observed: set[str] = set()
+        for path in tuple(paths):
+            context = state.import_context_evidence.get(path, {})
+            for member in cast(
+                "list[dict[str, object]]", context.get("supporting_source_members", [])
+            ):
+                if str(member["path"]) not in observed:
+                    members.append(member)
+                    observed.add(str(member["path"]))
+        for member_path in sorted(paths - {""} - observed):
             member, _raw = self.source.member(member_path)
             members.append(member)
         return members
@@ -1533,6 +1561,7 @@ class RepositoryVerification(
         if not symbol_scope_complete:
             state.search_bound_reasons.add("edit-file-symbol-limit")
         self._verification_collect_direct_references(state, symbol_names)
+        self._verification_collect_ecmascript_references(state)
         self._verification_collect_indirect_references(state)
         candidates = self._verification_candidates(state)
         identity_ambiguous = bool(

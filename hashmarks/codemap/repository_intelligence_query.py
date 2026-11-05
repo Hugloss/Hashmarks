@@ -141,7 +141,8 @@ class RepositoryViews(ReadScopeOwner):
                 {
                     "name": self.native.producers.typescript.name,
                     "available": self.native.producers.typescript.detect(
-                        self.workspace
+                        self.workspace,
+                        config_paths=self.native._typescript_config_paths(),
                     ),
                     "version": None,
                     "detail": None,

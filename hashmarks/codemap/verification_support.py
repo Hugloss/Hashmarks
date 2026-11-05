@@ -24,7 +24,10 @@ from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
 from .verification_plan import _UnqualifiedNominationMember
 
 if TYPE_CHECKING:
-    from .evidence_verification import RepositoryVerification
+    from .evidence_verification import (
+        RepositoryVerification,
+        _VerificationRelevanceState,
+    )
 
 _SUPPORT_SCAN_LIMIT = 512
 _INI_CONFIG = {
@@ -43,6 +46,7 @@ _PYTEST_SELECTION_OPTIONS = _PYTEST_NAME_OPTIONS | {
     "addopts",
     "testpaths",
     "norecursedirs",
+    "pythonpath",
 }
 _PYTEST_TOML_CONFIG = {"pytest.toml", ".pytest.toml"}
 _PathDetails = tuple[str, str, list[str]]
@@ -136,6 +140,91 @@ def _test_filename(path: PurePosixPath) -> bool:
 
 
 class VerificationSupportMixin:
+    def _verification_pythonpath_context(
+        self, state: _VerificationRelevanceState, path: str
+    ) -> tuple[str, ...]:
+        """Retain one explicit pytest import context, without choosing a config.
+
+        Only a single source-qualified declaration with a TOML string array is
+        supported. Configuration precedence, ini tokenization, plugins and
+        runtime imports remain native/external; none is reconstructed here.
+        """
+        if path in state.pythonpath_contexts:
+            return state.pythonpath_contexts[path]
+        state.pythonpath_contexts[path] = ()
+        if not path.endswith(
+            ".py"
+        ) or RepositoryDomain.TEST not in classify_repository_path(path):
+            return ()
+        members: list[dict[str, object]] = []
+        declared = self._pytest_selection_declarations(path, members, reconcile=False)
+        declarations = cast("list[dict[str, object]]", declared.get("declarations", []))
+        if declared.get("state") != "declared" or len(declarations) != 1:
+            return ()
+        declaration = declarations[0]
+        options = cast("Mapping[str, object]", declaration["options"])
+        configured = options.get("pythonpath")
+        if (
+            not isinstance(configured, list)
+            or not configured
+            or len(configured) > 32
+            or any(
+                not isinstance(root, str)
+                or not root
+                or PurePosixPath(root).is_absolute()
+                for root in configured
+            )
+        ):
+            return ()
+        parent = PurePosixPath(str(declaration["path"])).parent
+        roots: list[str] = []
+        try:
+            for root in configured:
+                roots.append(
+                    normalize_relative_path((parent / root).as_posix(), allow_root=True)
+                )
+        except ValueError:
+            return ()
+        state.import_owner_contributors.setdefault(path, set()).add(
+            str(declaration["path"])
+        )
+        state.import_context_evidence[path] = {
+            "kind": "declared-pytest-pythonpath",
+            "declaration": declaration,
+            "roots": roots,
+            "configuration_resolution": "not-performed",
+            "native_collection": "not-observed",
+            "runtime_import": "not-established",
+            "supporting_source_members": members,
+        }
+        state.pythonpath_contexts[path] = tuple(roots)
+        return tuple(roots)
+
+    @staticmethod
+    def _verification_candidate_import_context(
+        state: _VerificationRelevanceState, path: str
+    ) -> dict[str, object]:
+        paths = {state.edit_path, path, *state.indirect_via_paths.get(path, ())}
+        contexts = {
+            ref: context
+            for ref, context in state.import_context_evidence.items()
+            if ref in paths
+        }
+        if not contexts:
+            return {}
+        context = dict(
+            contexts.get(path, {"kind": "contributing-pytest-pythonpath-contexts"})
+        )
+        context["contributing_contexts"] = contexts
+        members: dict[str, dict[str, object]] = {}
+        for value in contexts.values():
+            for member in cast(
+                "list[dict[str, object]]", value["supporting_source_members"]
+            ):
+                members[str(member["path"])] = member
+        context["supporting_source_members"] = list(members.values())
+        return {"import_context": context}
+
     """Extend the verification owner with syntax and scope observations only."""
 
     def _pytest_selection_options(self, filename: str, raw: bytes) -> dict[str, object]:
@@ -298,6 +387,7 @@ class VerificationSupportMixin:
             "negative_evidence_admissible": False,
             "native_selection": selection,
         }
+        self._verification_attach_ecmascript_static(rel, payload, supporting)
         return {
             **payload,
             "evidence_identity": evidence_identity(

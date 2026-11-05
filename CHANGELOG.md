@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.35.4 — 2026-11-05
+
+- Observe Python module data and named type aliases through the canonical declaration, export and binding owners. Unsupported native Python syntax stays unavailable, without a parser fallback.
+- Qualify test import relationships against explicit, source-bound pytest import contexts while preserving packaging roots, ambiguity and every participating configuration revision or absence.
+- Resolve nested TypeScript projects, aliases and configuration references through the native compiler. Preserve exact admitted configuration inputs, bounded reads and selected compiler entry-file provenance.
+- Retain qualified used-import and JSX binding relationships through bounded source consumers, including explicit hop/visit exhaustion. Unused, shadowed, rebound, type-only and unsupported references do not become runtime verification claims.
+- Describe complete type-only TypeScript source and native project membership separately from runtime test relationships. Static facts preserve parser, compiler, source and configuration identity; verification sufficiency, execution and coverage remain external.
+
 ## 0.35.3 — 2026-11-05
 
 - Preserve lexical byte ordering for shell declarations and uses on the same physical line, without admitting later or ambiguous assignments.

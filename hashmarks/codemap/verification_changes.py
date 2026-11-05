@@ -45,6 +45,8 @@ _REFERENCE_FIELDS = (
     "indirect_reference_symbols",
     "indirect_via_paths",
     "file_read_evidence",
+    "import_context",
+    "source_reference_evidence",
 )
 
 
@@ -180,7 +182,26 @@ class VerificationChangesMixin:
         if self._verification_path_kind(target)["kind"] != "verifier":
             return None
         members = self._changed_reference_members(path, candidate)
-        if any(member.get("state") != "known-present" for member in members):
+        required = {
+            path,
+            target,
+            *cast("list[str]", candidate.get("indirect_via_paths", [])),
+        }
+        present = {
+            str(member["path"])
+            for member in members
+            if member.get("state") == "known-present"
+        }
+        configuration_absences = {
+            str(member["path"]): member
+            for member in _supporting_members(candidate.get("import_context"))
+            if member.get("state") == "known-absent"
+        }
+        if not required <= present or any(
+            member.get("state") != "known-present"
+            and configuration_absences.get(str(member["path"])) != member
+            for member in members
+        ):
             return None
         relationship = self.relationship_evidence(
             source=path,

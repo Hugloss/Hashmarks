@@ -33,7 +33,7 @@ contract. Its syntax facts do not gain the qualification of this operation.
 Schema: `hashmarks.source-bindings.v1`.
 
 The additive consumer-evidence fields below are produced by
-`hashmarks.source-binding-interpreter.v4`. Consumers bind the actual producer
+`hashmarks.source-binding-interpreter.v5`. Consumers bind the actual producer
 identity and supported interpreter contract; the schema name alone does not
 prove that a released installation supplies these fields.
 
@@ -106,6 +106,15 @@ to an implementation.
 `conditions` and `reasons` belong to the individual fact. Consumers must retain
 them alongside `qualification`; a non-null `target` is not permission to drop
 the conditions. Every fact carries `runtime_target="not-established"`.
+
+Native Python named type aliases are authored `type-alias` declarations. They
+do not establish callable or runtime values. A Python runtime whose parser
+cannot admit that syntax returns unavailable evidence without a fallback.
+
+A simple uppercase JSX tag name may identify its existing lexical binding,
+including an imported component. Lowercase, namespace and unsupported tag forms
+remain unknown. This describes the source name, not an element factory, runtime
+component implementation or proof that the component executes.
 
 The operation qualifies the complete bounded member before applying the
 returned-fact limit. A later write, parameter shadow or same-scope declaration

@@ -232,7 +232,9 @@ class RepositoryNativeEvidence(EvidenceFreshnessMixin):
         ensure_publication_generation: Callable[[], int],
     ) -> None:
         if selected is None or self.producers.typescript.name in selected:
-            if self.producers.typescript.detect(self.workspace):
+            if self.producers.typescript.detect(
+                self.workspace, config_paths=self._typescript_config_paths()
+            ):
                 ts = self._collect_typescript_resolution()
                 generation = ensure_publication_generation()
                 self.store.replace_native_file_edges(
@@ -242,7 +244,8 @@ class RepositoryNativeEvidence(EvidenceFreshnessMixin):
                     "native-file",
                     ts.producer,
                     bind_generation=True,
-                    manifests=("tsconfig.json",),
+                    manifests=tuple(path for path, _raw in ts.inputs)
+                    or self._typescript_config_paths(),
                     generation=generation,
                 )
                 results.append({"producer": ts.producer, "file_edges": len(ts.edges)})
@@ -292,18 +295,48 @@ class RepositoryNativeEvidence(EvidenceFreshnessMixin):
                 imports[path].append(str(edge["target"]))
         return imports, members, {path: rows[path] for path in members}
 
+    def _typescript_config_paths(self) -> tuple[str, ...]:
+        configs = tuple(sorted(self.store.paths_named("tsconfig.json")))
+        if not configs and self.files.visible_file("tsconfig.json") is not None:
+            configs = ("tsconfig.json",)
+        return configs
+
     def _collect_typescript_resolution(self) -> TypeScriptResolution:
         warnings: list[str] = []
         imports, members, syntax_rows = self._typescript_inputs(warnings)
-        config, raw = self.source.member("tsconfig.json", include_bytes=True)
-        if raw is None or config.get("state") != "known-present":
+        configs = self._typescript_config_paths()
+        if not configs:
             return TypeScriptResolution(
                 self.producers.typescript.name,
                 (),
                 (*warnings, "tsconfig.json: canonical source revision unavailable"),
             )
-        members["tsconfig.json"] = config
-        result = self.producers.typescript.collect(self.workspace, imports)
+        # Native configuration may extend a non-source or extensionless member.
+        # The parser index is not that admission universe. Reuse the canonical
+        # repository-file owner before the native host reads selected inputs.
+        admitted = tuple(
+            selected.rel
+            for selected in self.files.iter_files()
+            if selected.visibility.value == "source"
+        )
+        result = self.producers.typescript.collect(
+            self.workspace, imports, config_paths=configs, admitted_paths=admitted
+        )
+        input_unqualified = False
+        for path, raw in result.inputs:
+            member, current = self.source._bounded_source_observation(path, 1_048_576)
+            if member.get("state") != "known-present" or current != raw:
+                warnings.append(
+                    "TypeScript source inputs changed during resolution: " + path
+                )
+                input_unqualified = True
+            else:
+                members[path] = member
+        qualified_edges = tuple(
+            edge
+            for edge in result.edges
+            if edge.source in imports and edge.target in imports
+        )
         changed = [
             path
             for path, before in members.items()
@@ -326,7 +359,9 @@ class RepositoryNativeEvidence(EvidenceFreshnessMixin):
             )
         return replace(
             result,
-            edges=() if changed or syntax_changed else result.edges,
+            edges=()
+            if changed or syntax_changed or input_unqualified
+            else qualified_edges,
             warnings=(*warnings, *result.warnings),
         )
 

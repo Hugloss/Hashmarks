@@ -47,6 +47,7 @@ class TaskCandidate(TypedDict):
     locality_projection: NotRequired[bool]
     task_keyword_syntax: NotRequired[dict[str, object]]
     supporting_source_members: NotRequired[list[dict[str, object]]]
+    import_context: NotRequired[dict[str, object]]
 
 
 class ActionDiscrimination(TypedDict):

@@ -126,6 +126,10 @@ def _statement_candidates(node: ast.AST, scope: PythonScope) -> list[PythonBindi
         ]
     if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
         return [PythonBinding(node.name, node, scope, "declaration")]
+    if isinstance(node, getattr(ast, "TypeAlias", ())):
+        name = getattr(node, "name", None)
+        if isinstance(name, ast.Name):
+            return [PythonBinding(name.id, node, scope, "type-alias")]
     if isinstance(node, ast.Assign):
         return [
             PythonBinding(target.id, target, scope, "alias", value=node.value)
