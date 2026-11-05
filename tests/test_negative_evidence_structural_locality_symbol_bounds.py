@@ -185,7 +185,9 @@ def authority(value):
     with _codemap(tmp_path) as codemap:
         codemap.index.sync()
         original = codemap.store.visible_symbol_candidates
-        worker_rows = [dict(row) for row in original("Worker", limit=10)]
+        worker_rows = [
+            dict(row) for row in original("Worker", limit=10) if row["kind"] == "class"
+        ]
         assert len(worker_rows) == 1
         worker = worker_rows[0]
         noise = [
