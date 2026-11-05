@@ -55,7 +55,7 @@ produce current declarations; old selections never restore facts.
 | Source form | Observation |
 | --- | --- |
 | Make variable assignment | Name, authored value expression, assignment operator and `export`/`override`/`private` syntax |
-| Make target | Literal target names and prerequisite expression |
+| Make target | Literal target names, prerequisite expression and plain literal prerequisite tokens with order-only syntax |
 | Tab-prefixed Make recipe | Physical recipe span, associated target names, `@`/`+`/`-` prefixes after leading whitespace and supported command expressions |
 | Shell variable or alias assignment | Declared name, quote-preserving expression and literal value when the small lexical subset permits it |
 | Indexed shell array declaration | Authored element words and scope, without asserting effective array state |
@@ -70,6 +70,41 @@ produce current declarations; old selections never restore facts.
 literal under this subset. Individual `words` remain available when another
 word contains expansion. This field is source evidence; it is not an executable
 plan, command recommendation or guarantee of the executable that would run.
+
+`literal_prerequisite_tokens` preserves source order and duplicates for the small
+plain-word Make prerequisite subset, including each token's position before or
+after the authored order-only `|` separator. Expansions, escaping, globbing,
+patterns, inline recipes, assignments and multiple separators leave that field
+unavailable (`null`) while retaining the original expression. These are authored
+tokens, never effective prerequisites or proof that any target executes.
+
+For one explicitly selected Make file, Python callers may request
+`MakeShellDeclarations(make_paths=("Makefile",), layout="file",
+selected_targets=("check",))`. The intact file observation additionally carries
+`selected_target_source`, a bounded source relationship projection. It retains
+the exact target request and a separate `by_target` projection for each requested
+name, reusing the one parsed file. Each projection retains authored literal prerequisite edges (including duplicate
+occurrences), declaration fact indices, associated recipe/source fact indices,
+source paths, observed cycles and unresolved prerequisites/source statements.
+Consumers need not rebuild that source graph. A prerequisite without a target
+declaration in this selected file remains unresolved; this does not establish
+that a prerequisite file is absent. Includes and unobserved native expansion
+cannot supply invented edges. This projection never selects effective Make work,
+computes tools, decides closure sufficiency, chooses a branch, or executes work.
+
+All requested targets share one operation-local projection budget: 1,000,000
+work units, 65,536 copied path members and 2 MiB of encoded dynamic projection
+payload. Traversal and target-index work, retained prerequisite/unknown rows,
+internal path tuples and emitted target/candidate paths reserve their budget
+before accumulation or copying. Target-name input shares the selected-source
+256 KiB bound. Fixed request/status metadata remains bounded by that input and
+the 64-target limit. `selected_target_source.projection_budget` records the
+shared limits, consumption and exhausted dimension. Exhaustion leaves each
+affected target's `source_truncation: stopped` and an unresolved
+`selected-target-projection-budget-exhausted` reason. Observed prefixes remain
+source evidence; omitted targets/candidates never become absence, effective
+selection, or sufficient closure. Full-file parsing qualifications remain
+separate from selected-projection truncation.
 
 Single quotes, double quotes, escaped literal characters and backslash line
 continuations are supported for simple statements. Multiline quoted shell words

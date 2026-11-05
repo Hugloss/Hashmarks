@@ -193,12 +193,15 @@ class RepositoryDeclarationDiscoveryMixin(ReadScopeOwner):
         self,
         path: str,
         include_bytes: bool,
+        *,
+        max_bytes: int | None = None,
     ) -> tuple[dict[str, object], bytes | None]:
         if TYPE_CHECKING:
             self = cast("RepositoryDeclarations", self)
         return self.source.member(
             path,
             include_bytes=include_bytes,
+            max_bytes=max_bytes,
         )
 
     def _declaration_provider_paths(self, prefix: str) -> tuple[str, ...]:

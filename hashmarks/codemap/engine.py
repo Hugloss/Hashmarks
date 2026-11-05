@@ -193,7 +193,11 @@ class CodeMap:
             declarations=self.declarations,
         )
         self._dependencies = RepositoryDependencies(
-            self.source, self._imports, self.correlation, self.relationships
+            self.source,
+            self._imports,
+            self.correlation,
+            self.relationships,
+            self.verification,
         )
         self._changes = RepositoryChanges(self.tasks, self.relationships)
         self._cross_repository = RepositoryCrossRepository(self.changes)

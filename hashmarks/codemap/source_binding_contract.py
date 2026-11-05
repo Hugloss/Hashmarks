@@ -10,7 +10,7 @@ MAX_LITERAL_BYTES = 256
 MAX_HELPER_EDGES = 1
 MAX_BINDING_EXPRESSION_DEPTH = 32
 MAX_BINDING_SUPPORTING_RANGES = 64
-BINDING_INTERPRETER_SIGNATURE = "hashmarks.source-binding-interpreter.v5"
+BINDING_INTERPRETER_SIGNATURE = "hashmarks.source-binding-interpreter.v6"
 BINDING_FACT_KINDS = (
     "declaration",
     "import-binding",
@@ -20,6 +20,7 @@ BINDING_FACT_KINDS = (
     "argument-binding",
     "conditional-call-binding",
     "reference",
+    "forward-annotation-reference",
     "call-site",
     "literal-expression",
     "property-write",

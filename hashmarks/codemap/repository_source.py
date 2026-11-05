@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, TypedDict, Unpack, cast
 
 from hashmarks.digest import Digest
-from hashmarks.file_store import UnstableFileError
+from hashmarks.file_store import FileReadBoundError, UnstableFileError
 from hashmarks.freshness import freshness_state
 from hashmarks.operation_contract import operation_response, operation_schema
 from hashmarks.paths import normalize_relative_path
@@ -226,10 +226,17 @@ class RepositorySource(
         source: _RepositoryMemberSource,
         *,
         include_bytes: bool,
+        max_bytes: int | None = None,
     ) -> _RepositoryMemberRead | dict[str, object]:
         try:
             if include_bytes:
-                raw, digest = self.file_store.read_bytes_stable(source.path)
+                raw, digest = (
+                    self.file_store.read_bytes_stable(source.path)
+                    if max_bytes is None
+                    else self.file_store.read_bytes_stable(
+                        source.path, max_bytes=max_bytes
+                    )
+                )
             elif source.row is None:
                 digest = self.file_store.digest(
                     source.path,
@@ -241,6 +248,12 @@ class RepositorySource(
             else:
                 digest = None
                 raw = None
+        except FileReadBoundError:
+            return {
+                "path": source.rel,
+                "state": "unknown",
+                "reason": "source-size-bound",
+            }
         except FileNotFoundError:
             return {
                 "path": source.rel,
@@ -267,8 +280,11 @@ class RepositorySource(
         relpath: str,
         *,
         include_bytes: bool = False,
+        max_bytes: int | None = None,
     ) -> tuple[dict[str, object], bytes | None]:
         """Observe one repository member through canonical policy/revision authority."""
+        if max_bytes is not None and (type(max_bytes) is not int or max_bytes < 0):
+            raise ValueError("max_bytes must be a non-negative integer or None")
         source = self._repository_member_source(relpath)
         if isinstance(source, dict):
             return source, None
@@ -294,7 +310,9 @@ class RepositorySource(
                 None,
             )
 
-        read = self._read_repository_member_source(source, include_bytes=include_bytes)
+        read = self._read_repository_member_source(
+            source, include_bytes=include_bytes, max_bytes=max_bytes
+        )
         if isinstance(read, dict):
             return read, None
         raw, digest = read.raw, read.digest
@@ -504,27 +522,7 @@ class RepositorySource(
         # Observe current admission without publishing a replacement generation.
         if self.reads.depth == 0:
             self.files.refresh_policy()
-        candidate = self._repository_member_source(relpath)
-        if isinstance(candidate, dict):
-            return candidate, None
-        try:
-            oversized = candidate.path.stat().st_size > max_bytes
-        except OSError:
-            oversized = False
-        if oversized:
-            return {
-                "path": candidate.rel,
-                "state": "unknown",
-                "reason": "source-size-bound",
-            }, None
-        member, raw = self.member(relpath, include_bytes=True)
-        if raw is not None and len(raw) > max_bytes:
-            return {
-                "path": member["path"],
-                "state": "unknown",
-                "reason": "source-size-bound",
-            }, None
-        return member, raw
+        return self.member(relpath, include_bytes=True, max_bytes=max_bytes)
 
     def _source_evidenced_hits(
         self,

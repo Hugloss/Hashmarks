@@ -308,10 +308,12 @@ def test_nomination_rejects_unqualified_native_source_observation(
     )
     with CodeMap(tmp_path) as codemap:
         codemap.index.sync()
+        member = codemap.source.member
 
         def unknown_member(
-            _path: str, *, include_bytes: bool = False
+            path: str, *, include_bytes: bool = False, max_bytes: int | None = None
         ) -> tuple[dict[str, object], None]:
+            member(path, include_bytes=include_bytes, max_bytes=max_bytes)
             return (
                 {
                     "state": "unknown",

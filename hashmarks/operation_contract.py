@@ -98,6 +98,10 @@ OPERATION_CONTRACTS = (
         (("default", "hashmarks.dependency-projection.v1"),),
     ),
     OperationContract(
+        "dependency_verification",
+        (("default", "hashmarks.dependency-verification.v1"),),
+    ),
+    OperationContract(
         "repository_declarations",
         (
             ("observation", "hashmarks.repository-declarations.v1"),

@@ -33,7 +33,7 @@ contract. Its syntax facts do not gain the qualification of this operation.
 Schema: `hashmarks.source-bindings.v1`.
 
 The additive consumer-evidence fields below are produced by
-`hashmarks.source-binding-interpreter.v5`. Consumers bind the actual producer
+`hashmarks.source-binding-interpreter.v6`. Consumers bind the actual producer
 identity and supported interpreter contract; the schema name alone does not
 prove that a released installation supplies these fields.
 
@@ -110,6 +110,23 @@ the conditions. Every fact carries `runtime_target="not-established"`.
 Native Python named type aliases are authored `type-alias` declarations. They
 do not establish callable or runtime values. A Python runtime whose parser
 cannot admit that syntax returns unavailable evidence without a fallback.
+
+Python root annotations written as string literals additionally expose
+`forward-annotation-reference` facts for supported names and attributes in the
+decoded expression. These retain `type-syntax` conditions and use the same
+lexical binding owner as ordinary annotations; local rebinding, ambiguity and
+dynamic namespace writes remain unknown. The expression is parsed separately
+and never evaluated, and imported implementations are not loaded or resolved.
+String values nested inside `Literal[...]` are not treated as root annotations.
+
+Each fact's `range`, `expression` and `annotation.range` locate the exact source
+string container. `annotation` records the parser, `evaluation="not-performed"`
+and bounded `decoded_text`. `parsed_expression` records the native expression
+kind, name, text and its separate `decoded-annotation-utf8-bytes` range. Those
+decoded offsets must never be applied to the member's bytes: escapes, adjacent
+strings and Unicode can change their physical representation. Invalid or
+oversized decoded expressions retain explicit unknown facts; syntax-node or
+result-bound exhaustion fails the complete observation before projection.
 
 A simple uppercase JSX tag name may identify its existing lexical binding,
 including an imported component. Lowercase, namespace and unsupported tag forms
@@ -350,6 +367,7 @@ projection. Evidence ranges refer to the packet's full-member revision.
 | `default-binding` | A separate conditional parameter-default relationship. |
 | `argument-binding` | A separate conditional relationship between an argument and a parameter on one admitted local helper call. |
 | `reference` | A source expression's qualified, conditional or unknown relationship to its lexical binding. |
+| `forward-annotation-reference` | A Python root annotation string's separately parsed source reference, exact source container and decoded expression coordinates; runtime/type evaluation remains unperformed. |
 | `call-site` | A call expression and the source qualification of its callee; its runtime target remains unestablished. |
 | `literal-expression` | An authored string occurrence or supported string expression, with unknowns retained. |
 | `property-write` | An authored property destination and separately qualified receiver evidence. |

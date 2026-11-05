@@ -60,6 +60,7 @@ _EXPECTED = {
     },
     "dependency_consumers": {"default": "hashmarks.dependency-consumers.v1"},
     "dependency_projection": {"default": "hashmarks.dependency-projection.v1"},
+    "dependency_verification": {"default": "hashmarks.dependency-verification.v1"},
     "repository_declarations": {
         "observation": "hashmarks.repository-declarations.v1",
         "explain": "hashmarks.repository-declaration-explain.v1",
@@ -396,6 +397,10 @@ def test_operation_modes_fail_closed() -> None:
 
 
 _FIXED_MODE_CORE_BOUNDARIES = {
+    "dependency_verification": (
+        "hashmarks/codemap/dependency_verification.py",
+        "verification",
+    ),
     "dependency_projection": (
         "hashmarks/codemap/dependency_projection.py",
         "projection",

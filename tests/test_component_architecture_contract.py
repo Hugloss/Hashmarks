@@ -104,6 +104,7 @@ COMPONENTS: dict[str, tuple[str, frozenset[str]]] = {
                 "RepositoryImports",
                 "RepositoryCorrelation",
                 "RepositoryRelationships",
+                "RepositoryVerification",
             }
         ),
     ),

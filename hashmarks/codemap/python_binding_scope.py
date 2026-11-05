@@ -206,6 +206,7 @@ class PythonScopes(ast.NodeVisitor):
         self.owners: dict[ast.AST, PythonScope] = {}
         self.function_scopes: dict[FunctionNode, PythonScope] = {}
         self.type_nodes: set[ast.AST] = set()
+        self.annotation_roots: set[ast.AST] = set()
         self.literal_arguments: dict[ast.AST, tuple[ast.Call, ast.AST]] = {}
         self.formatted_string_parts: set[ast.Constant] = set()
         self._argument_call: tuple[ast.Call, ast.AST] | None = None
@@ -245,6 +246,7 @@ class PythonScopes(ast.NodeVisitor):
     def _visit_type(self, node: ast.AST | None) -> None:
         if node is None:
             return
+        self.annotation_roots.add(node)
         before = self._in_type
         self._in_type = True
         self.visit(node)

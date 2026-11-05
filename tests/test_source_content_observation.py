@@ -177,7 +177,7 @@ def test_unreadable_source_cannot_return_signature_or_pointer_claims(
 ) -> None:
     (tmp_path / "image.png").write_bytes(b"\x89PNG\r\n\x1a\n")
 
-    def unavailable(_path: Path) -> NoReturn:
+    def unavailable(_path: Path, *, max_bytes: int | None = None) -> NoReturn:
         raise OSError("source unavailable")
 
     with CodeMap(
