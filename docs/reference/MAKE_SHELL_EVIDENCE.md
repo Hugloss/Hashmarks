@@ -63,6 +63,7 @@ produce current declarations; old selections never restore facts.
 | Simple command statement | Word expressions, constant-word projections, command-local environment assignments and preceding source separator |
 | Named variable reference | Reference spelling and source declaration candidates with their physical sites and contexts |
 | Literal function/alias invocation spelling | Same-file function/alias declaration candidates, with command binding unestablished |
+| Simple quoted shell heredoc delimiter | Opaque data extent with exact UTF-8 byte ranges, never command candidates from the data |
 | Make include or shell `source`/`.` expression | The source expression and the fact that included contents were not observed |
 
 `literal_argv` is a lexical projection available only when every command word is
@@ -71,7 +72,10 @@ word contains expansion. This field is source evidence; it is not an executable
 plan, command recommendation or guarantee of the executable that would run.
 
 Single quotes, double quotes, escaped literal characters and backslash line
-continuations are supported for simple statements. Separators inside quoted
+continuations are supported for simple statements. Multiline quoted shell words
+are captured with the same incremental quote state, retaining their literal
+newlines and physical source extent within the existing statement bound.
+Separators inside quoted
 strings remain data. For example, `printf '%s' 'one; two'` is one command
 expression, and `'$NAME'` is a literal shell word rather than a variable read.
 Make recipe expansion is qualified separately: Make variable syntax inside
@@ -88,7 +92,7 @@ bounded candidate derivation retains its exact supporting declarations; it never
 
 ## Conditional authored binding candidates
 
-The `hashmarks.make-shell-syntax.v4` producer retains the existing
+The `hashmarks.make-shell-syntax.v5` producer retains the existing
 `static_binding_observation`. `state="conditional-static"` continues to name
 simple source indirection. Broader supported forms use
 `state="conditional-source"`: multiword Make fragments, `?=` authored defaults,
@@ -105,6 +109,21 @@ explicitly require the authored declarations to take effect, with no intervening
 rebinding or readonly conflict; unobserved source state may change bindings.
 These are conditional source relationships, never effective expansion or command
 binding. Known conflicting declarations still prevent a unique candidate.
+
+`logical_offset` retains the existing tokenizer's zero-based character position
+inside the logical source line; physical start/end lines still bind continuations.
+This preserves the order of semicolon-separated declarations and uses without
+inventing a value from a later shell assignment. Inline function bodies retain
+their original lexical offsets. Recursive Make source references (`=` and the
+conditional `?=` fallback) may refer to later authored declarations, with native
+evaluation time explicitly unestablished. Immediate Make assignments do not
+borrow a later definition.
+
+Same-line control delimiters bound lexical context only. A completed
+`if ...; then ...; fi` does not add a condition to every later statement, while
+nested unclosed controls remain in the source context. Quoted keywords and
+command arguments do not close a context. Bodies, branch results, heredoc data
+and execution remain uninterpreted; context balance supplies no negative proof.
 
 If any command word remains unresolved, the whole observation stays
 `state="unclassified"` and has no `words` value. `authored_words` may retain
@@ -187,10 +206,26 @@ Make `define` bodies are uninterpreted macro source. A custom `.RECIPEPREFIX`
 prevents later tabbed lines from being promoted to established recipes.
 Escaped target names and target patterns remain unresolved; their following
 recipes do not acquire invented literal target names.
-An encountered here-document stops command observation for the rest of that
-selected file so body text cannot become invented invocations. Multiline quoted
-shell strings outside the supported continuation subset and malformed quoting
-fail the observation rather than yielding partial executable-looking facts.
+A shell heredoc with one simple quoted identifier delimiter, such as
+`<<'PAYLOAD'`, retains an opaque `shell-heredoc-data` fact. The body and terminator
+have exact half-open UTF-8 byte ranges in the original selected member. Body
+lines bypass command, quote and control interpretation, including command-like
+text and unmatched quotes; observation resumes only after the exact literal
+terminator. No effective input, command execution or branch result is claimed.
+Unquoted, dynamic, multiple and tab-stripping delimiters remain outside this
+subset and stop observation for the rest of the file. A missing terminator
+retains an unterminated data extent and incomplete remaining-source coverage.
+The distinct `<<<` here-string operator remains uninterpreted input on its
+source line and does not consume later statements as heredoc data. Heredoc
+framing uses physical LF boundaries; Unicode line-separator data cannot invent
+a terminator.
+Shell token boundaries use space, tab and LF. Other whitespace code points
+remain authored word data; a quoted identifier followed by CR or Unicode word
+data is an unsupported composite delimiter, never shortened into a supported
+one. Make's CRLF source-line transport is normalized separately before recipe
+lexing. Source coordinates still refer to the original captured member.
+Malformed/unclosed quotes and exceeded source, statement or data-line bounds
+refuse the observation rather than returning an apparently complete prefix.
 
 Bounds are 16 selected files across both languages, 262,144 bytes per file,
 16,384 characters per logical statement, 256 tokens per statement and the
