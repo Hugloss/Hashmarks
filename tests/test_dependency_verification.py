@@ -8,7 +8,12 @@ from copy import deepcopy
 from pathlib import Path
 
 import pytest
-from contract_assertions import assert_array, assert_object, assert_records
+from contract_assertions import (
+    assert_array,
+    assert_integer,
+    assert_object,
+    assert_records,
+)
 
 from hashmarks import CodeMap, hash_file
 from hashmarks.adapters import (
@@ -259,6 +264,57 @@ def test_rehashed_tampering_cannot_change_native_chain_membership(
                 if key != "evidence_identity"
             },
         )
+    packet["evidence_identity"] = evidence_identity(
+        str(packet["schema"]),
+        {key: value for key, value in packet.items() if key != "evidence_identity"},
+    )
+    assert validate_dependency_verification(packet, observation)["valid"] is False
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "query-bound",
+        "path-request",
+        "membership-count",
+        "consumer-generation",
+        "verifier-generation",
+    ],
+)
+def test_rehashed_numeric_correspondence_keeps_json_value_types(
+    repository: CodeMap, mutation: str
+) -> None:
+    observation, nodes = _observation(repository)
+    packet = deepcopy(_packet(repository, observation, nodes))
+    assert validate_dependency_verification(packet, observation)["valid"] is True
+    verification = assert_records(packet["verification_packets"])[0]
+    if mutation == "query-bound":
+        query = assert_records(assert_records(packet["path_queries"])[0]["results"])[0]
+        assert_object(query["bounds"])["max_depth"] = True
+    elif mutation == "path-request":
+        assert_records(packet["path_requests"])[0]["max_depth"] = True
+    elif mutation == "membership-count":
+        assert_object(verification["membership"])["member_count"] = True
+    elif mutation == "consumer-generation":
+        binding = assert_object(
+            assert_object(packet["consumer_packet"])["repository_binding"]
+        )
+        binding["codemap_generation"] = float(
+            assert_integer(binding["codemap_generation"])
+        )
+    else:
+        binding = assert_object(verification["repository"])
+        binding["codemap_generation"] = float(
+            assert_integer(binding["codemap_generation"])
+        )
+    verification["evidence_identity"] = evidence_identity(
+        str(verification["schema"]),
+        {
+            key: value
+            for key, value in verification.items()
+            if key != "evidence_identity"
+        },
+    )
     packet["evidence_identity"] = evidence_identity(
         str(packet["schema"]),
         {key: value for key, value in packet.items() if key != "evidence_identity"},

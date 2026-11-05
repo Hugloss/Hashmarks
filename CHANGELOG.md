@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.36.1 — 2026-11-05
+
+- Reject boolean/integer and float/integer substitutions when revalidating retained dependency query, membership, source and provenance receipts. Canonical JSON correspondence preserves the existing schema/container checks; valid native observations remain unchanged.
+
 ## 0.36.0 — 2026-11-05
 
 - Compose qualified dependency, importing-source and verifier relationships through one bounded producer observation. Retain exact source, target and relationship provenance; ambiguous, stale or conditional evidence cannot become a positive verification claim. Execution and sufficiency remain external.
