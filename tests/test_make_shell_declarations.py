@@ -12,6 +12,7 @@ from hashmarks.codemap import (
     MakeShellDeclarations,
     RepositoryDeclarationProviderError,
 )
+from hashmarks.codemap import make_shell_declarations as make_source
 from hashmarks.codemap.make_shell_declarations import (
     MAX_MAKE_SHELL_BYTES,
     MAX_MAKE_SHELL_FACTS,
@@ -259,6 +260,115 @@ def test_selected_make_source_retains_cycles_and_unresolved_prerequisites(
         selected["negative_evidence_admissible"] is False
         for selected in source.values()
     )
+
+
+def _selected_source_file(root: Path, targets: tuple[str, ...]) -> dict:
+    packet = _observe(
+        root,
+        MakeShellDeclarations(
+            make_paths=("Makefile",), layout="file", selected_targets=targets
+        ),
+    )
+    return _values(packet, "make-shell-file-observation")[0]
+
+
+def test_linear_make_source_budget_stops_before_materializing_remaining_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = "".join(
+        f"t{index}: "
+        + (f"t{index + 1}" if index < 15 else "")
+        + f"\n\techo target-{index}\n"
+        for index in range(16)
+    )
+    _write(tmp_path, "Makefile", source)
+    monkeypatch.setattr(make_source, "MAX_SELECTED_SOURCE_PATH_MEMBERS", 96)
+    file = _selected_source_file(tmp_path, ("t0",))
+    selected = file["selected_target_source"]
+    limited = selected["by_target"]["t0"]
+    assert file["facts_completeness"] == "complete-supported-subset"
+    assert limited["source_truncation"] == "stopped"
+    assert limited["negative_evidence_admissible"] is False
+    assert {row["target"] for row in limited["target_occurrences"]} < {
+        f"t{index}" for index in range(16)
+    }
+    assert {
+        row["budget"]
+        for row in limited["unresolved"]
+        if row["reason"] == "selected-target-projection-budget-exhausted"
+    } == {"path-members"}
+    assert selected["projection_budget"]["path_members"]["used"] <= 96
+    # Missing candidates remain unproven even though their original source was
+    # parsed. A fresh operation with enough budget recovers the exact leaf fact.
+    monkeypatch.setattr(make_source, "MAX_SELECTED_SOURCE_PATH_MEMBERS", 4096)
+    complete = _selected_source_file(tmp_path, ("t0",))
+    observed = complete["selected_target_source"]["by_target"]["t0"]
+    assert observed["source_truncation"] == "not-truncated"
+    candidates = [
+        complete["facts"][index]["value"]["literal_argv"]
+        for index in observed["source_candidate_indices"]
+    ]
+    assert ["echo", "target-15"] in candidates
+    assert observed["negative_evidence_admissible"] is False
+
+
+def test_selected_roots_share_one_aggregate_path_budget(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write(
+        tmp_path,
+        "Makefile",
+        "a: a1\n\techo a\na1: a2\n\techo a1\na2:\n\techo a2\nb: b1\n\techo b\nb1: b2\n\techo b1\nb2:\n\techo b2\n",
+    )
+    monkeypatch.setattr(make_source, "MAX_SELECTED_SOURCE_PATH_MEMBERS", 25)
+    file = _selected_source_file(tmp_path, ("a", "b"))
+    source = file["selected_target_source"]
+    assert source["by_target"]["a"]["source_truncation"] == "not-truncated"
+    assert source["by_target"]["b"]["source_truncation"] == "stopped"
+    assert source["projection_budget"]["path_members"]["used"] <= 25
+    for selected in source["by_target"].values():
+        assert selected["negative_evidence_admissible"] is False
+        assert all(
+            str(index) in selected["candidate_paths"]
+            for index in selected["source_candidate_indices"]
+        )
+
+
+@pytest.mark.parametrize(
+    ("setting", "limit", "reason"),
+    [
+        ("MAX_SELECTED_SOURCE_WORK", 4, "work"),
+        ("MAX_SELECTED_SOURCE_BYTES", 96, "encoded-bytes"),
+    ],
+)
+def test_selected_make_work_and_payload_exhaustion_remain_unknown(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    setting: str,
+    limit: int,
+    reason: str,
+) -> None:
+    _write(tmp_path, "Makefile", "all: child\n\techo all\nchild:\n\techo child\n")
+    monkeypatch.setattr(make_source, setting, limit)
+    file = _selected_source_file(tmp_path, ("all",))
+    selected = file["selected_target_source"]["by_target"]["all"]
+    assert selected["source_truncation"] == "stopped"
+    assert selected["semantic_coverage"] == "incomplete"
+    assert selected["negative_evidence_admissible"] is False
+    assert {
+        row["budget"]
+        for row in selected["unresolved"]
+        if row["reason"] == "selected-target-projection-budget-exhausted"
+    } == {reason}
+
+
+def test_selected_make_target_request_is_bounded_before_projection() -> None:
+    with pytest.raises(ValueError, match="bounded input"):
+        MakeShellDeclarations(
+            make_paths=("Makefile",),
+            layout="file",
+            selected_targets=("a" * (MAX_MAKE_SHELL_BYTES + 1),),
+        )
 
 
 @pytest.mark.parametrize(

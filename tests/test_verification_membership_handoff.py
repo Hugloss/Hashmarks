@@ -331,7 +331,7 @@ def test_unreadable_source_remains_unknown(
 ) -> None:
     report = _report(repository)
 
-    def unavailable(path: Path) -> None:
+    def unavailable(path: Path, *, max_bytes: int | None = None) -> None:
         raise PermissionError(path)
 
     monkeypatch.setattr(repository.file_store, "read_bytes_stable", unavailable)

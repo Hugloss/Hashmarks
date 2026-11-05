@@ -6,6 +6,7 @@ source candidates, never effective expansion, runtime binding, or execution.
 
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass, field
@@ -25,6 +26,9 @@ MAX_MAKE_SHELL_BYTES = 262_144
 MAX_STATEMENT_CHARS = 16_384
 MAX_STATEMENT_WORDS = 256
 MAX_MAKE_SHELL_FACTS = 4_096
+MAX_SELECTED_SOURCE_WORK = 1_000_000
+MAX_SELECTED_SOURCE_PATH_MEMBERS = 65_536
+MAX_SELECTED_SOURCE_BYTES = 2_097_152
 _NAME = r"[A-Za-z_][A-Za-z_0-9]*"
 _MAKE_NAME = r"[A-Za-z_.][A-Za-z_0-9.-]*"
 _ASSIGNMENT = re.compile(rf"^({_NAME})=(.*)$", re.DOTALL)
@@ -1096,124 +1100,282 @@ class _TargetEdge(TypedDict):
     order_only_syntax: bool
 
 
-def _target_declarations(facts: Sequence[_Fact]) -> dict[str, list[int]]:
+@dataclass(slots=True)
+class _SelectedSourceBudget:
+    work_limit: int
+    path_member_limit: int
+    byte_limit: int
+    work: int = 0
+    path_members: int = 0
+    encoded_bytes: int = 0
+    exhausted: str | None = None
+
+    def reserve(
+        self, *, work: int = 0, path_members: int = 0, encoded_bytes: int = 0
+    ) -> bool:
+        if self.exhausted is not None:
+            return False
+        for name, used, amount, limit in (
+            ("work", self.work, work, self.work_limit),
+            ("path-members", self.path_members, path_members, self.path_member_limit),
+            ("encoded-bytes", self.encoded_bytes, encoded_bytes, self.byte_limit),
+        ):
+            if amount > limit - used:
+                self.exhausted = name
+                return False
+        self.work += work
+        self.path_members += path_members
+        self.encoded_bytes += encoded_bytes
+        return True
+
+    def retain(
+        self,
+        value: object,
+        *,
+        work: int = 0,
+        path_members: int = 0,
+        path_bytes: int = 0,
+    ) -> bool:
+        size = len(
+            json.dumps(value, ensure_ascii=True, separators=(",", ":")).encode("utf-8")
+        )
+        return self.reserve(
+            work=work, path_members=path_members, encoded_bytes=size + path_bytes
+        )
+
+    def packet(self) -> dict[str, object]:
+        return {
+            "scope": "all-selected-targets-for-one-file-observation",
+            "work": {"limit": self.work_limit, "used": self.work},
+            "path_members": {
+                "limit": self.path_member_limit,
+                "used": self.path_members,
+            },
+            "encoded_bytes": {"limit": self.byte_limit, "used": self.encoded_bytes},
+            "exhausted": self.exhausted,
+        }
+
+
+def _target_declarations(
+    facts: Sequence[_Fact], budget: _SelectedSourceBudget
+) -> dict[str, list[int]]:
     declarations: dict[str, list[int]] = {}
     for index, fact in enumerate(facts):
+        if not budget.reserve(work=1):
+            break
         if fact.kind == "make-target-declaration":
             for name in cast("list[str]", fact.value["targets"]):
+                if not budget.retain((name, index), work=1):
+                    return declarations
                 declarations.setdefault(name, []).append(index)
     return declarations
 
 
 def _literal_target_edges(
-    target: str, indices: Sequence[int], facts: Sequence[_Fact]
+    target: str,
+    indices: Sequence[int],
+    facts: Sequence[_Fact],
+    budget: _SelectedSourceBudget,
 ) -> tuple[list[_TargetEdge], list[dict[str, object]]]:
     edges: list[_TargetEdge] = []
     unresolved: list[dict[str, object]] = []
     for index in indices:
         prerequisites = facts[index].value.get("literal_prerequisite_tokens")
         if prerequisites is None:
-            unresolved.append(
-                {
-                    "target": target,
-                    "fact_index": index,
-                    "reason": "nonliteral-prerequisite-expression",
-                }
-            )
+            row: dict[str, object] = {
+                "target": target,
+                "fact_index": index,
+                "reason": "nonliteral-prerequisite-expression",
+            }
+            if not budget.retain(row, work=1):
+                break
+            unresolved.append(row)
             continue
         for ordinal, token in enumerate(
             cast("list[_LiteralPrerequisite]", prerequisites)
         ):
-            edges.append(
-                {
-                    "source": target,
-                    "target": token["literal"],
-                    "declaration_fact_index": index,
-                    "token_ordinal": ordinal,
-                    "order_only_syntax": token["order_only_syntax"],
-                }
-            )
+            edge: _TargetEdge = {
+                "source": target,
+                "target": token["literal"],
+                "declaration_fact_index": index,
+                "token_ordinal": ordinal,
+                "order_only_syntax": token["order_only_syntax"],
+            }
+            if not budget.retain(edge, work=1):
+                return edges, unresolved
+            edges.append(edge)
     return edges, unresolved
 
 
-def _selected_target_source(
-    facts: Sequence[_Fact], targets: tuple[str, ...], *, stopped: bool
-) -> dict[str, object]:
-    """Follow only authored literal prerequisite edges, never effective Make work."""
-    declarations = _target_declarations(facts)
-    paths: dict[str, tuple[str, ...]] = {}
-    edges: list[_TargetEdge] = []
-    cycles: list[list[str]] = []
-    unresolved: list[dict[str, object]] = []
-    pending: list[tuple[str, tuple[str, ...]]] = [
-        (target, ()) for target in reversed(targets)
-    ]
-    while pending:
-        name, ancestors = pending.pop()
-        path = (*ancestors, name)
-        if name in ancestors:
-            cycles.append(list(path))
-            continue
-        if name not in declarations:
-            unresolved.append(
-                {
-                    "target": name,
-                    "source_path": list(path),
-                    "reason": "no-selected-file-target-declaration",
-                }
+@dataclass(frozen=True, slots=True)
+class _SelectedPath:
+    names: tuple[str, ...]
+    encoded_bytes: int
+
+
+@dataclass(slots=True)
+class _SelectedTargetSource:
+    facts: Sequence[_Fact]
+    declarations: dict[str, list[int]]
+    budget: _SelectedSourceBudget
+    paths: dict[str, _SelectedPath] = field(default_factory=dict)
+    occurrences: list[dict[str, object]] = field(default_factory=list)
+    edges: list[_TargetEdge] = field(default_factory=list)
+    cycles: list[list[str]] = field(default_factory=list)
+    unresolved: list[dict[str, object]] = field(default_factory=list)
+
+    def _path(self, name: str, parent: _SelectedPath) -> _SelectedPath | None:
+        length = len(parent.names) + 1
+        if not self.budget.reserve(work=length):
+            return None
+        size = parent.encoded_bytes + len(json.dumps(name)) + bool(parent.names)
+        if name in parent.names:
+            if self.budget.reserve(path_members=length, encoded_bytes=size):
+                self.cycles.append([*parent.names, name])
+            return None
+        if name in self.paths:
+            return None
+        if name not in self.declarations:
+            row: dict[str, object] = {
+                "target": name,
+                "source_path": [],
+                "reason": "no-selected-file-target-declaration",
+            }
+            if self.budget.retain(row, path_members=length, path_bytes=size - 2):
+                row["source_path"] = [*parent.names, name]
+                self.unresolved.append(row)
+            return None
+        occurrence: dict[str, object] = {
+            "target": name,
+            "declaration_fact_indices": self.declarations[name],
+            "source_path": [],
+        }
+        if not self.budget.retain(
+            occurrence, work=2 * length, path_members=2 * length, path_bytes=size - 2
+        ):
+            return None
+        path = _SelectedPath((*parent.names, name), size)
+        self.paths[name] = path
+        occurrence["source_path"] = list(path.names)
+        self.occurrences.append(occurrence)
+        return path
+
+    def walk(self, targets: tuple[str, ...]) -> None:
+        pending = [(target, _SelectedPath((), 2)) for target in reversed(targets)]
+        while pending and self.budget.exhausted is None:
+            name, parent = pending.pop()
+            path = self._path(name, parent)
+            if path is None:
+                continue
+            observed, unknown = _literal_target_edges(
+                name, self.declarations[name], self.facts, self.budget
             )
-            continue
-        if name in paths:
-            continue
-        paths[name] = path
-        observed, unknown = _literal_target_edges(name, declarations[name], facts)
-        edges.extend(observed)
-        unresolved.extend(unknown)
-        pending.extend((edge["target"], path) for edge in reversed(observed))
-    candidates = {
-        str(index): [
-            list(paths[name])
-            for name in cast("list[str]", fact.value.get("make_targets", []))
-            if name in paths
-        ]
-        for index, fact in enumerate(facts)
-        if any(
-            name in paths
-            for name in cast("list[str]", fact.value.get("make_targets", []))
+            self.edges.extend(observed)
+            self.unresolved.extend(unknown)
+            if self.budget.exhausted is None:
+                pending.extend((edge["target"], path) for edge in reversed(observed))
+
+    def _candidate_paths(self, index: int, names: Sequence[str]) -> list[list[str]]:
+        paths: list[list[str]] = []
+        for name in names:
+            if not self.budget.reserve(work=1):
+                break
+            path = self.paths.get(name)
+            if path is None:
+                continue
+            if not self.budget.reserve(
+                work=len(path.names),
+                path_members=len(path.names),
+                encoded_bytes=path.encoded_bytes + len(str(index)) + 8,
+            ):
+                break
+            paths.append(list(path.names))
+        return paths
+
+    def candidates(self) -> dict[str, list[list[str]]]:
+        candidates: dict[str, list[list[str]]] = {}
+        for index, fact in enumerate(self.facts):
+            if not self.budget.reserve(work=1):
+                break
+            paths = self._candidate_paths(
+                index, cast("list[str]", fact.value.get("make_targets", []))
+            )
+            if paths:
+                candidates[str(index)] = paths
+        return candidates
+
+
+def _selected_target_source(
+    facts: Sequence[_Fact],
+    target: str,
+    declarations: dict[str, list[int]],
+    budget: _SelectedSourceBudget,
+    *,
+    stopped: bool,
+) -> dict[str, object]:
+    projection = _SelectedTargetSource(facts, declarations, budget)
+    projection.walk((target,))
+    candidates = projection.candidates()
+    source_indices: list[int] = []
+    for index, fact in enumerate(facts):
+        if not budget.reserve(work=1):
+            break
+        if fact.kind in {
+            "make-unresolved-statement",
+            "make-unresolved-recipe",
+            "make-include-declaration",
+            "make-unresolved-directive",
+        }:
+            if not budget.retain(index):
+                break
+            source_indices.append(index)
+    if budget.exhausted is not None:
+        projection.unresolved.append(
+            {
+                "reason": "selected-target-projection-budget-exhausted",
+                "budget": budget.exhausted,
+            }
         )
-    }
     return {
         "schema": "hashmarks.make-selected-target-source.v1",
-        "selected_targets": list(targets),
-        "target_occurrences": [
-            {
-                "target": name,
-                "declaration_fact_indices": declarations[name],
-                "source_path": list(path),
-            }
-            for name, path in paths.items()
-        ],
-        "prerequisite_edges": edges,
+        "selected_targets": [target],
+        "target_occurrences": projection.occurrences,
+        "prerequisite_edges": projection.edges,
         "source_candidate_indices": [int(index) for index in candidates],
         "candidate_paths": candidates,
-        "cycles": cycles,
-        "unresolved": unresolved,
-        "unresolved_source_indices": [
-            index
-            for index, fact in enumerate(facts)
-            if fact.kind
-            in {
-                "make-unresolved-statement",
-                "make-unresolved-recipe",
-                "make-include-declaration",
-                "make-unresolved-directive",
-            }
-        ],
-        "source_truncation": "stopped" if stopped else "not-truncated",
+        "cycles": projection.cycles,
+        "unresolved": projection.unresolved,
+        "unresolved_source_indices": source_indices,
+        "source_truncation": "stopped"
+        if stopped or budget.exhausted is not None
+        else "not-truncated",
         "semantic_coverage": "incomplete",
         "effective_target_selection": "not-established",
         "execution": "not-established",
         "negative_evidence_admissible": False,
+    }
+
+
+def _selected_target_sources(
+    facts: Sequence[_Fact], targets: tuple[str, ...], *, stopped: bool
+) -> dict[str, object]:
+    budget = _SelectedSourceBudget(
+        MAX_SELECTED_SOURCE_WORK,
+        MAX_SELECTED_SOURCE_PATH_MEMBERS,
+        MAX_SELECTED_SOURCE_BYTES,
+    )
+    declarations = _target_declarations(facts, budget)
+    by_target = {
+        target: _selected_target_source(
+            facts, target, declarations, budget, stopped=stopped
+        )
+        for target in targets
+    }
+    return {
+        "schema": "hashmarks.make-selected-target-sources.v1",
+        "selected_targets": list(targets),
+        "by_target": by_target,
+        "projection_budget": budget.packet(),
     }
 
 
@@ -1249,16 +1411,9 @@ def _file_fact(
             "semantic_coverage": "incomplete",
             **(
                 {
-                    "selected_target_source": {
-                        "schema": "hashmarks.make-selected-target-sources.v1",
-                        "selected_targets": list(selected_targets),
-                        "by_target": {
-                            target: _selected_target_source(
-                                facts, (target,), stopped=stopped
-                            )
-                            for target in selected_targets
-                        },
-                    }
+                    "selected_target_source": _selected_target_sources(
+                        facts, selected_targets, stopped=stopped
+                    )
                 }
                 if selected_targets
                 else {}
@@ -1300,6 +1455,14 @@ class MakeShellDeclarations:
             raise ValueError(
                 "Make target source selection requires one Make file and file layout"
             )
+        if (
+            any(
+                not isinstance(name, str) or len(name) > MAX_MAKE_SHELL_BYTES
+                for name in self.selected_targets
+            )
+            or sum(len(name) for name in self.selected_targets) > MAX_MAKE_SHELL_BYTES
+        ):
+            raise ValueError("Make source target request exceeds bounded input")
         if len(self.selected_targets) > 64 or len(set(self.selected_targets)) != len(
             self.selected_targets
         ):

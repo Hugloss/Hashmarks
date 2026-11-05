@@ -92,6 +92,20 @@ that a prerequisite file is absent. Includes and unobserved native expansion
 cannot supply invented edges. This projection never selects effective Make work,
 computes tools, decides closure sufficiency, chooses a branch, or executes work.
 
+All requested targets share one operation-local projection budget: 1,000,000
+work units, 65,536 copied path members and 2 MiB of encoded dynamic projection
+payload. Traversal and target-index work, retained prerequisite/unknown rows,
+internal path tuples and emitted target/candidate paths reserve their budget
+before accumulation or copying. Target-name input shares the selected-source
+256 KiB bound. Fixed request/status metadata remains bounded by that input and
+the 64-target limit. `selected_target_source.projection_budget` records the
+shared limits, consumption and exhausted dimension. Exhaustion leaves each
+affected target's `source_truncation: stopped` and an unresolved
+`selected-target-projection-budget-exhausted` reason. Observed prefixes remain
+source evidence; omitted targets/candidates never become absence, effective
+selection, or sufficient closure. Full-file parsing qualifications remain
+separate from selected-projection truncation.
+
 Single quotes, double quotes, escaped literal characters and backslash line
 continuations are supported for simple statements. Multiline quoted shell words
 are captured with the same incremental quote state, retaining their literal
