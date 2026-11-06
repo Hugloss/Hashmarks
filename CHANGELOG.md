@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.36.2 — 2026-11-06
+
+- Observe explicit repository fixture-directory inputs copied by tests through qualified default `shutil.copytree` calls. Retain descendant input identity, reader/source revisions and incomplete consumer scope; copied inputs do not establish execution, assertion coverage or test sufficiency. Dynamic, filtered, shadowed and unsupported copies remain unqualified.
+
 ## 0.36.1 — 2026-11-05
 
 - Reject boolean/integer and float/integer substitutions when revalidating retained dependency query, membership, source and provenance receipts. Canonical JSON correspondence preserves the existing schema/container checks; valid native observations remain unchanged.
