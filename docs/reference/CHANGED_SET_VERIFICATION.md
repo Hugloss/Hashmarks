@@ -179,6 +179,14 @@ that the test is sufficient. The relationship carries the current reader and
 source revisions and the declared source directory; execution and result
 authority remain external.
 
+This fixture-input observation domain belongs to `changed_set`; its internal
+request selects the additional observation, not consumer policy. The legacy
+task verification graph retains its Python symbol/import correspondence scope.
+An input copied for a test does not establish a symbol call or owner, and its
+bounded consumer search does not change the completeness of that separate
+domain. Changed-set fixture-consumer scope remains unknown/incomplete even
+when no copy input is returned; an empty result establishes no consumer absence.
+
 This observation requires an unshadowed standard-library import, the same
 repository-root-qualified literal source syntax, and exactly two positional
 arguments with default copy behavior. Custom filters/copy functions, keyword

@@ -6,7 +6,7 @@ import ast
 from pathlib import Path
 
 import pytest
-from contract_assertions import assert_object, assert_records
+from contract_assertions import assert_array, assert_object, assert_records
 
 from hashmarks import CodeMap
 from hashmarks.codemap.verification_file_reads import literal_repository_file_reads
@@ -215,3 +215,33 @@ def test_direct_python_source_read_keeps_its_existing_unqualified_scope(
     with CodeMap(root, state_dir=tmp_path / "state") as repository:
         repository.index.sync()
         assert _targets(repository.verification.changed_set([_SOURCE])) == []
+
+
+def test_changed_set_fixture_scope_does_not_redefine_legacy_symbol_reference_scope(
+    tmp_path: Path,
+) -> None:
+    root = _repository(tmp_path, _SOURCE, _reader())
+    imported = root / "tests/test_renderer.py"
+    imported.write_text(
+        "from examples.catalog.generator.renderer import render\n"
+        "def test_renderer(): assert render() == 'synthetic'\n"
+    )
+    with CodeMap(root, state_dir=tmp_path / "state") as repository:
+        repository.index.sync()
+        legacy = repository.tasks.verification_ownership_graph(f"Change {_SOURCE}")
+        changed = repository.verification.changed_set([_SOURCE])
+    qualification = assert_object(legacy["verification_qualification"])
+    assert qualification["completeness"] == "complete"
+    assert qualification["search_bound_reasons"] == []
+    assert {
+        row["path"]
+        for row in assert_records(legacy["verification_owners"])
+        if row.get("covers_edit_candidates") == [_SOURCE]
+    } == {"tests/test_renderer.py"}
+    assert set(_targets(changed)) == {_READER, "tests/test_renderer.py"}
+    change = assert_records(changed["changes"])[0]
+    assert assert_object(change["consumer_scope"])["completeness"] == "incomplete"
+    assert "literal-file-reader-syntax-scope" in assert_array(
+        assert_object(change["relevance"])["search_bound_reasons"]
+    )
+    assert changed["negative_evidence_admissible"] is False

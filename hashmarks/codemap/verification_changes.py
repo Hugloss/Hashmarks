@@ -139,6 +139,7 @@ class VerificationChangesMixin:
             {"path": path},
             None,
             (),
+            observe_fixture_inputs=True,
         )
         relevance = dict(self.for_owner(request, limit=min(limit, 16)))
         # Shared indexed selection preserves stale bindings for its callers.

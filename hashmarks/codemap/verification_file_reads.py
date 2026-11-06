@@ -530,7 +530,12 @@ def literal_repository_file_reads(
 
 class VerificationFileReadsMixin:
     def _verification_file_read_evidence(
-        self, path: str, target: str, target_revision: object
+        self,
+        path: str,
+        target: str,
+        target_revision: object,
+        *,
+        observe_fixture_inputs: bool,
     ) -> list[dict[str, object]]:
         if TYPE_CHECKING:
             self = cast("RepositoryVerification", self)
@@ -544,14 +549,17 @@ class VerificationFileReadsMixin:
             snapshot = read_python_ast(self.workspace / path)
         except (OSError, SyntaxError, UnicodeError):
             return []
-        copied, ambiguous_copy = self.imports._resolve_import_owner_evidence(
-            path, "shutil.copytree"
-        )
+        copy_import_qualified = False
+        if observe_fixture_inputs:
+            copied, ambiguous_copy = self.imports._resolve_import_owner_evidence(
+                path, "shutil.copytree"
+            )
+            copy_import_qualified = not copied and not ambiguous_copy
         reads = literal_repository_file_reads(
             snapshot.tree,
             path,
             target,
-            include_directory_copies=not copied and not ambiguous_copy,
+            include_directory_copies=copy_import_qualified,
         )
         self.source.ensure_current(path)
         member = self.reads.file_row(path)
@@ -566,10 +574,18 @@ class VerificationFileReadsMixin:
         return reads
 
     def _verification_collect_file_reads(
-        self, state: _VerificationRelevanceState
+        self, state: _VerificationRelevanceState, *, observe_fixture_inputs: bool
     ) -> None:
         if TYPE_CHECKING:
             self = cast("RepositoryVerification", self)
+        # Legacy task relevance observes Python symbol/import correspondence.
+        # The changed-set operation separately opts into bounded fixture inputs;
+        # their unknown scope must not silently redefine that older domain.
+        if not observe_fixture_inputs and PurePosixPath(state.edit_path).suffix in {
+            ".py",
+            ".pyi",
+        }:
+            return
         # Bounded lexical discovery and deliberately limited syntax can establish
         # positive relationships, never complete absence of file readers.
         state.search_bound_reasons.add("literal-file-reader-syntax-scope")
@@ -589,7 +605,10 @@ class VerificationFileReadsMixin:
             ):
                 continue
             reads = self._verification_file_read_evidence(
-                path, state.edit_path, target.get("member_revision")
+                path,
+                state.edit_path,
+                target.get("member_revision"),
+                observe_fixture_inputs=observe_fixture_inputs,
             )
             if reads:
                 state.candidate_paths.add(path)

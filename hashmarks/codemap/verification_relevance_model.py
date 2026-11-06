@@ -54,3 +54,4 @@ class VerificationRequest:
     edit: Mapping[str, object] | None
     current_verify: Mapping[str, object] | None
     rows: tuple[Mapping[str, object], ...]
+    observe_fixture_inputs: bool = False
