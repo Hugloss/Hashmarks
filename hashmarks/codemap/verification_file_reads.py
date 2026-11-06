@@ -1,14 +1,18 @@
-"""Bounded structural observations of test reads of repository-owned files.
+"""Bounded structural observations of test inputs from repository-owned files.
 
 Literal text only locates candidate sources. A qualified AST must prove an
-unshadowed pathlib read rooted at that source file's repository ancestor. This
-observes a read relationship, never test sufficiency or execution.
+unshadowed pathlib read or default shutil directory copy rooted at that source
+file's repository ancestor. This observes an input relationship, never test
+sufficiency or execution.
 """
 
 from __future__ import annotations
 
 import ast
 from collections import Counter
+from collections.abc import Iterator
+from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING, cast
 
@@ -79,6 +83,31 @@ def _path_imports(tree: ast.Module, counts: Counter[str]) -> frozenset[str]:
         for alias in statement.names
         if alias.name == "Path" and counts[alias.asname or alias.name] == 1
     )
+
+
+def _copy_imports(
+    tree: ast.Module, counts: Counter[str]
+) -> tuple[frozenset[str], frozenset[str]]:
+    modules: set[str] = set()
+    functions: set[str] = set()
+    for statement in tree.body:
+        if isinstance(statement, ast.Import):
+            modules.update(
+                alias.asname or alias.name
+                for alias in statement.names
+                if alias.name == "shutil" and counts[alias.asname or alias.name] == 1
+            )
+        elif (
+            isinstance(statement, ast.ImportFrom)
+            and statement.module == "shutil"
+            and not statement.level
+        ):
+            functions.update(
+                alias.asname or alias.name
+                for alias in statement.names
+                if alias.name == "copytree" and counts[alias.asname or alias.name] == 1
+            )
+    return frozenset(modules), frozenset(functions)
 
 
 def _is_call(node: ast.expr, names: frozenset[str]) -> bool:
@@ -183,6 +212,13 @@ def _has_loop_exit(node: ast.AST, *, nested_loop: bool = False) -> bool:
     )
 
 
+@dataclass(frozen=True)
+class _ReadSyntaxScope:
+    tests_only: bool
+    copy_imports: tuple[frozenset[str], frozenset[str]]
+    copy_inputs_only: bool
+
+
 class _LiteralReadVisitor(ast.NodeVisitor):
     def __init__(
         self,
@@ -192,7 +228,7 @@ class _LiteralReadVisitor(ast.NodeVisitor):
         *,
         counts: Counter[str],
         iteration_only_names: frozenset[str],
-        tests_only: bool = True,
+        scope: _ReadSyntaxScope,
     ) -> None:
         self.roots = roots
         self.names = names
@@ -201,7 +237,10 @@ class _LiteralReadVisitor(ast.NodeVisitor):
         self.iteration_only_names = iteration_only_names
         self.collections: dict[str, tuple[tuple[str, ...], ...]] = {}
         self.iterated_targets: set[str] = set()
-        self.tests_only = tests_only
+        self.tests_only = scope.tests_only
+        self.copy_modules, self.copy_functions = scope.copy_imports
+        self.copy_inputs_only = scope.copy_inputs_only
+        self.copy_scope = True
         self.test: str | None = None
         self.in_function = False
         self.terminated = False
@@ -271,13 +310,59 @@ class _LiteralReadVisitor(ast.NodeVisitor):
     def _visit_comprehension(self, node: ast.expr) -> None:
         outer_targets = self.iterated_targets
         self.iterated_targets = set()
-        self.generic_visit(node)
+        if isinstance(node, (ast.ListComp, ast.SetComp, ast.DictComp)) and all(
+            not generator.is_async
+            and not generator.ifs
+            and isinstance(generator.iter, (ast.List, ast.Tuple, ast.Set))
+            and bool(generator.iter.elts)
+            and all(isinstance(item, ast.Constant) for item in generator.iter.elts)
+            for generator in node.generators
+        ):
+            self.generic_visit(node)
+        else:
+            self._visit_copy_guarded(node)
         self.iterated_targets = outer_targets
 
-    visit_GeneratorExp = _visit_comprehension
     visit_ListComp = _visit_comprehension
     visit_SetComp = _visit_comprehension
     visit_DictComp = _visit_comprehension
+
+    def visit_GeneratorExp(self, node: ast.GeneratorExp) -> None:
+        # Python eagerly evaluates only the outermost iterator expression.
+        # Merely constructing a generator does not read its deferred body.
+        self.visit(node.generators[0].iter)
+
+    @contextmanager
+    def _copy_guard(self) -> Iterator[None]:
+        previous = self.copy_scope
+        self.copy_scope = False
+        try:
+            yield
+        finally:
+            self.copy_scope = previous
+
+    def _visit_copy_guarded(self, node: ast.AST) -> None:
+        with self._copy_guard():
+            self.generic_visit(node)
+
+    def visit_BoolOp(self, node: ast.BoolOp) -> None:
+        self.visit(node.values[0])
+        with self._copy_guard():
+            for operand in node.values[1:]:
+                self.visit(operand)
+
+    def visit_IfExp(self, node: ast.IfExp) -> None:
+        self.visit(node.test)
+        if isinstance(node.test, ast.Constant):
+            self.visit(node.body if bool(node.test.value) else node.orelse)
+        else:
+            with self._copy_guard():
+                self.visit(node.body)
+                self.visit(node.orelse)
+
+    visit_Try = _visit_copy_guarded
+    visit_TryStar = _visit_copy_guarded
+    visit_Match = _visit_copy_guarded
 
     def visit_If(self, node: ast.If) -> None:
         # Dynamic guards, including typing-only aliases, remain unqualified.
@@ -295,6 +380,17 @@ class _LiteralReadVisitor(ast.NodeVisitor):
     def visit_Raise(self, node: ast.Raise) -> None:
         self.generic_visit(node)
         self.terminated = True
+
+    def visit_Assert(self, node: ast.Assert) -> None:
+        self.visit(node.test)
+        if isinstance(node.test, ast.Constant):
+            if not bool(node.test.value):
+                if node.msg is not None:
+                    self.visit(node.msg)
+                self.terminated = True
+        elif node.msg is not None:
+            with self._copy_guard():
+                self.visit(node.msg)
 
     def visit_While(self, node: ast.While) -> None:
         return
@@ -322,12 +418,16 @@ class _LiteralReadVisitor(ast.NodeVisitor):
         reader_scope = (
             self.test is not None or not self.tests_only and not self.in_function
         )
+        directory = self._copied_directory(node)
+        observed_input = directory is not None or (
+            not self.copy_inputs_only and self._reads_target(node)
+        )
         if (
             reader_scope
             and not self.terminated
             and len(self.reads)
             < VERIFICATION_RELEVANCE_DEFAULTS.literal_file_read_sites
-            and self._reads_target(node)
+            and observed_input
         ):
             self.reads.append(
                 {
@@ -335,7 +435,12 @@ class _LiteralReadVisitor(ast.NodeVisitor):
                     "test_symbol" if self.tests_only else "reader_symbol": self.test,
                     "line": node.lineno,
                     "end_line": node.end_lineno or node.lineno,
-                    "basis": "unshadowed-pathlib-literal-read",
+                    "basis": "unshadowed-shutil-copytree-input"
+                    if directory is not None
+                    else "unshadowed-pathlib-literal-read",
+                    **(
+                        {"source_directory": directory} if directory is not None else {}
+                    ),
                     **(
                         {
                             "line": node.func.value.lineno,
@@ -349,6 +454,28 @@ class _LiteralReadVisitor(ast.NodeVisitor):
                 }
             )
         self.generic_visit(node)
+
+    def _copied_directory(self, node: ast.Call) -> str | None:
+        # Only the default copy operation establishes this positive input
+        # relationship. Filters, custom copy functions and computed sources
+        # remain outside the observed syntax; runtime success is not inferred.
+        function = node.func
+        qualified = (
+            isinstance(function, ast.Name)
+            and function.id in self.copy_functions
+            or isinstance(function, ast.Attribute)
+            and function.attr == "copytree"
+            and isinstance(function.value, ast.Name)
+            and function.value.id in self.copy_modules
+        )
+        if not self.copy_scope or not qualified or len(node.args) != 2 or node.keywords:
+            return None
+        parts = _literal_path(node.args[0], self.roots, self.names)
+        if not parts:
+            return None
+        source = PurePosixPath(*parts)
+        target = PurePosixPath(self.target)
+        return source.as_posix() if source in target.parents else None
 
     def _reads_target(self, node: ast.Call) -> bool:
         if not isinstance(node.func, ast.Attribute) or node.func.attr not in {
@@ -366,7 +493,12 @@ class _LiteralReadVisitor(ast.NodeVisitor):
 
 
 def literal_repository_file_reads(
-    tree: ast.Module, reader_path: str, target: str, *, tests_only: bool = True
+    tree: ast.Module,
+    reader_path: str,
+    target: str,
+    *,
+    tests_only: bool = True,
+    include_directory_copies: bool = False,
 ) -> list[dict[str, object]]:
     counts, collection_uses, iteration_uses = _name_uses(tree)
     names = _path_imports(tree, counts)
@@ -383,7 +515,14 @@ def literal_repository_file_reads(
             for name, uses in collection_uses.items()
             if uses == iteration_uses[name]
         ),
-        tests_only=tests_only,
+        scope=_ReadSyntaxScope(
+            tests_only=tests_only,
+            copy_imports=_copy_imports(tree, counts)
+            if include_directory_copies
+            else (frozenset(), frozenset()),
+            copy_inputs_only=tests_only
+            and PurePosixPath(target).suffix in {".py", ".pyi"},
+        ),
     )
     visitor.visit(tree)
     return visitor.reads
@@ -391,7 +530,12 @@ def literal_repository_file_reads(
 
 class VerificationFileReadsMixin:
     def _verification_file_read_evidence(
-        self, path: str, target: str, target_revision: object
+        self,
+        path: str,
+        target: str,
+        target_revision: object,
+        *,
+        observe_fixture_inputs: bool,
     ) -> list[dict[str, object]]:
         if TYPE_CHECKING:
             self = cast("RepositoryVerification", self)
@@ -405,7 +549,18 @@ class VerificationFileReadsMixin:
             snapshot = read_python_ast(self.workspace / path)
         except (OSError, SyntaxError, UnicodeError):
             return []
-        reads = literal_repository_file_reads(snapshot.tree, path, target)
+        copy_import_qualified = False
+        if observe_fixture_inputs:
+            copied, ambiguous_copy = self.imports._resolve_import_owner_evidence(
+                path, "shutil.copytree"
+            )
+            copy_import_qualified = not copied and not ambiguous_copy
+        reads = literal_repository_file_reads(
+            snapshot.tree,
+            path,
+            target,
+            include_directory_copies=copy_import_qualified,
+        )
         self.source.ensure_current(path)
         member = self.reads.file_row(path)
         if member is None:
@@ -419,11 +574,17 @@ class VerificationFileReadsMixin:
         return reads
 
     def _verification_collect_file_reads(
-        self, state: _VerificationRelevanceState
+        self, state: _VerificationRelevanceState, *, observe_fixture_inputs: bool
     ) -> None:
         if TYPE_CHECKING:
             self = cast("RepositoryVerification", self)
-        if PurePosixPath(state.edit_path).suffix in {".py", ".pyi"}:
+        # Legacy task relevance observes Python symbol/import correspondence.
+        # The changed-set operation separately opts into bounded fixture inputs;
+        # their unknown scope must not silently redefine that older domain.
+        if not observe_fixture_inputs and PurePosixPath(state.edit_path).suffix in {
+            ".py",
+            ".pyi",
+        }:
             return
         # Bounded lexical discovery and deliberately limited syntax can establish
         # positive relationships, never complete absence of file readers.
@@ -444,7 +605,10 @@ class VerificationFileReadsMixin:
             ):
                 continue
             reads = self._verification_file_read_evidence(
-                path, state.edit_path, target.get("member_revision")
+                path,
+                state.edit_path,
+                target.get("member_revision"),
+                observe_fixture_inputs=observe_fixture_inputs,
             )
             if reads:
                 state.candidate_paths.add(path)

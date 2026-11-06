@@ -1554,7 +1554,9 @@ class RepositoryVerification(
                 "task_matches": task_matches,
             }
 
-        self._verification_collect_file_reads(state)
+        self._verification_collect_file_reads(
+            state, observe_fixture_inputs=request.observe_fixture_inputs
+        )
         symbol_names, symbol_scope_complete = self._verification_edit_symbols(
             edit_path, edit
         )

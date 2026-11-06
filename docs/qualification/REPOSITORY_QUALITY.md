@@ -66,7 +66,7 @@ The current contracts provide concrete review cases:
   not rebuild its relationships. Its public validator and the native delta
   validator check typed self-consistency/correspondence, not authenticity or live
   freshness. For example, rehashing a packet must not make JSON `true` substitute
-  for integer `1`; the [existing regression](../../tests/test_dependency_verification.py)
+  for integer `1`; the [existing regression](https://github.com/Hugloss/Hashmarks/blob/main/tests/test_dependency_verification.py)
   covers that distinction. Fresh source qualification uses the observer owner.
 - [Make/shell](../reference/MAKE_SHELL_EVIDENCE.md) and
   [npm declarations](../reference/REPOSITORY_DECLARATIONS.md#selected-npm-manifest-declarations)

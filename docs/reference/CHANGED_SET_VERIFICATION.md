@@ -170,6 +170,34 @@ positive relationships with the existing reader/source revisions, not execution
 observations or proof that the verifier is sufficient. Unsupported syntax does
 not establish absence.
 
+**Observer ownership: OBSERVER.** A source-qualified default
+`shutil.copytree(ROOT / "fixtures/subtree", destination)` inside a test may
+also identify an admitted descendant as an explicit fixture input, including
+Python or TypeScript source. This is a repository input relationship, not proof
+that the copy succeeds, that the test executes or asserts every descendant, or
+that the test is sufficient. The relationship carries the current reader and
+source revisions and the declared source directory; execution and result
+authority remain external.
+
+This fixture-input observation domain belongs to `changed_set`; its internal
+request selects the additional observation, not consumer policy. The legacy
+task verification graph retains its Python symbol/import correspondence scope.
+An input copied for a test does not establish a symbol call or owner, and its
+bounded consumer search does not change the completeness of that separate
+domain. Changed-set fixture-consumer scope remains unknown/incomplete even
+when no copy input is returned; an empty result establishes no consumer absence.
+
+This observation requires an unshadowed standard-library import, the same
+repository-root-qualified literal source syntax, and exactly two positional
+arguments with default copy behavior. Custom filters/copy functions, keyword
+options, computed sources, shadowed or rebound names, deferred calls and
+unsupported control flow remain unqualified. The maintained index and existing
+bounded task-term candidate search locate possible readers, including ancestor
+directory terms when a test does not spell a descendant basename. No recursive
+discovery or complete fixture-consumption claim is added. Direct reads of
+Python source retain their existing separate qualification limits; a textual
+source assertion does not acquire copy-input authority.
+
 The asset packet reports its actual limits: currently 64 candidate members,
 64 returned references, 1 MiB per supporting member and 4 MiB of supporting
 source bytes. `source_coverage` qualifies the selected source observations, not
