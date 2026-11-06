@@ -23,10 +23,13 @@ MAX_PROVIDER_WARNINGS = 32
 MAX_PROVIDER_WARNING_CHARS = 1_024
 MAX_DISCOVERY_PACKET_BYTES = 1_572_864
 
-_MemberReader = Callable[
-    [str, bool],
-    tuple[dict[str, object], bytes | None],
-]
+
+class _MemberReader(Protocol):
+    def __call__(
+        self, path: str, include_bytes: bool, *, max_bytes: int | None = None
+    ) -> tuple[dict[str, object], bytes | None]: ...
+
+
 _PathEnumerator = Callable[[str], tuple[str, ...]]
 
 
@@ -54,7 +57,7 @@ class RepositoryDeclarationProviderContext(Protocol):
         """Return whether an admitted repository member is currently present."""
         ...
 
-    def read_bytes(self, path: str) -> bytes:
+    def read_bytes(self, path: str, *, max_bytes: int | None = None) -> bytes:
         """Read stable admitted repository bytes and bind their revision."""
         ...
 
@@ -138,6 +141,7 @@ class _RepositoryDeclarationProviderContext:
         observation: Mapping[str, object],
         *,
         content: bool,
+        max_bytes: int | None = None,
     ) -> None:
         signature = self._signature(observation)
         previous = self._inputs.get(path)
@@ -145,13 +149,20 @@ class _RepositoryDeclarationProviderContext:
             previous_signature = {
                 key: value
                 for key, value in previous.items()
-                if key != "observation_kind"
+                if key not in {"observation_kind", "max_bytes"}
             }
             if previous_signature != signature:
                 raise RepositoryDeclarationProviderError(
                     f"declaration provider input changed while reading: {path}"
                 )
             content = content or previous.get("observation_kind") == "content"
+            previous_bound = previous.get("max_bytes")
+            if isinstance(previous_bound, int):
+                max_bytes = (
+                    previous_bound
+                    if max_bytes is None
+                    else min(max_bytes, previous_bound)
+                )
         if path not in self._inputs and len(self._inputs) >= MAX_PROVIDER_INPUTS:
             raise RepositoryDeclarationProviderError(
                 f"declaration provider inputs exceed {MAX_PROVIDER_INPUTS} paths"
@@ -159,6 +170,7 @@ class _RepositoryDeclarationProviderContext:
         self._inputs[path] = {
             **signature,
             "observation_kind": "content" if content else "existence",
+            **({"max_bytes": max_bytes} if max_bytes is not None else {}),
         }
 
     def exists(self, path: str) -> bool:
@@ -174,10 +186,10 @@ class _RepositoryDeclarationProviderContext:
             f"declaration provider cannot qualify existence for {normalized}: {state}"
         )
 
-    def read_bytes(self, path: str) -> bytes:
-        observation, raw = self._read_member(path, True)
+    def read_bytes(self, path: str, *, max_bytes: int | None = None) -> bytes:
+        observation, raw = self._read_member(path, True, max_bytes=max_bytes)
         normalized = str(observation.get("path") or path)
-        self._record(normalized, observation, content=True)
+        self._record(normalized, observation, content=True, max_bytes=max_bytes)
         if observation.get("state") != "known-present" or raw is None:
             raise RepositoryDeclarationProviderError(
                 "declaration provider cannot read current repository bytes for "
@@ -560,9 +572,18 @@ def _validate_provider_input(
         raise RepositoryDeclarationProviderError(
             f"declaration provider {provider_name} input kind is malformed"
         )
-    current, _raw = read_member(path, observation_kind == "content")
+    max_bytes = previous.get("max_bytes")
+    if max_bytes is not None and (type(max_bytes) is not int or max_bytes < 0):
+        raise RepositoryDeclarationProviderError(
+            f"declaration provider {provider_name} input byte bound is malformed"
+        )
+    current, _raw = read_member(
+        path, observation_kind == "content", max_bytes=max_bytes
+    )
     current_signature = _RepositoryDeclarationProviderContext._signature(current)
     current_signature["observation_kind"] = observation_kind
+    if max_bytes is not None:
+        current_signature["max_bytes"] = max_bytes
     if current_signature != dict(previous):
         raise RepositoryDeclarationProviderError(
             f"declaration provider {provider_name} input changed during discovery: {path}"

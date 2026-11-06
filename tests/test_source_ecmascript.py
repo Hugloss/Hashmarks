@@ -409,9 +409,11 @@ def test_syntax_rechecks_canonical_bytes_without_following_imports(
         read_bytes = codemap.source.file_store.read_bytes_stable
         reads: list[Path] = []
 
-        def captured(path: Path) -> tuple[bytes, Digest]:
+        def captured(
+            path: Path, *, max_bytes: int | None = None
+        ) -> tuple[bytes, Digest]:
             reads.append(path)
-            return read_bytes(path)
+            return read_bytes(path, max_bytes=max_bytes)
 
         monkeypatch.setattr(codemap.source.file_store, "read_bytes_stable", captured)
         packet = codemap.source.ecmascript("consumer.ts")

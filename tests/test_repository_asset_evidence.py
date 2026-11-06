@@ -214,9 +214,10 @@ def test_large_unindexed_asset_never_falls_through_to_unbounded_member_reads(
         native_read = repository.source.file_store.read_bytes_stable
         native_digest = repository.source.file_store.digest
 
-        def read(path: Path) -> tuple[bytes, Digest]:
-            assert path.name != "large.png", "oversized image bytes were read"
-            return native_read(path)
+        def read(path: Path, *, max_bytes: int | None = None) -> tuple[bytes, Digest]:
+            if path.name == "large.png":
+                assert max_bytes is not None and max_bytes <= 1_048_576
+            return native_read(path, max_bytes=max_bytes)
 
         def digest(
             path: Path,
@@ -307,9 +308,10 @@ def test_oversized_reader_is_not_reconciled_before_its_source_bound(
         )
         native = repository.source.file_store.read_bytes_stable
 
-        def read(path: Path) -> tuple[bytes, Digest]:
-            assert path.name != "guide.md", "oversized reader was read before its bound"
-            return native(path)
+        def read(path: Path, *, max_bytes: int | None = None) -> tuple[bytes, Digest]:
+            if path.name == "guide.md":
+                assert max_bytes is not None and max_bytes <= 1_048_576
+            return native(path, max_bytes=max_bytes)
 
         monkeypatch.setattr(repository.source.file_store, "read_bytes_stable", read)
         asset = assert_object(_change(repository, "docs/screen.png")["asset"])

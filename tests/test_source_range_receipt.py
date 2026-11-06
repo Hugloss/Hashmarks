@@ -142,9 +142,11 @@ def test_range_receipt_reuses_one_canonical_byte_capture(
         read_bytes = codemap.source.file_store.read_bytes_stable
         reads: list[Path] = []
 
-        def captured(path: Path) -> tuple[bytes, Digest]:
+        def captured(
+            path: Path, *, max_bytes: int | None = None
+        ) -> tuple[bytes, Digest]:
             reads.append(path)
-            return read_bytes(path)
+            return read_bytes(path, max_bytes=max_bytes)
 
         monkeypatch.setattr(codemap.source.file_store, "read_bytes_stable", captured)
         packet = codemap.source.range_receipt("example.py", start_byte=0, end_byte=9)

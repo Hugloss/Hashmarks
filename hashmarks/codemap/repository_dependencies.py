@@ -15,11 +15,13 @@ from .dependency_resolution_delta import DependencyResolutionDeltaMixin
 from .dependency_resolution_derivation import DependencyResolutionDerivationMixin
 from .dependency_resolution_evidence import DependencyResolutionEvidenceMixin
 from .dependency_resolution_query import dependency_inventory_assessment
+from .dependency_verification import DependencyVerificationMixin
 
 if TYPE_CHECKING:
     from .decision_session import DecisionScope
     from .evidence_correlation import RepositoryCorrelation
     from .evidence_graph import RepositoryRelationships
+    from .evidence_verification import RepositoryVerification
     from .import_resolution import RepositoryImports
     from .repository_source import RepositorySource
 
@@ -30,6 +32,7 @@ class RepositoryDependencies(
     DependencyResolutionEvidenceMixin,
     DependencyResolutionDeltaMixin,
     DependencyResolutionDerivationMixin,
+    DependencyVerificationMixin,
     ReadScopeOwner,
 ):
     """Own qualified dependency facts without resolver or execution authority.
@@ -46,17 +49,20 @@ class RepositoryDependencies(
         imports: RepositoryImports,
         correlation: RepositoryCorrelation,
         relationships: RepositoryRelationships,
+        verification: RepositoryVerification,
     ) -> None:
         if (
             imports.reads is not source.reads
             or correlation.reads is not source.reads
             or relationships.reads is not source.reads
+            or verification.reads is not source.reads
         ):
             raise ValueError("Dependency inputs must share one repository read scope")
         self.source = source
         self.imports = imports
         self._repository_correlation = correlation
         self.relationships = relationships
+        self._verification = verification
         self.store = source.store
 
     @property

@@ -854,6 +854,95 @@ class _PythonBindings:
                 "name": name,
             }
         self.rows.append(row)
+        if node in self.syntax.annotation_roots and isinstance(node, ast.Constant):
+            self._forward_annotation_rows(node)
+
+    def _forward_annotation_rows(self, node: ast.Constant) -> None:
+        """Observe a separate decoded type expression without evaluating it."""
+        assert isinstance(node.value, str)
+        value = self._literal(node.value, node)
+        if value.literal is None:
+            self.rows.append(self._forward_annotation_row(node, None, value))
+            return
+        try:
+            expression = ast.parse(value.literal, mode="eval")
+        except (SyntaxError, ValueError, RecursionError):
+            self.rows.append(
+                self._forward_annotation_row(
+                    node, None, self._unknown("invalid-forward-annotation")
+                )
+            )
+            return
+        nodes = list(ast.walk(expression))
+        if len(nodes) > MAX_BINDING_DETAILS:
+            raise BindingObservationBound("forward-annotation-node-bound")
+        parsed = self._annotation_expressions(nodes, value.literal.encode("utf-8"))
+        if len(self.rows) + len(parsed) > MAX_BINDING_RESULTS:
+            raise BindingObservationBound("forward-annotation-result-bound")
+        for reference, descriptor in parsed:
+            self._locate_annotation_reference(reference, node)
+            resolved = self.resolve(reference, self.syntax.owners[node])
+            self.rows.append(self._forward_annotation_row(node, descriptor, resolved))
+
+    def _annotation_expressions(
+        self, nodes: list[ast.AST], raw: bytes
+    ) -> list[tuple[ast.Name | ast.Attribute, dict[str, object]]]:
+        lines = _line_offsets(raw)
+        result: list[tuple[ast.Name | ast.Attribute, dict[str, object]]] = []
+        for reference in nodes:
+            if not isinstance(reference, (ast.Name, ast.Attribute)):
+                continue
+            start = lines[reference.lineno - 1] + reference.col_offset
+            end = lines[cast(int, reference.end_lineno) - 1] + cast(
+                int, reference.end_col_offset
+            )
+            result.append(
+                (
+                    reference,
+                    {
+                        "coordinate_system": "decoded-annotation-utf8-bytes",
+                        "range": {"start_byte": start, "end_byte": end},
+                        "syntax_type": type(reference).__name__,
+                        "name": reference.id
+                        if isinstance(reference, ast.Name)
+                        else reference.attr,
+                        "text": raw[start:end].decode("utf-8"),
+                    },
+                )
+            )
+        return result
+
+    def _locate_annotation_reference(
+        self, reference: ast.AST, container: ast.Constant
+    ) -> None:
+        # Decoded offsets cannot be treated as source offsets: escapes, prefixes
+        # and adjacent literals may change their physical representation.
+        # Binding ordering and supporting ranges use the exact source container.
+        for child in ast.walk(reference):
+            if isinstance(child, ast.expr):
+                child.lineno = container.lineno
+                child.col_offset = container.col_offset
+                child.end_lineno = container.end_lineno
+                child.end_col_offset = container.end_col_offset
+
+    def _forward_annotation_row(
+        self,
+        node: ast.Constant,
+        parsed: dict[str, object] | None,
+        value: _Value,
+    ) -> dict[str, object]:
+        value = self._supported(value, value.support, (node,))
+        row = self.row("forward-annotation-reference", node, value)
+        row.update(
+            parsed_expression=parsed,
+            annotation={
+                "range": self.range(node),
+                "decoded_text": self._literal(cast(str, node.value), node).literal,
+                "parser": "python-ast-expression",
+                "evaluation": "not-performed",
+            },
+        )
+        return row
 
     def _declaration_row(
         self, node: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef

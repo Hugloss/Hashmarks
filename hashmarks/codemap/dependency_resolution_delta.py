@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from collections import Counter, defaultdict
 from collections.abc import Mapping, Sequence
+from copy import deepcopy
 from typing import cast
 
 from . import dependency_resolution_contract as _contract
@@ -195,6 +197,65 @@ def _producer_provenance(observation: Mapping[str, object]) -> dict[str, object]
     }
 
 
+def _selection_endpoint_rows(
+    observation: Mapping[str, object], node_ids: Sequence[str]
+) -> dict[str, dict[str, object]]:
+    """Project exact declared facts without upgrading their endpoint coverage."""
+    components = {
+        str(row["component_id"]): row
+        for row in cast("Sequence[Mapping[str, object]]", observation["components"])
+    }
+    selections = {
+        str(row["node_id"]): row
+        for row in cast("Sequence[Mapping[str, object]]", observation["selections"])
+    }
+    counts = Counter(str(row["component_id"]) for row in selections.values())
+    inventories: dict[str, list[Mapping[str, object]]] = defaultdict(list)
+    incoming: dict[str, list[Mapping[str, object]]] = defaultdict(list)
+    roots: dict[str, list[Mapping[str, object]]] = defaultdict(list)
+    for row in cast("Sequence[Mapping[str, object]]", observation["inventory"]):
+        inventories[str(row["node_id"])].append(row)
+    for row in cast("Sequence[Mapping[str, object]]", observation["relationships"]):
+        incoming[str(row["target"])].append(row)
+    for row in cast("Sequence[Mapping[str, object]]", observation["root_evidence"]):
+        roots[str(row["node_id"])].append(row)
+    return {
+        node: deepcopy(
+            {
+                "component": components[str(selections[node]["component_id"])],
+                "selection": selections[node],
+                "component_selection_count": counts[
+                    str(selections[node]["component_id"])
+                ],
+                "inventory": inventories.get(node, []),
+                "roots": roots.get(node, []),
+                "incoming_relationships": incoming.get(node, []),
+                "root_relationships": [
+                    row for row in incoming.get(node, []) if str(row["source"]) in roots
+                ],
+            }
+        )
+        for node in sorted(node_ids)
+    }
+
+
+def _selection_changes(
+    before: Mapping[str, object],
+    after: Mapping[str, object],
+    delta: Mapping[str, object],
+) -> dict[str, object]:
+    added = cast("list[str]", delta["selections_added"])
+    removed = cast("list[str]", delta["selections_removed"])
+    changed = cast("list[str]", delta["selections_changed"])
+    left = _selection_endpoint_rows(before, [*removed, *changed])
+    right = _selection_endpoint_rows(after, [*added, *changed])
+    return {
+        "added": [right[node] for node in added],
+        "removed": [left[node] for node in removed],
+        "changed": [{"before": left[node], "after": right[node]} for node in changed],
+    }
+
+
 def _change_axes(
     before: Mapping[str, object],
     after: Mapping[str, object],
@@ -282,6 +343,7 @@ class DependencyResolutionDeltaMixin:
                 "component_selection_transitions": _component_selection_transitions(
                     before, after
                 ),
+                "selection_changes": _selection_changes(before, after, delta),
             }
         return {
             **delta,

@@ -20,44 +20,65 @@ A lower level never compensates for failure at a higher level.
 
 ## Five-question QA for declarations and relationships
 
-Use these questions when an agent claims a repository-intelligence defect,
-especially with limited reasoning or context. This is source-review guidance,
-not a new scorer, corpus definition or CI/release gate.
+These prompts apply portable finding derivation to Hashmarks' producer boundary.
+Use the questions relevant to the suspected failure; they are guidance, not
+required report fields, a new scorer, corpus definition or CI/release gate.
 
-1. **Which producer result exists?** Identify the exact Hashmarks revision,
-   public API, declaration/relationship packet, selected member and observed
-   generation. Inspect the producer implementation and existing contracts,
-   not only a consumer snippet or the presence of a parser.
+1. **What implementation and evidence were inspected?** Identify the exact
+   Hashmarks revision or loaded implementation, public API, selected source and
+   packet/generation where relevant. Inspect the applicable producer contract
+   and consumer path. Distinguish executed reproductions from static evidence
+   and unrun tests; structural inspection can prove an explicit structure or
+   absence contract without a runtime reproducer.
 2. **What does the result actually claim?** Separate authored Python/uv/Make/
    shell declarations from *effective* native uv, Make or shell execution;
    distinguish static source/dependency relationships from runtime call truth.
    Preserve producer identity, evidence scope, freshness, value state,
-   ambiguity, correspondence, completeness, truncation and negative-evidence
-   limits. Similar hashes across consumers do not prove shared semantics.
-3. **Where would a consumer misuse it?** Trace producer -> public adapter ->
-   downstream decision. Ask whether a consumer treats an incomplete source
-   observation as repository-wide absence, a producer relationship as its own
-   reconstructed graph, or a verification nomination as execution authority.
-   Hashmarks supplies repository facts; Oh-Goon or the harness owns admission,
-   process work and results.
-4. **What is the safe neighboring case?** Check a valid refined declaration,
-   unresolved/ambiguous value, unavailable source, stale observation, a
-   bounded relationship and a legitimate native-tool execution witness.
-   Existing validation, typed projections and upstream format guarantees may
-   refute a claimed defect. A grep hit or repeated syntax is not a reproducer.
+   JSON scalar types, ambiguity, correspondence, completeness, truncation and
+   negative-evidence limits. Similar hashes do not prove shared semantics.
+3. **Where does an actual contract fail?** Trace the producer output or public
+   adapter through the accepting decision and its consequence. Exact indexed
+   projection of qualified relationships is legitimate; inventing omitted
+   edges, repairing unknown scope locally, or treating nominations as execution
+   authority is not. A false known result, missing promised capability or
+   weakened qualifications can be a defect without two competing accepted
+   producers. A proposed capability beyond the current contract is a proposal,
+   not an existing defect. Hashmarks supplies repository evidence; external
+   owners retain reasoning, admission, process work and results.
+4. **What could disprove the suspicion?** Inspect the nearest relevant safe
+   control, existing regression or native-tool guarantee. A qualified bounded
+   relationship, unresolved declaration or Git execution witness may be correct.
+   Test the suspected distinction; do not require every uncertainty scenario or
+   infer fragility from a parser, repeated helper or grep hit alone.
 5. **What verdict and repair are justified?** Report a `FINDING` only when
    the producer or consumer actually violates its contract with a material
    consequence. Otherwise `LEAVE ALONE` or mark missing proof
    `INSUFFICIENT EVIDENCE`; a `CLEAN` claim is limited to the completed
    inspected scope. Repair the responsible owner, preserving unknown states,
-   with one focused positive and safe-control regression. Do not transfer
-   Git/worktree execution or certification authority into Hashmarks.
+   and add the smallest regression that supplies missing detection power.
+   Reuse an existing safe control where it already proves the distinction.
+   Do not transfer Git/worktree execution or certification authority into Hashmarks.
 
-This complements, but does not replace, the existing repository-quality
-measurement ordering below and the consumer's own qualification. AgentsCookbook
-owns portable finding derivation; EvalShot owns model-backed skill evaluation.
-A text instruction or a passing source scan does not prove a weak-thinking
-agent will distinguish these cases reliably.
+The current contracts provide concrete review cases:
+
+- [Dependency/verifier composition](../reference/DEPENDENCY_EVIDENCE.md#composed-dependency-and-verifier-evidence)
+  retains native packets, exact chain indices and qualifications; consumers need
+  not rebuild its relationships. Its public validator and the native delta
+  validator check typed self-consistency/correspondence, not authenticity or live
+  freshness. For example, rehashing a packet must not make JSON `true` substitute
+  for integer `1`; the [existing regression](../../tests/test_dependency_verification.py)
+  covers that distinction. Fresh source qualification uses the observer owner.
+- [Make/shell](../reference/MAKE_SHELL_EVIDENCE.md) and
+  [npm declarations](../reference/REPOSITORY_DECLARATIONS.md#selected-npm-manifest-declarations)
+  describe selected authored sources. Unsupported native expansion, hooks,
+  environment and resolution remain unestablished. Source/read bounds must
+  refuse or preserve incomplete scope, never return partial bytes as a complete
+  observation or upgrade a bounded result to absence.
+
+These prompts do not replace the repository-quality ordering above or consumer
+qualification. AgentsCookbook owns portable finding derivation; EvalShot owns
+model-backed skill evaluation. Documentation and static checks alone do not
+establish improved agent accuracy.
 
 ## Ground truth and corpus readiness
 
