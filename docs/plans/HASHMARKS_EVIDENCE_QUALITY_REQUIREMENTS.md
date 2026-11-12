@@ -1,8 +1,8 @@
 # Hashmarks evidence-quality requirements
 
-**Status:** Proposed delivery requirements; implementation and qualification are not implied.  
-**Scope:** Strengthen the existing headless repository observer through better evidence and evidence economics.  
-**Prepared:** 2026-11-10.  
+**Status:** Proposed delivery requirements; implementation and qualification are not implied.
+**Scope:** Strengthen the existing headless repository observer through better evidence and evidence economics.
+**Prepared:** 2026-11-10.
 **Paired delivery document:** `oh-goon/oh-goon:docs/development/EVIDENCE_DRIVEN_ORCHESTRATION_REQUIREMENTS.md`.
 
 ## 1. Goal and governing owners
