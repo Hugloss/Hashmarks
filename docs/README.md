@@ -50,6 +50,7 @@ This is the single catalog for the current maintained documentation in `docs/`.
 
 ## Plans
 
+- [`plans/HASHMARKS_EVIDENCE_QUALITY_REQUIREMENTS.md`](plans/HASHMARKS_EVIDENCE_QUALITY_REQUIREMENTS.md) — proposed headless evidence-quality improvements, bounded acceptance scenarios and consumer handoff; no Pierre integration or presentation work.
 - [`plans/STABILIZATION_PLAN.md`](plans/STABILIZATION_PLAN.md) — completed finite delivery: canonical ownership, current typing/regressions, representative public evidence and an advisory response-size target.
 - [`plans/CANONICAL_COMPONENT_REWRITE_PLAN.md`](plans/CANONICAL_COMPONENT_REWRITE_PLAN.md) — completed component rewrite design/history and separately deferred broad 5/5 qualification; start implementation work from the current maintainer guide and owner contracts.
 - [`plans/CANONICAL_OWNER_CONSOLIDATION_PLAN.md`](plans/CANONICAL_OWNER_CONSOLIDATION_PLAN.md) — superseded bounded owner-consolidation plan and source-binding/cache repair background.
