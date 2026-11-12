@@ -12,6 +12,7 @@ from contract_assertions import assert_integer, assert_object, assert_records
 
 from hashmarks import CodeMap
 from hashmarks.codemap.repository_observation import evidence_identity
+from hashmarks.digest import Digest
 from hashmarks.verification_nomination_validation import (
     validate_verification_nomination,
 )
@@ -88,6 +89,31 @@ def test_changed_source_has_qualified_target_membership_and_canonical_explanatio
     assert packet["negative_evidence_admissible"] is False
     assert packet["execution_authority"] == "external"
     _assert_no_execution(packet)
+
+
+def test_changed_set_bounds_repeated_source_byte_reads(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with _repository(tmp_path, _ordinary_files()) as repository:
+        original = repository.file_store.read_bytes_stable
+        source_reads = 0
+
+        def read(
+            path: str | Path, *, max_attempts: int = 3, max_bytes: int | None = None
+        ) -> tuple[bytes, Digest]:
+            nonlocal source_reads
+            if Path(path) == repository.workspace / "owner.py":
+                source_reads += 1
+            return original(path, max_attempts=max_attempts, max_bytes=max_bytes)
+
+        monkeypatch.setattr(repository.file_store, "read_bytes_stable", read)
+        packet = repository.verification.changed_set(["owner.py"])
+    assert _target_paths(packet) == ["tests/test_total.py"]
+    # Capture and source-role qualification each need at most one byte read.
+    # Support applicability consumes that existing qualified role; the final
+    # publication recheck still validates its source/configuration revisions.
+    assert source_reads <= 2
+    assert packet["negative_evidence_admissible"] is False
 
 
 def test_changed_test_is_a_verifier_but_helper_is_only_support(tmp_path: Path) -> None:
@@ -271,6 +297,44 @@ def test_source_drift_recomputes_and_retained_nomination_detects_mismatch(
     assert _target_paths(after) == []
     assert before["evidence_identity"] != after["evidence_identity"]
     assert binding["source_binding_state"] == "mismatch"
+
+
+def test_changed_set_rechecks_reused_support_role_configuration(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    files = {**_ordinary_files(), "conftest.py": "# shared fixtures\n"}
+    with _repository(tmp_path, files) as repository:
+        original = repository.verification._changed_target
+        changed = False
+
+        def mutate(path: str) -> dict[str, object]:
+            nonlocal changed
+            target = original(path)
+            if not changed:
+                changed = True
+                (repository.workspace / "pyproject.toml").write_text(
+                    '[tool.pytest.ini_options]\npython_functions = ["check_*"]\n'
+                )
+            return target
+
+        monkeypatch.setattr(repository.verification, "_changed_target", mutate)
+        packet = repository.verification.changed_set(["conftest.py"])
+        current, _ = repository.source.member("pyproject.toml")
+    assert changed is True
+    assert packet["targets"] == []
+    change = assert_records(packet["changes"])[0]
+    role = assert_object(change["classification"])
+    assert role["kind"] == "unknown"
+    assert role["reason"] == "pytest-selection-scope-unqualified"
+    assert (
+        next(
+            row
+            for row in assert_records(role["supporting_source_members"])
+            if row["path"] == "pyproject.toml"
+        )["member_revision"]
+        == current["member_revision"]
+    )
+    assert packet["negative_evidence_admissible"] is False
 
 
 def test_same_question_order_and_reopen_preserve_identity(tmp_path: Path) -> None:

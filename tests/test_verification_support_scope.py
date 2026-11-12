@@ -105,7 +105,8 @@ def test_conftest_scope_excludes_siblings_and_preserves_dynamic_unknowns(
     verification = _verification(index)
     with verification.reads.session():
         observed = verification._verification_support_scope(
-            "packages/left/tests/conftest.py", limit=100
+            verification._verification_path_kind("packages/left/tests/conftest.py"),
+            limit=100,
         )
     assert observed["targets"] == [
         "packages/left/tests/nested/test_override.py",
@@ -155,7 +156,9 @@ def test_test_configuration_is_qualified_syntax(
     )
     verification = _verification(index)
     with verification.reads.session():
-        observed = verification._verification_support_scope(path, limit=100)
+        observed = verification._verification_support_scope(
+            verification._verification_path_kind(path), limit=100
+        )
     assert observed["targets"] == (["package/tests/test_one.py"] if expected else [])
     assert observed["negative_evidence_admissible"] is False
     if expected:
@@ -177,9 +180,11 @@ def test_support_projection_bound_cannot_become_negative_evidence(
     )
     verification = _verification(index)
     with verification.reads.session():
-        bounded = verification._verification_support_scope("conftest.py", limit=1)
+        bounded = verification._verification_support_scope(
+            verification._verification_path_kind("conftest.py"), limit=1
+        )
         complete_projection = verification._verification_support_scope(
-            "conftest.py", limit=100
+            verification._verification_path_kind("conftest.py"), limit=100
         )
     assert bounded["targets"] == ["tests/test_a.py"]
     assert bounded["truncated"] is True
@@ -203,7 +208,7 @@ def test_malformed_and_missing_support_remain_unknown(index: RepositoryIndex) ->
     with verification.reads.session():
         for path in ("conftest.py", "pyproject.toml", "missing.py"):
             kind = verification._verification_path_kind(path)
-            observed = verification._verification_support_scope(path, limit=100)
+            observed = verification._verification_support_scope(kind, limit=100)
             assert kind["kind"] == "unknown"
             assert observed["targets"] == []
             assert observed["completeness"] == "unknown"
@@ -222,7 +227,9 @@ def test_support_identity_tracks_source_revision_and_ignores_fixture_name_coinci
     )
     verification = _verification(index)
     with verification.reads.session():
-        first = verification._verification_support_scope("tests/conftest.py", limit=10)
+        first = verification._verification_support_scope(
+            verification._verification_path_kind("tests/conftest.py"), limit=10
+        )
     _write(
         index,
         {
@@ -231,7 +238,7 @@ def test_support_identity_tracks_source_revision_and_ignores_fixture_name_coinci
     )
     with verification.reads.session():
         changed = verification._verification_support_scope(
-            "tests/conftest.py", limit=10
+            verification._verification_path_kind("tests/conftest.py"), limit=10
         )
     assert first["targets"] == changed["targets"]
     assert first["evidence_identity"] != changed["evidence_identity"]
@@ -254,7 +261,7 @@ def test_denied_support_does_not_leak_role_or_consumers(index: RepositoryIndex) 
     verification = _verification(index)
     with verification.reads.session():
         observed = verification._verification_support_scope(
-            "tests/conftest.py", limit=10
+            verification._verification_path_kind("tests/conftest.py"), limit=10
         )
     assert observed["targets"] == []
     source = assert_records(observed["supporting_source_members"])[0]
@@ -308,7 +315,9 @@ def test_unqualified_descendant_keeps_scope_incomplete(index: RepositoryIndex) -
     )
     verification = _verification(index)
     with verification.reads.session():
-        observed = verification._verification_support_scope("conftest.py", limit=10)
+        observed = verification._verification_support_scope(
+            verification._verification_path_kind("conftest.py"), limit=10
+        )
     assert observed["completeness"] == "incomplete"
     assert observed["unqualified_candidates"] == ["tests/test_broken.py"]
     assert observed["targets"] == []

@@ -55,6 +55,12 @@ a nomination; it does not refresh away the existing task evidence staleness
 signal. The changed-set producer owns reconciliation of its observed source
 contributors and then obtains strict current target nominations.
 
+Support applicability consumes the changed member's already qualified source
+role within the same observation, avoiding a second source/configuration read
+and interpretation. The final source-member ledger recheck still validates that
+role and its configuration inputs before publishing the packet; intervening
+changes require reconciliation rather than reuse of an older role.
+
 ## Relationships and support scope
 
 Ordinary source relationships reuse the existing bounded reference owner.

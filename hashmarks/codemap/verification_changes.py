@@ -267,7 +267,7 @@ class VerificationChangesMixin:
             if member.get("state") == "known-present"
             else {}
         )
-        support = self._verification_support_scope(path, limit=limit)
+        support = self._verification_support_scope(classification, limit=limit)
         relationships = self._changed_relationships(path, classification, relevance)
         relationships.extend(_records(support.get("relationships")))
         asset = self._asset_observation(path, source)
