@@ -453,12 +453,12 @@ class VerificationSupportMixin:
         return rows, unresolved, sorted(unsupported)
 
     def _verification_support_scope(
-        self, path: str, *, limit: int
+        self, source: dict[str, object], *, limit: int
     ) -> dict[str, object]:
-        """Observe bounded applicability; dynamic consumer scope stays unknown."""
+        """Project one qualified source role; dynamic consumer scope stays unknown."""
         if type(limit) is not int or not 1 <= limit <= 1000:
             raise ValueError("verification support limit must be between 1 and 1000")
-        source = self._verification_path_kind(path)
+        path = str(source["path"])
         applicable = source["reason"] in {"pytest-conftest", "pytest-configuration"}
         candidates = self._support_candidate_paths(path) if applicable else []
         rows, unresolved, unsupported = self._support_scope_rows(source, candidates)

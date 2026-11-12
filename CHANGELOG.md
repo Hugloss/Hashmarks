@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.36.3 — 2026-11-12
+
+- Reuse each changed member's qualified source role when observing shared verification support, reducing repeated source and configuration reads. Preserve exact evidence, uncertainty and the final source/configuration ledger recheck; changes during observation still require reconciliation before publication.
+
 ## 0.36.2 — 2026-11-06
 
 - Observe explicit repository fixture-directory inputs copied by tests through qualified default `shutil.copytree` calls. Retain descendant input identity, reader/source revisions and incomplete consumer scope; copied inputs do not establish execution, assertion coverage or test sufficiency. Dynamic, filtered, shadowed and unsupported copies remain unqualified.
