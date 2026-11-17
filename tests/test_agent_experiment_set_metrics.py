@@ -388,3 +388,62 @@ def test_v2_requires_explicit_replication_group(tmp_path: Path) -> None:
     path.write_text(json.dumps(payload))
     with pytest.raises(ValueError, match="replication_group"):
         experiment_sets.run_experiment_set(path)
+
+
+def test_set_rejects_experiment_replacement_after_manifest_admission(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    set_path = _set(tmp_path, experiments=1, tasks_each=1)
+    run_experiment = experiment_sets.run_experiment
+
+    def replace_before_comparison(
+        path: Path, *, strict_raw_evidence: bool = False
+    ) -> experiment_metrics.ExperimentReport:
+        value = json.loads(path.read_text())
+        value["provider_identity"] = "provider:replacement"
+        path.write_text(json.dumps(value))
+        for run in value["runs"]:
+            usage = path.parent / run["usage"]
+            record = json.loads(usage.read_text())
+            record["provider_identity"] = "provider:replacement"
+            if run["mode"] == "hashmarks":
+                record["model_input_tokens"] = 1
+            usage.write_text(json.dumps(record))
+        return run_experiment(path, strict_raw_evidence=strict_raw_evidence)
+
+    monkeypatch.setattr(experiment_sets, "run_experiment", replace_before_comparison)
+    with pytest.raises(ValueError, match="report manifest digest mismatch"):
+        experiment_sets.run_experiment_set(set_path)
+
+
+def test_set_report_and_bootstrap_retain_the_validated_outer_manifest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    set_path = _replicated_set(tmp_path)
+    expected = experiment_sets.run_experiment_set(set_path)
+    run_experiment = experiment_sets.run_experiment
+
+    def remove_set_after_comparison(
+        path: Path, *, strict_raw_evidence: bool = False
+    ) -> experiment_metrics.ExperimentReport:
+        report = run_experiment(path, strict_raw_evidence=strict_raw_evidence)
+        set_path.unlink(missing_ok=True)
+        return report
+
+    monkeypatch.setattr(experiment_sets, "run_experiment", remove_set_after_comparison)
+    actual = experiment_sets.run_experiment_set(set_path)
+    assert actual == expected
+
+
+def test_aggregate_rejects_mismatched_report_before_adding_tokens(
+    tmp_path: Path,
+) -> None:
+    path = _experiment(tmp_path, 0)
+    digest = _digest(path)
+    report = experiment_metrics.run_experiment(path, strict_raw_evidence=True)
+    report["manifest_sha256"] = "sha256:replacement"
+    state = experiment_sets._SetAggregation()
+    with pytest.raises(ValueError, match="report manifest digest mismatch"):
+        state.admit_report(report["experiment_id"], digest, report)
+    assert state.experiment_reports == []
+    assert state.total_baseline_tokens == state.total_hashmarks_tokens == 0

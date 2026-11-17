@@ -11,12 +11,11 @@ from typing import NotRequired, TypedDict, TypeGuard
 from hashmarks._command_output import log_command_output
 from scripts.agent_evaluation.metrics_agent_trace import (
     TraceComparison,
+    TraceDocument,
+    compare_records,
     load_trace,
     load_usage,
     load_verdict,
-)
-from scripts.agent_evaluation.metrics_agent_trace import (
-    compare as compare_traces,
 )
 from scripts.agent_evaluation.metrics_agent_trace import (
     gate as trace_gate,
@@ -174,10 +173,15 @@ def _validate_manifest(value: object, path: Path) -> TypeGuard[ExperimentManifes
 
 
 def load_manifest(path: Path) -> ExperimentManifest:
-    value: object = json.loads(path.read_text(encoding="utf-8"))
+    return _load_manifest_snapshot(path)[0]
+
+
+def _load_manifest_snapshot(path: Path) -> tuple[ExperimentManifest, str]:
+    data = path.read_bytes()
+    value: object = json.loads(data)
     if not _validate_manifest(value, path):
         raise ValueError(f"invalid experiment manifest: {path}")
-    return value
+    return value, "sha256:" + hashlib.sha256(data).hexdigest()
 
 
 def _validate_digest_binding(
@@ -276,7 +280,7 @@ def _validate_experiment_run(
     manifest: Mapping[str, object],
     run: Mapping[str, object],
     strict_raw_evidence: bool,
-) -> tuple[Path, Path, Path]:
+) -> tuple[TraceDocument, dict[str, object], dict[str, object]]:
     trace_path = _relative_file(root, run["trace"], "trace", manifest_path)
     verdict_path = _relative_file(root, run["verdict"], "verdict", manifest_path)
     usage_path = _relative_file(root, run["usage"], "usage", manifest_path)
@@ -296,36 +300,36 @@ def _validate_experiment_run(
     _validate_raw_evidence(
         root, manifest_path, run, verdict, usage, strict_raw_evidence
     )
-    return trace_path, verdict_path, usage_path
+    return trace, verdict, usage
 
 
 def run_experiment(
     manifest_path: Path, *, strict_raw_evidence: bool = False
 ) -> ExperimentReport:
-    manifest = load_manifest(manifest_path)
+    manifest, manifest_digest = _load_manifest_snapshot(manifest_path)
     root = manifest_path.parent
-    trace_paths: list[Path] = []
-    verdict_paths: list[Path] = []
-    usage_paths: list[Path] = []
+    traces: list[TraceDocument] = []
+    verdicts: list[dict[str, object]] = []
+    usages: list[dict[str, object]] = []
     repositories: set[str] = set()
 
     for run in manifest["runs"]:
-        trace_path, verdict_path, usage_path = _validate_experiment_run(
+        trace, verdict, usage = _validate_experiment_run(
             root,
             manifest_path,
             manifest,
             run,
             strict_raw_evidence,
         )
-        trace_paths.append(trace_path)
-        verdict_paths.append(verdict_path)
-        usage_paths.append(usage_path)
+        traces.append(trace)
+        verdicts.append(verdict)
+        usages.append(usage)
         repositories.add(run["repository_identity"])
 
-    comparison = compare_traces(
-        trace_paths,
-        verdict_paths=verdict_paths,
-        usage_paths=usage_paths,
+    comparison = compare_records(
+        traces,
+        verdicts=verdicts,
+        usages=usages,
         require_complete_pairs=True,
         require_external_verdict=True,
         require_external_usage=True,
@@ -337,7 +341,7 @@ def run_experiment(
     return {
         "schema": REPORT_SCHEMA,
         "experiment_id": manifest["experiment_id"],
-        "manifest_sha256": _sha256(manifest_path),
+        "manifest_sha256": manifest_digest,
         "runner_identity": manifest["runner_identity"],
         "runner_version": manifest.get("runner_version"),
         "model_identity": manifest["model_identity"],

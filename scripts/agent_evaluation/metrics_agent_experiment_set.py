@@ -14,7 +14,7 @@ from scripts.agent_evaluation.metrics_agent_experiment import (
     ExperimentManifest,
     ExperimentReport,
     ExperimentRun,
-    load_manifest,
+    _load_manifest_snapshot,
     run_experiment,
 )
 
@@ -152,6 +152,11 @@ class _SetAggregation:
     def admit_report(
         self, experiment_id: str, digest: str, report: ExperimentReport
     ) -> None:
+        if report["manifest_sha256"] != digest:
+            raise ValueError(
+                f"experiment {experiment_id} report manifest digest mismatch: "
+                f"expected {digest}, got {report['manifest_sha256']}"
+            )
         summary = report["comparison"]["summary"]
         if not summary.get("token_reduction_claim_eligible"):
             raise ValueError(f"experiment {experiment_id} is not token-claim eligible")
@@ -211,14 +216,6 @@ def _relative_file(root: Path, value: object, field: str, manifest_path: Path) -
     return resolved
 
 
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return "sha256:" + digest.hexdigest()
-
-
 def _validate_set_entry(
     entry: object, index: int, path: Path, seen_paths: set[str]
 ) -> TypeGuard[ExperimentSetEntry]:
@@ -273,10 +270,15 @@ def _validate_set_manifest(
 
 
 def load_set_manifest(path: Path) -> ExperimentSetManifest:
-    value: object = json.loads(path.read_text(encoding="utf-8"))
+    return _load_set_manifest_snapshot(path)[0]
+
+
+def _load_set_manifest_snapshot(path: Path) -> tuple[ExperimentSetManifest, str]:
+    data = path.read_bytes()
+    value: object = json.loads(data)
     if not _validate_set_manifest(value, path):
         raise ValueError(f"invalid experiment-set manifest: {path}")
-    return value
+    return value, "sha256:" + hashlib.sha256(data).hexdigest()
 
 
 def _replication_policy(manifest: Mapping[str, object]) -> tuple[int, float, int]:
@@ -300,7 +302,7 @@ def _replication_policy(manifest: Mapping[str, object]) -> tuple[int, float, int
 
 
 def _bootstrap_interval(
-    manifest_path: Path,
+    manifest_digest: str,
     experiment_reports: list[ExperimentMeasurement],
     confidence: float,
     bootstrap_samples: int,
@@ -311,7 +313,7 @@ def _bootstrap_interval(
     if len(experiment_reports) < 2:
         return None
     values = [report["model_input_token_reduction"] for report in experiment_reports]
-    seed = int(hashlib.sha256(manifest_path.read_bytes()).hexdigest()[:16], 16)
+    seed = int(manifest_digest.removeprefix("sha256:")[:16], 16)
     rng = random.Random(seed)
     sample_size = len(values)
     means = [
@@ -339,6 +341,8 @@ def _replication_report(
     manifest: ExperimentSetManifest,
     manifest_path: Path,
     experiment_reports: list[ExperimentMeasurement],
+    *,
+    manifest_digest: str,
 ) -> ReplicationReport:
     # Repetitions describe variation and never add repository/task breadth.
     groups: dict[str, list[ExperimentMeasurement]] = {}
@@ -371,7 +375,7 @@ def _replication_report(
         )
 
     ci = _bootstrap_interval(
-        manifest_path, experiment_reports, confidence, bootstrap_samples
+        manifest_digest, experiment_reports, confidence, bootstrap_samples
     )
     return {
         "group_count": len(groups),
@@ -416,13 +420,13 @@ def _load_bound_experiment(
     experiment_path = _relative_file(
         root, entry["manifest"], f"experiment {index} manifest", manifest_path
     )
-    digest = _sha256(experiment_path)
+    experiment, digest = _load_manifest_snapshot(experiment_path)
     if digest != entry["manifest_sha256"]:
         raise ValueError(
             "experiment manifest digest mismatch: "
             f"expected {entry['manifest_sha256']}, got {digest}"
         )
-    return experiment_path, digest, load_manifest(experiment_path)
+    return experiment_path, digest, experiment
 
 
 def _validate_experiment_consistency(
@@ -458,7 +462,7 @@ def _public_claim_blockers(state: _SetAggregation) -> list[str]:
 def run_experiment_set(
     manifest_path: Path, *, strict_raw_evidence: bool = True
 ) -> ExperimentSetReport:
-    manifest = load_set_manifest(manifest_path)
+    manifest, manifest_digest = _load_set_manifest_snapshot(manifest_path)
     root = manifest_path.parent
     state = _SetAggregation()
     expected_fields = _set_consistency_fields(manifest)
@@ -479,14 +483,19 @@ def run_experiment_set(
     aggregate_reduction = 1.0 - (
         state.total_hashmarks_tokens / state.total_baseline_tokens
     )
-    replication = _replication_report(manifest, manifest_path, state.experiment_reports)
+    replication = _replication_report(
+        manifest,
+        manifest_path,
+        state.experiment_reports,
+        manifest_digest=manifest_digest,
+    )
     internal_eligible = bool(state.experiment_reports)
     public_blockers = _public_claim_blockers(state)
 
     return {
         "schema": REPORT_SCHEMA,
         "experiment_set_id": manifest["experiment_set_id"],
-        "manifest_sha256": _sha256(manifest_path),
+        "manifest_sha256": manifest_digest,
         "model_identity": manifest["model_identity"],
         "model_config_identity": manifest["model_config_identity"],
         "task_policy_identity": manifest["task_policy_identity"],

@@ -227,19 +227,48 @@ def _wheel_info(member: str) -> zipfile.ZipInfo:
     return info
 
 
-def _wheel_members(
-    name: str, version: str, dist_info: str, *, editable: bool
+def _metadata_members(
+    dist_info: str, metadata_directory: str | Path | None = None
 ) -> dict[str, bytes]:
-    members: dict[str, bytes] = {
+    if metadata_directory is not None:
+        prepared = Path(metadata_directory)
+        if prepared.name != dist_info:
+            raise ValueError(
+                "prepared metadata directory does not match project identity"
+            )
+        # Read required files explicitly so missing metadata cannot fall back to
+        # newly generated metadata. Preserve unknown producer files as well.
+        members = {
+            f"{dist_info}/{name}": (prepared / name).read_bytes()
+            for name in ("METADATA", "WHEEL", "entry_points.txt")
+        }
+        for path in sorted(prepared.rglob("*")):
+            member = f"{dist_info}/{path.relative_to(prepared).as_posix()}"
+            if member not in members and path.is_file():
+                members[member] = path.read_bytes()
+        return members
+
+    members = {
         f"{dist_info}/METADATA": _metadata_bytes(),
         f"{dist_info}/WHEEL": _wheel_bytes(),
         f"{dist_info}/entry_points.txt": _entry_points_bytes(),
     }
-    project = _project_metadata()
-    for relative in _license_file_paths(project):
+    for relative in _license_file_paths(_project_metadata()):
         members[f"{dist_info}/licenses/{relative.as_posix()}"] = (
             ROOT / relative
         ).read_bytes()
+    return members
+
+
+def _wheel_members(
+    name: str,
+    version: str,
+    dist_info: str,
+    *,
+    editable: bool,
+    metadata_directory: str | Path | None = None,
+) -> dict[str, bytes]:
+    members = _metadata_members(dist_info, metadata_directory)
 
     if editable:
         pth_name = f"__editable__.{name.replace('-', '_')}-{version}.pth"
@@ -269,13 +298,24 @@ def _record_bytes(members: dict[str, bytes], dist_info: str) -> tuple[str, bytes
     return record_name, buffer.getvalue().encode("utf-8")
 
 
-def _write_wheel(wheel_directory: str | Path, *, editable: bool) -> str:
+def _write_wheel(
+    wheel_directory: str | Path,
+    *,
+    editable: bool,
+    metadata_directory: str | Path | None = None,
+) -> str:
     name, version, _, _ = _project()
     wheel_name = f"{name.replace('-', '_')}-{version}-py3-none-any.whl"
     target = Path(wheel_directory) / wheel_name
     target.parent.mkdir(parents=True, exist_ok=True)
     dist_info = _dist_info()
-    members = _wheel_members(name, version, dist_info, editable=editable)
+    members = _wheel_members(
+        name,
+        version,
+        dist_info,
+        editable=editable,
+        metadata_directory=metadata_directory,
+    )
 
     record_name, record = _record_bytes(members, dist_info)
     members[record_name] = record
@@ -297,12 +337,13 @@ def get_requires_for_build_editable(config_settings: object | None = None) -> li
 def prepare_metadata_for_build_wheel(
     metadata_directory: str | Path, config_settings: object | None = None
 ) -> str:
-    dist_info = Path(metadata_directory) / _dist_info()
-    dist_info.mkdir(parents=True, exist_ok=True)
-    (dist_info / "METADATA").write_bytes(_metadata_bytes())
-    (dist_info / "WHEEL").write_bytes(_wheel_bytes())
-    (dist_info / "entry_points.txt").write_bytes(_entry_points_bytes())
-    return dist_info.name
+    dist_info = _dist_info()
+    root = Path(metadata_directory)
+    for member, data in _metadata_members(dist_info).items():
+        target = root / member
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(data)
+    return dist_info
 
 
 def prepare_metadata_for_build_editable(
@@ -316,7 +357,9 @@ def build_wheel(
     config_settings: object | None = None,
     metadata_directory: str | Path | None = None,
 ) -> str:
-    return _write_wheel(wheel_directory, editable=False)
+    return _write_wheel(
+        wheel_directory, editable=False, metadata_directory=metadata_directory
+    )
 
 
 def build_editable(
@@ -324,7 +367,9 @@ def build_editable(
     config_settings: object | None = None,
     metadata_directory: str | Path | None = None,
 ) -> str:
-    return _write_wheel(wheel_directory, editable=True)
+    return _write_wheel(
+        wheel_directory, editable=True, metadata_directory=metadata_directory
+    )
 
 
 def get_requires_for_build_sdist(config_settings: object | None = None) -> list[str]:

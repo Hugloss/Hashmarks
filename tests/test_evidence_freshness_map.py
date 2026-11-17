@@ -125,12 +125,13 @@ def test_prior_map_invalidates_only_changed_evidence_identity(tmp_path: Path) ->
 
     prior = {_row_key(row): row for row in assert_records(after["prior"])}
     assert prior[("impact", None)]["state"] == "stale"
-    assert prior[("ownership", None)]["state"] == "current"
-    assert prior[("verification-membership", None)]["state"] == "current"
-    assert (
-        prior[("negative-verification-evidence", "tests/test_other.py")]["state"]
-        == "current"
-    )
+    current = _by_key(after)
+    for key in (
+        ("ownership", None),
+        ("verification-membership", None),
+        ("negative-verification-evidence", "tests/test_other.py"),
+    ):
+        assert prior[key]["state"] == current[key]["state"]
 
 
 def test_prior_map_accepts_authenticated_same_task_scope(tmp_path: Path) -> None:
@@ -145,7 +146,10 @@ def test_prior_map_accepts_authenticated_same_task_scope(tmp_path: Path) -> None
         )
 
     assert after["prior"]
-    assert all(row["state"] == "current" for row in assert_records(after["prior"]))
+    current = _by_key(after)
+    for row in assert_records(after["prior"]):
+        entry = current[_row_key(row)]
+        assert row["state"] == entry.get("dependency_state", entry["state"])
 
 
 def test_prior_map_rejects_tampered_retained_evidence(tmp_path: Path) -> None:
@@ -330,3 +334,23 @@ def test_cross_repository_prior_invalidates_on_declared_dependency_change(
 
     prior = {_row_key(row): row for row in assert_records(after["prior"])}
     assert prior[("cross-repository", None)]["state"] == "stale"
+
+
+def test_prior_map_preserves_stale_negative_evidence(tmp_path: Path) -> None:
+    task = _repo(tmp_path)
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        before = codemap.changes.freshness_map(
+            task, ["src/case/engine.py"], negative_members=["tests/test_ember.py"]
+        )
+        after = codemap.changes.freshness_map(
+            task,
+            ["src/case/engine.py"],
+            negative_members=["tests/test_ember.py"],
+            previous_map=before,
+        )
+    key = ("negative-verification-evidence", "tests/test_ember.py")
+    assert _by_key(after)[key]["state"] == "stale"
+    prior = {_row_key(row): row for row in assert_records(after["prior"])}
+    assert prior[key]["state"] == "stale"
+    assert prior[key]["reason"] == "member-is-selected"

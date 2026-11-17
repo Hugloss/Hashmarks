@@ -347,8 +347,14 @@ class EvidenceFreshnessMapMixin(ReadScopeOwner):
                     state = "unknown"
                     reason = "evidence-kind-not-requested-in-current-map"
             elif old_identity and old_identity == current_identity:
-                state = "current"
-                reason = "evidence-identity-unchanged"
+                state = str(current.get("state") or "unknown")
+                if state == "dependent":
+                    state = str(current.get("dependency_state") or "unknown")
+                reason = (
+                    "evidence-identity-unchanged"
+                    if state == "current"
+                    else str(current.get("reason") or "current-evidence-" + state)
+                )
             else:
                 state = "stale"
                 reason = "evidence-identity-changed"

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from typing import TYPE_CHECKING
 
 import pytest
@@ -254,3 +254,50 @@ def test_manifest_rejects_absolute_and_missing_evidence_paths(tmp_path: Path) ->
     manifest.write_text(json.dumps(payload))
     with pytest.raises(ValueError, match="file does not exist"):
         experiment_metrics.run_experiment(manifest)
+
+
+@pytest.mark.parametrize("record_kind", ["trace", "verdict", "usage", "manifest"])
+def test_comparison_uses_validated_records_after_file_replacement(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, record_kind: str
+) -> None:
+    manifest = _experiment(tmp_path)
+    manifest_digest = _digest(manifest)
+    validate = experiment_metrics._validate_experiment_run
+
+    def replace_after_validation(
+        root: Path,
+        manifest_path: Path,
+        manifest_value: Mapping[str, object],
+        run: Mapping[str, object],
+        strict_raw_evidence: bool,
+    ) -> tuple[experiment_metrics.TraceDocument, dict[str, object], dict[str, object]]:
+        records = validate(
+            root, manifest_path, manifest_value, run, strict_raw_evidence
+        )
+        if run["mode"] == "hashmarks":
+            path = (
+                manifest
+                if record_kind == "manifest"
+                else tmp_path / f"hashmarks.{record_kind}.json"
+            )
+            value = json.loads(path.read_text())
+            if record_kind == "usage":
+                value.update(
+                    model_input_tokens=1, provider_identity="provider:replacement"
+                )
+            elif record_kind == "verdict":
+                value.update(success=False, patch_correct=False)
+            elif record_kind == "trace":
+                value["repository_identity"] = "sha256:replacement"
+            else:
+                value["experiment_id"] = "replacement"
+            path.write_text(json.dumps(value))
+        return records
+
+    monkeypatch.setattr(
+        experiment_metrics, "_validate_experiment_run", replace_after_validation
+    )
+    report = experiment_metrics.run_experiment(manifest, strict_raw_evidence=True)
+    assert report["comparison"]["summary"]["average_model_input_token_reduction"] == 0.4
+    assert report["comparison"]["summary"]["hashmarks_correct_patches"] == 1
+    assert report["manifest_sha256"] == manifest_digest

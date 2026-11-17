@@ -492,9 +492,27 @@ def compare(
     require_external_verdict: bool = False,
     require_external_usage: bool = False,
 ) -> TraceComparison:
-    rows = [summarize(load_trace(path)) for path in paths]
-    verdicts = [load_verdict(path) for path in (verdict_paths or [])]
-    usages = [load_usage(path) for path in (usage_paths or [])]
+    return compare_records(
+        [load_trace(path) for path in paths],
+        verdicts=[load_verdict(path) for path in (verdict_paths or [])],
+        usages=[load_usage(path) for path in (usage_paths or [])],
+        require_complete_pairs=require_complete_pairs,
+        require_external_verdict=require_external_verdict,
+        require_external_usage=require_external_usage,
+    )
+
+
+def compare_records(
+    traces: list[TraceDocument],
+    *,
+    verdicts: list[dict[str, object]],
+    usages: list[dict[str, object]],
+    require_complete_pairs: bool = False,
+    require_external_verdict: bool = False,
+    require_external_usage: bool = False,
+) -> TraceComparison:
+    """Compare already admitted records without reopening their source paths."""
+    rows = [summarize(trace) for trace in traces]
     _bind_external_records(
         rows,
         _records_by_run(verdicts, "verdict"),

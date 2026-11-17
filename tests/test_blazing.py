@@ -264,3 +264,51 @@ def test_strong_manifest_verify_detects_leaf_type_change_without_tracker(
     (target / "child").write_text("content")
     second = tree.digest_manifest(manifest, verify=True)
     assert second != first
+
+
+@pytest.mark.parametrize("selected", ["src/pkg/a.py", "src/pkg"])
+@pytest.mark.parametrize("replacement", ["missing", "file", "symlink"])
+def test_dirty_ancestor_reconciles_cached_manifest(
+    tmp_path: Path, selected: str, replacement: str
+) -> None:
+    workspace = tmp_path / "repo"
+    (workspace / "src" / "pkg").mkdir(parents=True)
+    (workspace / "src" / "pkg" / "a.py").write_text("A")
+    engine = IdentityEngine(workspace, state_dir=tmp_path / "state")
+    try:
+        manifest = engine.manifest([selected])
+        first = engine.input_root(manifest)
+        (workspace / "src").rename(workspace / "moved")
+        if replacement == "file":
+            (workspace / "src").write_text("replacement")
+        elif replacement == "symlink":
+            (workspace / "moved" / "pkg" / "a.py").write_text("B")
+            (workspace / "src").symlink_to("moved", target_is_directory=True)
+        engine.record_changes(["src"])
+        if replacement == "symlink":
+            second = engine.input_root(manifest)
+            assert second != first
+            assert second == engine.input_root(manifest, verify=True)
+        else:
+            with pytest.raises((FileNotFoundError, NotADirectoryError)):
+                engine.input_root(manifest)
+    finally:
+        engine.close()
+
+
+def test_dirty_symlink_invalidates_direct_path_descendants(tmp_path: Path) -> None:
+    workspace = tmp_path / "repo"
+    (workspace / "target").mkdir(parents=True)
+    (workspace / "target" / "a.py").write_text("A")
+    (workspace / "link").symlink_to("target", target_is_directory=True)
+    engine = IdentityEngine(workspace, state_dir=tmp_path / "state")
+    try:
+        engine.merkle.path_digest("link")
+        first = engine.merkle.path_digest("link/a.py")
+        (workspace / "target" / "a.py").write_text("B")
+        engine.record_changes(["link"])
+        second = engine.merkle.path_digest("link/a.py")
+        assert second != first
+        assert second == engine.merkle.path_digest("link/a.py", verify=True)
+    finally:
+        engine.close()
