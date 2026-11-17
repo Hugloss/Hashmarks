@@ -383,13 +383,27 @@ class MerkleTree:
 
         absolute = self.workspace / rel
         if kind == "auto":
+            with self._lock:
+                cached = self._path_cache.get(rel)
+            # Only an observed regular file proves an exact leaf. A missing
+            # or replaced ancestor (including a symlink) may cover cached
+            # descendants, regardless of its current filesystem type.
             kind = (
-                "directory"
-                if absolute.is_dir() and not absolute.is_symlink()
-                else "file"
+                "file"
+                if cached is not None
+                and cached.kind == b"F"
+                and absolute.is_file()
+                and not absolute.is_symlink()
+                else "directory"
             )
 
         self._invalidate_path_cache(rel, kind=kind)
+        if kind == "directory":
+            prefix = rel.rstrip("/") + "/" if rel else ""
+            with self._lock:
+                for key in list(self._dir_cache):
+                    if key == rel or key.startswith(prefix):
+                        self._dir_cache.pop(key, None)
         # Direct MerkleTree users may not attach a ChangeTracker, so explicit
         # invalidation must update manifest synthetic trees immediately too.
         self._invalidate_manifest_cache((rel,))

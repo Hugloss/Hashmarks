@@ -181,3 +181,61 @@ def test_build_backend_rejects_license_symlink_outside_project(
 
     with pytest.raises(RuntimeError, match="outside the project root"):
         hashmarks_build._license_file_paths({"license-files": ["LICENSE"]})
+
+
+@pytest.mark.parametrize("editable", [False, True])
+def test_build_preserves_prepared_metadata_after_source_changes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, editable: bool
+) -> None:
+    _write_release(tmp_path, metadata_version="1.2.3", runtime_version="1.2.3")
+    monkeypatch.setattr(hashmarks_build, "ROOT", tmp_path)
+    prepare = (
+        hashmarks_build.prepare_metadata_for_build_editable
+        if editable
+        else hashmarks_build.prepare_metadata_for_build_wheel
+    )
+    build = hashmarks_build.build_editable if editable else hashmarks_build.build_wheel
+    project = tmp_path / "pyproject.toml"
+    project.write_text(project.read_text() + 'license-files = ["LICENSE"]\n')
+    (tmp_path / "LICENSE").write_bytes(b"Prepared license")
+    prepared = tmp_path / "metadata" / prepare(tmp_path / "metadata")
+    (prepared / "producer-data").mkdir()
+    (prepared / "producer-data" / "note").write_bytes(b"opaque metadata")
+    expected = {
+        path.relative_to(prepared).as_posix(): path.read_bytes()
+        for path in prepared.rglob("*")
+        if path.is_file()
+    }
+    project = tmp_path / "pyproject.toml"
+    project.write_text(
+        project.read_text() + 'dependencies = ["changed-dependency>=1"]\n'
+    )
+    (tmp_path / "README.md").write_text("Changed description\n")
+    (tmp_path / "LICENSE").write_bytes(b"Changed license")
+    wheel = build(tmp_path / "out", metadata_directory=prepared)
+    with zipfile.ZipFile(tmp_path / "out" / wheel) as archive:
+        for relative, data in expected.items():
+            assert archive.read(f"{prepared.name}/{relative}") == data
+
+
+@pytest.mark.parametrize("editable", [False, True])
+@pytest.mark.parametrize("invalid", ["missing-metadata", "wrong-identity"])
+def test_build_rejects_invalid_prepared_metadata(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, editable: bool, invalid: str
+) -> None:
+    _write_release(tmp_path, metadata_version="1.2.3", runtime_version="1.2.3")
+    monkeypatch.setattr(hashmarks_build, "ROOT", tmp_path)
+    prepared = (
+        tmp_path
+        / "metadata"
+        / hashmarks_build.prepare_metadata_for_build_wheel(tmp_path / "metadata")
+    )
+    if invalid == "missing-metadata":
+        (prepared / "METADATA").unlink()
+        expected = FileNotFoundError
+    else:
+        prepared = prepared.rename(prepared.with_name("other-1.2.3.dist-info"))
+        expected = ValueError
+    build = hashmarks_build.build_editable if editable else hashmarks_build.build_wheel
+    with pytest.raises(expected):
+        build(tmp_path / "out", metadata_directory=prepared)
