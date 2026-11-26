@@ -478,6 +478,8 @@ class RepositorySource(
                 kind = names.get(token.type)
                 if kind is None or token.start[0] != token.end[0]:
                     continue
+                if token.type == tokenize.NAME and not token.string.isidentifier():
+                    continue
                 # Token columns are Unicode code points in the original source.
                 offset = bom_columns if token.start[0] == 1 else 0
                 kinds.setdefault(token.start[0], []).append(

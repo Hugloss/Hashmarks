@@ -208,6 +208,24 @@ def test_bom_occurrences_use_original_columns_and_exclude_the_mark_from_tokens(
             )
 
 
+def test_malformed_name_cannot_classify_an_interior_mark(tmp_path: Path) -> None:
+    (tmp_path / "member.py").write_text(
+        "valid = 1\n\ufeffbroken = 2\ntail = 'inside:\ufeff'\n"
+    )
+    with CodeMap(tmp_path) as codemap:
+        assert codemap.source.outline("member.py")["parse_error"]
+        observed = codemap.source.observe("member.py", literal="\ufeff")
+        assert [
+            (row["line"], row["occurrence_kind"])
+            for row in assert_records(observed["occurrences"])
+        ] == [(2, "unknown"), (3, "string-literal")]
+        for literal in ("valid", "tail"):
+            (hit,) = assert_records(
+                codemap.source.observe("member.py", literal=literal)["occurrences"]
+            )
+            assert hit["occurrence_kind"] == "identifier"
+
+
 def test_bom_index_bindings_and_source_reads_share_exact_member_bytes(
     tmp_path: Path,
 ) -> None:
