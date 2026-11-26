@@ -213,6 +213,21 @@ def _pointer(value: object, pointer: str) -> object:
     return value
 
 
+def _expand_source_qualifiers(view: dict[str, object]) -> None:
+    shared = assert_object(view.pop("line_anchor_qualifiers", {}))
+    anchors = []
+    for raw_anchor in assert_records(view["line_anchors"]):
+        anchor = {**shared, **raw_anchor}
+        qualifiers = assert_object(anchor.pop("context_excerpt_qualifiers", {}))
+        if "context_excerpt" in anchor:
+            anchor["context_excerpt"] = [
+                {**qualifiers, **row}
+                for row in assert_records(anchor["context_excerpt"])
+            ]
+        anchors.append(anchor)
+    view["line_anchors"] = anchors
+
+
 def test_default_text_shares_only_identical_overlapping_source_excerpts(
     tmp_path: Path,
 ) -> None:
@@ -236,6 +251,8 @@ def test_default_text_shares_only_identical_overlapping_source_excerpts(
     source = _source(packet)
     anchors = assert_records(source["line_anchors"])
     assert len(anchors) == 3
+    anchors[0]["optional_qualifier"] = False
+    anchors[1]["optional_qualifier"] = 0
     # Identical line numbers do not qualify different slices of the same line.
     alternative = assert_records(anchors[2]["context_excerpt"])[0]
     alternative["text"] = str(alternative["text"])[10:]
@@ -252,12 +269,18 @@ def test_default_text_shares_only_identical_overlapping_source_excerpts(
     )
     view = assert_object(json.loads(line.partition(": ")[2]))
     refs = assert_object(view.pop("excerpt_text_refs"))
+    shared = assert_object(view["line_anchor_qualifiers"])
+    assert shared["member_revision"] == anchors[0]["member_revision"]
+    assert "optional_qualifier" not in shared
+    _expand_source_qualifiers(view)
     assert refs and "/line_anchors/2/context_excerpt/0/text" not in refs
     for target, first in refs.items():
         original_row = assert_object(_pointer(view, target.rsplit("/", 1)[0]))
         assert "text" not in original_row
         original_row["text"] = _pointer(view, str(first))
-    assert view["line_anchors"] == source["line_anchors"]
+    assert json.dumps(view["line_anchors"], sort_keys=True) == json.dumps(
+        source["line_anchors"], sort_keys=True
+    )
     assert view["negative_evidence"] == source["negative_evidence"]
     assert decode_initial_packet(assert_object(response["result"])) == packet
 
@@ -293,6 +316,7 @@ def test_initial_text_round_trips_localized_python_evidence(
     if not separator:
         assert comment in line
     observed = assert_object(json.loads(line.partition(": ")[2]))
+    _expand_source_qualifiers(observed)
     assert observed["line_anchors"] == _source(packet)["line_anchors"]
 
 
@@ -330,17 +354,7 @@ def test_source_view_recovers_every_native_value_and_future_metadata(
         view = assert_object(json.loads(line.partition(": ")[2]))
     recovered = deepcopy(assert_object(_pointer(packet, str(view["metadata_ref"]))))
     displayed = deepcopy(view)
-    shared = assert_object(displayed.pop("line_anchor_qualifiers", {}))
-    anchors = []
-    for raw_anchor in assert_records(displayed["line_anchors"]):
-        anchor = {**shared, **raw_anchor}
-        context_shared = assert_object(anchor.pop("context_excerpt_qualifiers", {}))
-        anchor["context_excerpt"] = [
-            {**context_shared, **row}
-            for row in assert_records(anchor["context_excerpt"])
-        ]
-        anchors.append(anchor)
-    displayed["line_anchors"] = anchors
+    _expand_source_qualifiers(displayed)
     recovered.update(
         {key: value for key, value in displayed.items() if key != "metadata_ref"}
     )

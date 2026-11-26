@@ -58,10 +58,22 @@ completeness claim. The observer:
 - Refuses to expose source for denied, outline-only, unreadable, symlink, oversized,
   NUL-bearing, or invalid-UTF-8 members. For these, match count and completeness
   remain unknown rather than zero.
+- A failed admission or filesystem metadata probe yields an unknown member state.
+  A directory or special file at the requested location is unsupported. The
+  source owner reports a member missing only when lookup establishes absence
+  at that path. Verification and binding consumers retain those distinctions.
 - Counts all observed occurrences within the single bounded member while returning
   at most `limit` locations. A truncated result is incomplete. A proven
   zero-match source scan can establish negative evidence **only within that exact
   member**, and only when repository freshness is current.
+
+Standalone member observations refresh the configured context policy before
+returning either metadata or bytes. An inaccessible policy yields an unknown
+member with reason `repository-evidence-policy-unavailable` and no bytes.
+Once the policy becomes readable, the next observation applies its current
+rules. A confirmed missing policy entry uses the built-in defaults. A
+configured symbolic link whose target is missing remains unavailable until
+that link resolves or the entry itself is removed.
 
 The default source byte ceiling is 1 MiB (maximum configurable ceiling 8 MiB).
 No file is read in full if its preliminary size check already exceeds the bound;

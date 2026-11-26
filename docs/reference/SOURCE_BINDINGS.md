@@ -451,6 +451,21 @@ Eviction can cause another parse through the same owner without changing
 evidence. Syntax reuse creates no durable observation, generation or freshness
 authority, and consumers treat shared trees as immutable.
 
+The native Python parser accepts a leading UTF-8 byte-order mark and checks
+the member's coding cookie against it. The marker stays in the original
+member revision and the exact-source cache key. First-line byte offsets
+include its three bytes, so a binding range slices the same original bytes
+as its source read. Literal observations count the mark as one source column.
+The first Python token starts after it.
+
+For unmarked files, a Python coding cookie must decode the captured bytes
+to the same text as UTF-8. For example, an ASCII-only member declaring
+Latin-1 can qualify. A disagreement, unknown codec or invalid UTF-8 makes
+Python structure and binding facts unavailable. The original member can
+still supply revision-bound byte evidence, and UTF-8 text can supply literal
+locations without claiming Python token or symbol identity. File-backed
+diagnostic reads apply the same qualification before publishing an AST.
+
 ## Observer ownership
 
 - **Observed repository fact/evidence:** source-local declarations, references, authored imports, bounded aliases and string values, and explicitly conditional default/argument relationships.

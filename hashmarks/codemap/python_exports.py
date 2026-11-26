@@ -50,11 +50,8 @@ class PythonExportBinding:
     replaces_assignment: bool = False
 
     @property
-    def unwrapped_function(self) -> bool:
-        return (
-            isinstance(self.declaration, (ast.FunctionDef, ast.AsyncFunctionDef))
-            and not self.declaration.decorator_list
-        )
+    def unwrapped_declaration(self) -> bool:
+        return self.declaration is not None and not self.declaration.decorator_list
 
     def declaration_rows(
         self, name: str, rows: Sequence[dict[str, object]]
@@ -456,11 +453,11 @@ def _statement_export_binding(
         return PythonExportBinding(kind, tuple(targets)) if targets else None
     if isinstance(node, ast.Import):
         return _module_import_binding(node, name)
-    if not (
-        _writes_name(node, name, annotation_targets_bind=False)
-        if writes is None
-        else name in writes
-    ):
+    if writes is None:
+        writes = frozenset(_binding_writes(node, annotation_targets_bind=False))
+    # A compound statement can conditionally import any star-exported name.
+    # Its wildcard write does not prove which module supplied this binding.
+    if name not in writes and "*" not in writes:
         return None
     if _assignment_binds(node, name):
         return PythonExportBinding("local")
@@ -511,8 +508,10 @@ def python_class_export_binding(
     return _export_binding(node.body, name, writes, before_line=before_line)
 
 
-def python_class_node(tree: ast.Module, qualname: str) -> ast.ClassDef | None:
-    """Qualify every class component with the same ordered binding analysis."""
+def python_class_node(
+    tree: ast.Module, qualname: str, *, require_unwrapped: bool = False
+) -> ast.ClassDef | None:
+    """Locate a declaration; a call through its published path must qualify every component."""
     selected: ast.ClassDef | None = None
     for part in qualname.split("."):
         binding = (
@@ -520,7 +519,9 @@ def python_class_node(tree: ast.Module, qualname: str) -> ast.ClassDef | None:
             if selected is None
             else python_class_export_binding(selected, part)
         )
-        if not isinstance(binding.declaration, ast.ClassDef):
+        if not isinstance(binding.declaration, ast.ClassDef) or (
+            require_unwrapped and not binding.unwrapped_declaration
+        ):
             return None
         selected = binding.declaration
     return selected
@@ -635,9 +636,22 @@ def _all_statement_exports(
             ) as call
         ) if method in {"append", "extend"}:
             return _call_all_exports(exports, call, method)
-        case ast.Delete(targets=targets) if _targets_all(targets):
-            return AllExportStatus.UNKNOWN
+    if _writes_name(node, "__all__", annotation_targets_bind=False) or any(
+        _may_mutate_all(child) for child in _binding_nodes(node)
+    ):
+        return AllExportStatus.UNKNOWN
     return exports
+
+
+def _may_mutate_all(node: ast.AST) -> bool:
+    match node:
+        case ast.Subscript(value=ast.Name(id="__all__"), ctx=ast.Store() | ast.Del()):
+            return True
+        case ast.Call(func=ast.Attribute(value=ast.Name(id="__all__"), attr=method)):
+            # The supported unconditional append/extend cases have already
+            # been consumed. Do not execute other methods to derive membership.
+            return method not in {"copy", "count", "index"}
+    return False
 
 
 def _extend_all_exports(

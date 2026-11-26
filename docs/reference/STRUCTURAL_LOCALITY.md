@@ -118,9 +118,12 @@ can identify a direct callable declaration. With `self.prop()`, the call uses
 the value returned by the property. That call stays unresolved, as does a call
 through a custom or stacked method decorator.
 
-A decorator on a module-level function can also replace the published callable.
+A decorator on a module-level function or class can also replace the published callable.
 Local calls, import aliases and module-qualified calls retain the authored
 declaration as a candidate. Its source and import evidence remain available.
+Member calls through a class name or inherited base require each class on the
+lookup path to have an unwrapped declaration. Methods authored inside a
+decorated class still retain their source-local calls to independent functions.
 
 ## Forwarding-only syntax
 
@@ -497,6 +500,12 @@ copying the receiver expression into the packet. A separate inner call in
 Static `__all__` declarations define star-export membership, including explicitly
 listed leading-underscore names. Implicit exports exclude those names; dynamic
 or deleted `__all__` declarations retain unresolved export authority.
+Supported unconditional `append` and `extend` operations preserve explicit
+membership. Operations such as `clear()`, slice writes and conditional
+reassignment withdraw it while the original declaration remains readable.
+A wildcard import inside a compound statement can rebind a name previously
+declared or imported at module scope. Until a later unconditional binding
+qualifies that name, its call and re-export identity remain uncertain.
 
 The verification projection composes existing impact-test evidence with already
 qualified test callers of the selected symbol. It preserves the selected edit

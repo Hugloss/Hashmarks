@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import stat
 import sys
 from collections.abc import Iterator, Mapping, Sequence
 from copy import deepcopy
@@ -15,6 +16,7 @@ from hashmarks.file_store import FileReadBoundError, UnstableFileError
 from hashmarks.freshness import freshness_state
 from hashmarks.operation_contract import operation_response, operation_schema
 from hashmarks.paths import normalize_relative_path
+from hashmarks.python_ast_cache import qualify_python_source_encoding
 
 from .decision_session import (
     DecisionRefreshRequired,
@@ -28,7 +30,11 @@ from .python_ast import estimate_tokens, python_source_byte_lines, python_symbol
 from .query_primitives import _WORD_RE
 from .repository_observation import evidence_identity, packet_digest
 from .scoped_source_literals import ScopedSourceLiteralsMixin
-from .signature_preview import outline_disclosure, signature_disclosure
+from .signature_preview import (
+    outline_disclosure,
+    share_source_signature_budget,
+    signature_disclosure,
+)
 from .source_bindings import SourceBindingsMixin
 from .source_content import source_content_observation
 from .source_ecmascript import SourceEcmascriptMixin
@@ -262,28 +268,15 @@ class RepositorySource(
                 "state": "unsupported",
                 "reason": "repository-evidence-denied",
             }
-        if not self.files.is_admitted(rel):
-            return {
-                "path": rel,
-                "state": "unsupported",
-                "reason": "repository-evidence-not-admitted",
-            }
         path = self.workspace / rel
-        cursor = self.workspace
-        for part in rel.split("/"):
-            cursor = cursor / part
-            if cursor.is_symlink():
-                return {
-                    "path": rel,
-                    "state": "unsupported",
-                    "reason": "symlink-evidence-not-observed",
-                }
-        if not path.is_file():
-            return {
-                "path": rel,
-                "state": "known-absent",
-                "reason": "member-not-present",
-            }
+        try:
+            problem = self._member_path_problem(rel, path)
+        except OSError:
+            # Admission probes and metadata reads can both be inaccessible.
+            problem = ("unknown", "member-read-unstable-or-unavailable")
+        if problem is not None:
+            state, reason = problem
+            return {"path": rel, "state": state, "reason": reason}
         row = self.reads.file_row(rel)
         visibility = (
             str(row.get("evidence_visibility") or decision.evidence_visibility.value)
@@ -299,6 +292,22 @@ class RepositorySource(
             visibility=visibility,
             indexed_revision=indexed_revision,
         )
+
+    def _member_path_problem(self, rel: str, path: Path) -> tuple[str, str] | None:
+        if not self.files.is_admitted(rel):
+            return "unsupported", "repository-evidence-not-admitted"
+        cursor = self.workspace
+        try:
+            for part in rel.split("/"):
+                cursor = cursor / part
+                mode = cursor.lstat().st_mode
+                if stat.S_ISLNK(mode):
+                    return "unsupported", "symlink-evidence-not-observed"
+                if cursor == path and not stat.S_ISREG(mode):
+                    return "unsupported", "member-not-regular-file"
+        except (FileNotFoundError, NotADirectoryError):
+            return "known-absent", "member-not-present"
+        return None
 
     def _read_repository_member_source(
         self,
@@ -354,6 +363,17 @@ class RepositorySource(
             }
         return _RepositoryMemberRead(raw, digest)
 
+    def _member_policy_available(self) -> bool:
+        # Scoped reads established admission on entry. Standalone metadata
+        # and byte reads must qualify the policy at observation time.
+        if self.reads.depth:
+            return True
+        try:
+            self.files.refresh_policy()
+        except OSError:
+            return False
+        return True
+
     def member(
         self,
         relpath: str,
@@ -364,6 +384,12 @@ class RepositorySource(
         """Observe one repository member through canonical policy/revision authority."""
         if max_bytes is not None and (type(max_bytes) is not int or max_bytes < 0):
             raise ValueError("max_bytes must be a non-negative integer or None")
+        if not self._member_policy_available():
+            return {
+                "path": normalize_relative_path(relpath, allow_root=False),
+                "state": "unknown",
+                "reason": "repository-evidence-policy-unavailable",
+            }, None
         source = self._repository_member_source(relpath)
         if isinstance(source, dict):
             return source, None
@@ -443,14 +469,21 @@ class RepositorySource(
             tokenize.COMMENT: "comment",
         }
         try:
+            qualify_python_source_encoding(text, filename=path)
+            token_text = text.removeprefix("\ufeff")
+            bom_columns = len(text) - len(token_text)
             for token in tokenize.generate_tokens(
-                io.StringIO(text, newline=None).readline
+                io.StringIO(token_text, newline=None).readline
             ):
                 kind = names.get(token.type)
                 if kind is None or token.start[0] != token.end[0]:
                     continue
+                if token.type == tokenize.NAME and not token.string.isidentifier():
+                    continue
+                # Token columns are Unicode code points in the original source.
+                offset = bom_columns if token.start[0] == 1 else 0
                 kinds.setdefault(token.start[0], []).append(
-                    (token.start[1], token.end[1], kind)
+                    (token.start[1] + offset, token.end[1] + offset, kind)
                 )
         except (tokenize.TokenError, IndentationError, SyntaxError):
             return {}
@@ -596,10 +629,6 @@ class RepositorySource(
         self, relpath: str, max_bytes: int
     ) -> tuple[dict[str, object], bytes | None]:
         """Enforce the source budget while reusing canonical member authority."""
-        # Standalone retained-evidence reads do not enter an indexing read scope.
-        # Observe current admission without publishing a replacement generation.
-        if self.reads.depth == 0:
-            self.files.refresh_policy()
         return self.member(relpath, include_bytes=True, max_bytes=max_bytes)
 
     def _source_evidenced_hits(
@@ -1124,26 +1153,23 @@ class RepositorySource(
 
     @staticmethod
     def _source_choices(
-        visible: list[dict[str, object]], budget: int
-    ) -> dict[str, object]:
+        visible: list[dict[str, object]], budget_bytes: int
+    ) -> list[dict[str, object]]:
         rows = visible[:20]
-        preview_bytes = 4 * budget // len(rows)
-        return {
-            "matches": [
-                {
-                    "symbol_id": f"{row['path']}::{row['qualname']}",
-                    "path": row["path"],
-                    "qualname": row["qualname"],
-                    "lines": [row["start_line"], row["end_line"]],
-                    **_column_fields(row),
-                    **signature_disclosure(
-                        str(row["path"]), str(row["signature"]), max_bytes=preview_bytes
-                    ),
-                }
-                for row in rows
-            ],
-            "matches_truncated": len(visible) > len(rows),
-        }
+        preview_bytes = budget_bytes // len(rows)
+        return [
+            {
+                "symbol_id": f"{row['path']}::{row['qualname']}",
+                "path": row["path"],
+                "qualname": row["qualname"],
+                "lines": [row["start_line"], row["end_line"]],
+                **_column_fields(row),
+                **signature_disclosure(
+                    str(row["path"]), str(row["signature"]), max_bytes=preview_bytes
+                ),
+            }
+            for row in rows
+        ]
 
     def _source_current_content(
         self,
@@ -1175,12 +1201,17 @@ class RepositorySource(
         if token_budget < 16:
             raise ValueError("token budget must be at least 16")
         visible = self._source_visible_matches(query)
+        signature_bytes = 4 * token_budget
         result: dict[str, object] = {
             "schema": operation_schema("source"),
             "query": query,
         }
+        matches: list[dict[str, object]] = []
         if len(visible) > 1:
-            result.update(self._source_choices(visible, token_budget))
+            matches = self._source_choices(visible, signature_bytes)
+            result.update(
+                matches=matches, matches_truncated=len(visible) > len(matches)
+            )
             if "::" not in query:
                 return {**result, "ambiguous": True}
         path, qualname, current, body = self._source_current_content(query, visible[0])
@@ -1195,9 +1226,10 @@ class RepositorySource(
             budget=token_budget,
             too_large=tokens > token_budget,
             **signature_disclosure(
-                path, str(current["signature"]), max_bytes=4 * token_budget
+                path, str(current["signature"]), max_bytes=signature_bytes
             ),
         )
+        share_source_signature_budget(result, matches, signature_bytes)
         if tokens > token_budget:
             result["guidance"] = "Use outline/deps or raise the explicit source budget."
         else:
