@@ -46,6 +46,9 @@ completeness claim. The observer:
   Reported literal coordinates always refer to the original LF-delimited source.
   Equal spans (for example, two names in one unpacking assignment) leave the
   enclosing symbol unknown. The location and match count remain available.
+- When native Python syntax is unavailable, symbol source reads use the optional
+  range provider's LF-delimited rows. A bare CR inside one of those rows does
+  not shift the disclosed body. The native parse diagnostic remains on the outline.
 - For Python sources, attaches tokenizer-qualified `identifier`, `string-literal`,
   or `comment` occurrence kinds when the entire occurrence fits one supported
   single-line token. Other languages and ambiguous tokens report `unknown`; this

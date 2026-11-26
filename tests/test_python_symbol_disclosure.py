@@ -112,6 +112,43 @@ def test_outline_groups_shared_binding_statement_but_preserves_each_occurrence(
     assert len([row for row in rows if row["signature"] == separate]) == 4
 
 
+def test_outline_shares_inline_alias_statement_only_at_matching_byte_columns(
+    tmp_path: Path,
+) -> None:
+    prefix = "label = '界'; "
+    shared = "PRIMARY = PREVIOUS = FALLBACK = 'v1'"
+    repeated = "left = right = 0"
+    source = prefix + shared + "; " + repeated + "; " + repeated
+    (tmp_path / "settings.py").write_text(source + "\n", encoding="utf-8")
+    with CodeMap(tmp_path) as repository:
+        packet = repository.source.outline("settings.py")
+        rows = assert_records(packet["symbols"])
+        aliases = [row for row in rows if row["signature"] == shared]
+        assert {row["qualname"] for row in aliases} == {
+            "PRIMARY",
+            "PREVIOUS",
+            "FALLBACK",
+        }
+        for row in aliases:
+            read = repository.source.read(f"settings.py::{row['qualname']}")
+            assert read["content"] == shared
+            assert (read["start_byte_column"], read["end_byte_column"]) == (
+                len(prefix.encode()),
+                len((prefix + shared).encode()),
+            )
+    outline = assert_text(packet["outline"])
+    assert outline.split("\n") == [
+        f"{prefix[:-2]}  [1-1]",
+        f"{shared}  [1-1]",
+        *[f"{repeated}  [1-1]"] * 4,
+    ]
+    assert (
+        len({row["start_byte_column"] for row in rows if row["signature"] == repeated})
+        == 2
+    )
+    assert packet["outline_tokens"] == estimate_tokens(outline)
+
+
 def test_python_outline_discloses_long_signature_once_with_its_exact_occurrence(
     tmp_path: Path,
 ) -> None:

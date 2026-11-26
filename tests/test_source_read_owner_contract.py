@@ -11,6 +11,37 @@ from hashmarks.codemap.providers import TreeSitterRangeProvider
 from hashmarks.codemap.python_ast import estimate_tokens
 
 
+@pytest.mark.parametrize("newline", [b"\n", b"\r\n"])
+def test_advisory_python_symbol_body_uses_the_providers_lf_rows(
+    tmp_path: Path, newline: bytes
+) -> None:
+    provider = TreeSitterRangeProvider.auto()
+    if provider.signature("python") is None:
+        pytest.skip("Optional Python range provider unavailable")
+    path = tmp_path / "legacy.py"
+    raw = newline.join(
+        [
+            b"# metadata\r# continued",
+            b"print 'legacy'",
+            b"def target():",
+            b"    return 'right'",
+            b"",
+        ]
+    )
+    path.write_bytes(raw)
+    with CodeMap(tmp_path, range_provider=provider) as cm:
+        outline = cm.source.outline("legacy.py")
+        assert outline["parse_error"]
+        source = cm.source.read("legacy.py::target")
+        assert source["lines"] == [3, 4]
+        assert source["content"] == "def target():\n    return 'right'"
+        assert cm.source.slice("legacy.py", 3, 4) == source["content"]
+        observed = cm.source.observe("legacy.py", literal="right")
+        (hit,) = assert_records(observed["occurrences"])
+        assert hit["line"] == 4 and hit["enclosing_symbol"] is None
+        assert cm.source.bindings("legacy.py")["availability"] == "unavailable"
+
+
 def test_context_uses_a_fresh_native_definition_at_its_reported_line(
     tmp_path: Path,
 ) -> None:

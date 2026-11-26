@@ -22,7 +22,13 @@ from hashmarks.python_ast_cache import read_python_ast
 from .model import EvidenceVisibility
 from .python_binding_scope import unfiltered_literal_comprehension
 from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
-from .verification_reference_syntax import literal_truth, possible_boolean_operands
+from .verification_reference_syntax import (
+    empty_literal_iterable,
+    empty_loop_else_exits,
+    literal_truth,
+    possible_boolean_operands,
+    visit_suite_fields,
+)
 
 if TYPE_CHECKING:
     from .evidence_verification import (
@@ -259,10 +265,7 @@ class _LiteralReadVisitor(ast.NodeVisitor):
         outer_collections = self.collections.copy()
         outer_targets = self.iterated_targets
         self.iterated_targets = set()
-        for child in node.body:
-            self.visit(child)
-            if self.terminated:
-                break
+        self._visit_suite(node.body, stop_if_terminated=True)
         self.test = None
         self.in_function = False
         self.collections = outer_collections
@@ -361,14 +364,24 @@ class _LiteralReadVisitor(ast.NodeVisitor):
     visit_TryStar = _visit_copy_guarded
     visit_Match = _visit_copy_guarded
 
+    def generic_visit(self, node: ast.AST) -> None:
+        visit_suite_fields(node, self.visit, self._visit_suite)
+
+    def _visit_suite(
+        self, statements: list[ast.stmt], *, stop_if_terminated: bool = False
+    ) -> None:
+        for child in statements:
+            self.visit(child)
+            if (stop_if_terminated and self.terminated) or empty_loop_else_exits(child):
+                break
+
     def visit_If(self, node: ast.If) -> None:
         # Dynamic guards, including typing-only aliases, remain unqualified.
         if not isinstance(node.test, ast.Constant):
             return
-        for child in node.body if bool(node.test.value) else node.orelse:
-            self.visit(child)
-            if self.terminated:
-                break
+        self._visit_suite(
+            node.body if bool(node.test.value) else node.orelse, stop_if_terminated=True
+        )
 
     def visit_Return(self, node: ast.Return) -> None:
         self.generic_visit(node)
@@ -393,6 +406,13 @@ class _LiteralReadVisitor(ast.NodeVisitor):
         return
 
     def visit_For(self, node: ast.For) -> None:
+        if empty_literal_iterable(node.iter):
+            # An exit stops the else suite, but an enclosing handler or
+            # finally suite may still observe an input.
+            previous = self.terminated
+            self._visit_suite(node.orelse, stop_if_terminated=True)
+            self.terminated = previous
+            return
         paths = self._finite_paths(node.iter)
         if (
             paths is None
@@ -404,8 +424,7 @@ class _LiteralReadVisitor(ast.NodeVisitor):
         outer_targets = self.iterated_targets.copy()
         if any(PurePosixPath(*parts).as_posix() == self.target for parts in paths):
             self.iterated_targets.add(node.target.id)
-        for child in node.body:
-            self.visit(child)
+        self._visit_suite(node.body)
         self.iterated_targets = outer_targets
 
     def visit_AsyncFor(self, node: ast.AsyncFor) -> None:

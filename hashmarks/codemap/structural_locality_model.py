@@ -5,20 +5,20 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Callable, Mapping
-from typing import TypedDict
 
 from hashmarks.operation_contract import operation_schema
+
+from .model import SignatureDisclosure
 
 LOCALITY_SCHEMA = operation_schema("structural_locality")
 LOCALITY_DELTA_SCHEMA = operation_schema("structural_locality_delta")
 
 
-class LocalityNodeFacts(TypedDict):
+class LocalityNodeFacts(SignatureDisclosure):
     path: str
     qualname: str
     name: str
     kind: str
-    signature: str
     lines: list[int]
     navigation_depth: int
     file_digest: str

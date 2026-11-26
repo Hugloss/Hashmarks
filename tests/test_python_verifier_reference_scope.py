@@ -947,3 +947,119 @@ def test_conditional_expression_uses_qualified_test_and_arms(
     assert row["direct_reference"] is direct
     assert bool(changed["targets"]) is direct
     assert changed["negative_evidence_admissible"] is False
+
+
+def test_empty_for_body_cannot_displace_a_verifier_in_loop_else(tmp_path: Path) -> None:
+    with _repository(
+        tmp_path,
+        "from owner import calculate_tax\n"
+        "def test_calculate_tax():\n    for item in []:\n        assert calculate_tax() == item\n",
+    ) as repository:
+        live = "tests/test_live.py"
+        (tmp_path / live).write_text(
+            "from owner import calculate_tax\ndef test_amount():\n"
+            "    for item in ():\n        pass\n    else:\n        assert calculate_tax() == 2\n"
+        )
+        repository.index.sync()
+        packet = repository.tasks.evidence("Change calculate_tax in owner.py")
+        changed = repository.verification.changed_set(["owner.py"])
+        calls = repository.structure.locality("owner.py::calculate_tax", max_depth=0)
+    verification = packet["verification"]
+    dead = next(
+        r
+        for r in verification["relevance"]["candidates"]
+        if r["path"] == "tests/test_amounts.py"
+    )
+    assert dead.get("reference_strength") == "reachable-import"
+    assert dead.get("direct_reference") is False
+    assert dead.get("test_symbol") is None
+    assert assert_object(verification["plan"])["test_symbol"] == "test_amount"
+    assert [r["path"] for r in assert_records(changed["targets"])] == [live]
+    assert changed["negative_evidence_admissible"] is False
+    assert {
+        r["source"]
+        for r in assert_records(assert_records(calls["nodes"])[0]["exact_callers"])
+    } == {"test_amount", "test_calculate_tax"}
+
+
+@pytest.mark.parametrize(
+    ("body", "direct"),
+    [
+        ("for item in {}: calculate_tax()", False),
+        ("for item in '': calculate_tax()", False),
+        ("for item in b'': calculate_tax()", False),
+        ("for calculate_tax().item in (): pass", False),
+        ("for item in (): pass\n    calculate_tax()", True),
+        ("for item in [calculate_tax()]: pass", True),
+        ("for item in [*items]: calculate_tax()", True),
+        ("for item in (1,): calculate_tax()", True),
+        ("for item in items: calculate_tax()", True),
+        ("for calculate_tax in (): pass\n    calculate_tax()", False),
+    ],
+)
+def test_empty_for_preserves_eager_headers_bindings_and_possible_iterations(
+    tmp_path: Path, body: str, direct: bool
+) -> None:
+    with _repository(
+        tmp_path,
+        "from owner import calculate_tax\ndef test_amount(items):\n    " + body + "\n",
+    ) as repository:
+        repository.index.sync()
+        changed = repository.verification.changed_set(["owner.py"])
+    assert bool(changed["targets"]) is direct
+    assert changed["negative_evidence_admissible"] is False
+
+
+@pytest.mark.parametrize(
+    ("body", "reachable"),
+    [
+        ("for _ in (): pass\n    else: return\n    OBSERVE", False),
+        ("for _ in []: pass\n    else: raise ValueError\n    OBSERVE", False),
+        (
+            "try:\n        for _ in (): pass\n        else: return\n        OBSERVE\n    finally: pass",
+            False,
+        ),
+        (
+            "try:\n        for _ in (): pass\n        else: raise ValueError\n        OBSERVE\n    except ValueError: pass",
+            False,
+        ),
+        (
+            "try:\n        for _ in (): pass\n        else: return\n    finally: OBSERVE",
+            True,
+        ),
+        (
+            "try:\n        for _ in (): pass\n        else: raise ValueError\n    except ValueError: OBSERVE",
+            True,
+        ),
+        (
+            "try:\n        for _ in (): pass\n        else: raise ValueError\n    except ValueError: pass\n    OBSERVE",
+            True,
+        ),
+        ("for _ in (): pass\n    else:\n        if flag: return\n    OBSERVE", True),
+        ("for _ in rows: break\n    else: return\n    OBSERVE", True),
+        ("for _ in (): pass\n    else: return OBSERVE", True),
+    ],
+)
+def test_empty_loop_else_exit_affects_only_the_surrounding_suite(
+    tmp_path: Path, body: str, reachable: bool
+) -> None:
+    uses = "(calculate_tax(), (ROOT / 'docs/guide.md').read_text())"
+    source = (
+        "from pathlib import Path\nfrom owner import calculate_tax\n"
+        "ROOT = Path(__file__).resolve().parents[1]\n"
+        "def test_amount(flag, rows):\n    " + body.replace("OBSERVE", uses) + "\n"
+    )
+    with _repository(tmp_path, source) as repository:
+        (tmp_path / "docs").mkdir()
+        (tmp_path / "docs/guide.md").write_text("example")
+        repository.index.sync()
+        for path in ("owner.py", "docs/guide.md"):
+            changed = repository.verification.changed_set([path])
+            assert bool(changed["targets"]) is reachable, path
+            assert changed["negative_evidence_admissible"] is False
+        verify = repository.tasks.evidence("Change calculate_tax in owner.py")[
+            "verification"
+        ]
+        assert assert_object(verify["plan"]).get("test_symbol") == (
+            "test_amount" if reachable else None
+        )

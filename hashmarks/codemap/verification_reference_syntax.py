@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import ast
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from functools import lru_cache
 
@@ -33,6 +33,45 @@ def literal_truth(test: ast.expr) -> bool | None:
     if isinstance(operand, ast.Constant):
         return bool(operand.value) != negated
     return None
+
+
+def empty_literal_iterable(node: ast.expr) -> bool:
+    """Only literal iterables whose syntax guarantees zero members."""
+    match node:
+        case ast.List(elts=[]) | ast.Tuple(elts=[]) | ast.Dict(keys=[]):
+            return True
+        case ast.Constant(value="" | b""):
+            return True
+    return False
+
+
+def empty_loop_else_exits(statement: ast.stmt) -> bool:
+    """Only the sole reachable suite of an explicitly empty loop can prove this exit."""
+    return (
+        isinstance(statement, ast.For)
+        and empty_literal_iterable(statement.iter)
+        and any(
+            isinstance(child, (ast.Return, ast.Raise)) for child in statement.orelse
+        )
+    )
+
+
+def visit_suite_fields(
+    node: ast.AST,
+    visit: Callable[[ast.AST], object],
+    visit_suite: Callable[[list[ast.stmt]], None],
+) -> None:
+    """Traverse sibling statement lists independently, including exception and final suites."""
+    for field, value in ast.iter_fields(node):
+        if isinstance(value, list):
+            if field in {"body", "orelse", "finalbody"}:
+                visit_suite(value)
+            else:
+                for child in value:
+                    if isinstance(child, ast.AST):
+                        visit(child)
+        elif isinstance(value, ast.AST):
+            visit(value)
 
 
 def possible_boolean_operands(node: ast.BoolOp) -> Iterator[ast.expr]:
@@ -129,21 +168,14 @@ class _VerificationReferenceIndexVisitor(PythonReferenceVisitor):
         previous = self.guard
         for statement in statements:
             self.visit(statement)
-            if isinstance(statement, (ast.Return, ast.Raise, ast.Break, ast.Continue)):
+            if isinstance(
+                statement, (ast.Return, ast.Raise, ast.Break, ast.Continue)
+            ) or empty_loop_else_exits(statement):
                 self.guard = self.guard or "statically-dead"
         self.guard = previous
 
     def generic_visit(self, node: ast.AST) -> None:
-        for field, value in ast.iter_fields(node):
-            if isinstance(value, list):
-                if field in {"body", "orelse", "finalbody"}:
-                    self._visit_suite(value)
-                else:
-                    for child in value:
-                        if isinstance(child, ast.AST):
-                            self.visit(child)
-            elif isinstance(value, ast.AST):
-                self.visit(value)
+        visit_suite_fields(node, self.visit, self._visit_suite)
 
     def _guarded_branches(self, test: ast.expr) -> tuple[str | None, str | None]:
         truth = literal_truth(test)
@@ -162,6 +194,16 @@ class _VerificationReferenceIndexVisitor(PythonReferenceVisitor):
     def visit_BoolOp(self, node: ast.BoolOp) -> None:
         for operand in possible_boolean_operands(node):
             self.visit(operand)
+
+    def visit_For(self, node: ast.For) -> None:
+        self.visit(node.iter)
+        previous = self.guard
+        if empty_literal_iterable(node.iter):
+            self.guard = previous or "statically-dead"
+        self.visit(node.target)
+        self._visit_suite(node.body)
+        self.guard = previous
+        self._visit_suite(node.orelse)
 
     def visit_IfExp(self, node: ast.IfExp) -> None:
         self.visit(node.test)
