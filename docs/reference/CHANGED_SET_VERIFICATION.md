@@ -78,10 +78,11 @@ branch, including an alias or the `else` branch of a negated guard. A local
 flag, rebound import, or repository-owned `typing` module retains ordinary
 conditional source evidence. These relationships describe source uses. Native
 execution of a conditional branch remains unobserved. The verifier treats
-statements following a direct `return` or `raise` in the same suite as
-unreachable. Operands of the exit, sibling branches, handlers and `finally`
-suites retain their own source evidence. An exit inside a compound statement
-does not establish that the enclosing suite exits. The call index retains the
+statements following a direct `return`, `raise`, `break` or `continue` in the
+same suite as unreachable. Exit operands, loop headers, sibling branches, loop
+`else` clauses, handlers and `finally` suites retain their own source evidence.
+An exit inside a compound statement does not establish that the enclosing
+suite exits. The call index retains the
 authored static call sites separately from this verification qualification.
 Inside a Python function,
 a local variable's annotation supplies type syntax. The verifier observes the

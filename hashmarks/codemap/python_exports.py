@@ -453,11 +453,11 @@ def _statement_export_binding(
         return PythonExportBinding(kind, tuple(targets)) if targets else None
     if isinstance(node, ast.Import):
         return _module_import_binding(node, name)
-    if not (
-        _writes_name(node, name, annotation_targets_bind=False)
-        if writes is None
-        else name in writes
-    ):
+    if writes is None:
+        writes = frozenset(_binding_writes(node, annotation_targets_bind=False))
+    # A compound statement can conditionally import any star-exported name.
+    # Its wildcard write does not prove which module supplied this binding.
+    if name not in writes and "*" not in writes:
         return None
     if _assignment_binds(node, name):
         return PythonExportBinding("local")
@@ -636,9 +636,22 @@ def _all_statement_exports(
             ) as call
         ) if method in {"append", "extend"}:
             return _call_all_exports(exports, call, method)
-        case ast.Delete(targets=targets) if _targets_all(targets):
-            return AllExportStatus.UNKNOWN
+    if _writes_name(node, "__all__", annotation_targets_bind=False) or any(
+        _may_mutate_all(child) for child in _binding_nodes(node)
+    ):
+        return AllExportStatus.UNKNOWN
     return exports
+
+
+def _may_mutate_all(node: ast.AST) -> bool:
+    match node:
+        case ast.Subscript(value=ast.Name(id="__all__"), ctx=ast.Store() | ast.Del()):
+            return True
+        case ast.Call(func=ast.Attribute(value=ast.Name(id="__all__"), attr=method)):
+            # The supported unconditional append/extend cases have already
+            # been consumed. Do not execute other methods to derive membership.
+            return method not in {"copy", "count", "index"}
+    return False
 
 
 def _extend_all_exports(

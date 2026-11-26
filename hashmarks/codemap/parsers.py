@@ -6,6 +6,8 @@ import re
 from dataclasses import replace
 from typing import TYPE_CHECKING
 
+from hashmarks.python_ast_cache import UNQUALIFIED_SOURCE_ENCODING
+
 from .model import (
     CODEMAP_SCHEMA,
     EdgeRecord,
@@ -300,7 +302,10 @@ def parse_source(
     else:
         artifact = _path_only(text, file_digest=file_digest, language=language)
 
-    if range_provider is not None:
+    if (
+        range_provider is not None
+        and artifact.parse_error != UNQUALIFIED_SOURCE_ENCODING
+    ):
         artifact = range_provider.enrich(artifact, source, grammar)
     if (
         language in ECMASCRIPT_GRAMMARS | {"python"}

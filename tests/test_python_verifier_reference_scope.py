@@ -685,14 +685,22 @@ def test_class_namespace_shadow_keeps_a_method_header_from_becoming_a_witness(
     assert changed["negative_evidence_admissible"] is False
 
 
-@pytest.mark.parametrize("exit_statement", ["return", "raise RuntimeError()"])
+@pytest.mark.parametrize(
+    "body",
+    [
+        "return\n    calculate_tax()",
+        "raise RuntimeError()\n    calculate_tax()",
+        "for item in (1,):\n        break\n        calculate_tax()",
+        "for item in (1,):\n        continue\n        calculate_tax()",
+    ],
+)
 def test_dead_use_after_a_direct_exit_cannot_supply_a_verifier(
-    tmp_path: Path, exit_statement: str
+    tmp_path: Path, body: str
 ) -> None:
     with _repository(
         tmp_path,
         "from owner import calculate_tax\n"
-        "def test_calculate_tax():\n    " + exit_statement + "\n    calculate_tax()\n",
+        "def test_calculate_tax():\n    " + body + "\n",
     ) as repository:
         active = "tests/test_live.py"
         (tmp_path / active).write_text(
@@ -733,6 +741,13 @@ def test_dead_use_after_a_direct_exit_cannot_supply_a_verifier(
         "try:\n        raise RuntimeError()\n    except RuntimeError:\n        calculate_tax()",
         "try:\n        return\n    finally:\n        calculate_tax()",
         "def helper():\n        return\n    calculate_tax()",
+        "while calculate_tax():\n        break",
+        "for _ in (calculate_tax(),):\n        continue",
+        "for _ in (1,):\n        if flag: break\n        calculate_tax()",
+        "for _ in (1,):\n        continue\n    for _ in (1,):\n        calculate_tax()",
+        "for _ in flag:\n        break\n    else:\n        calculate_tax()",
+        "for _ in (1,):\n        try: continue\n        finally: calculate_tax()",
+        "for _ in (1,):\n        for inner in (1,): break\n        calculate_tax()",
     ],
 )
 def test_direct_exit_keeps_evaluated_operands_and_independent_suites(
@@ -759,6 +774,8 @@ def test_direct_exit_keeps_evaluated_operands_and_independent_suites(
         "try:\n        pass\n    finally:\n        return\n        calculate_tax()",
         "try:\n        raise RuntimeError()\n    except RuntimeError:\n        raise\n        calculate_tax()",
         "for item in (1,):\n        return\n        calculate_tax()",
+        "while flag:\n        break; calculate_tax()",
+        "for item in (1,):\n        if flag:\n            continue\n            calculate_tax()",
         "return\n    def helper(value=calculate_tax()): pass",
         "calculate_tax()\n    return\n    calculate_tax = lambda: 2",
     ],

@@ -103,7 +103,7 @@ class _VerificationReferenceIndexVisitor(PythonReferenceVisitor):
         previous = self.guard
         for statement in statements:
             self.visit(statement)
-            if isinstance(statement, (ast.Return, ast.Raise)):
+            if isinstance(statement, (ast.Return, ast.Raise, ast.Break, ast.Continue)):
                 self.guard = self.guard or "statically-dead"
         self.guard = previous
 

@@ -431,6 +431,11 @@ such as `codec.py::Codec.encode@L12` reads that occurrence directly.
 
 Python `find`, `symbol`, `deps` candidate records, and symbol source responses show at most 512 UTF-8 bytes per
 signature preview. Source also applies the caller's smaller source budget.
+When a qualified Python source read lists repeated occurrences, the selected
+signature and every displayed match signature share an aggregate allowance of
+four UTF-8 bytes per requested token. Complete signatures and previews both
+count. The caller’s source-body budget is applied separately, and symbol
+locators and response metadata have their existing bounds.
 For oversized signatures the result carries `signature: null`,
 `signature_truncated: true` and a UTF-8 prefix in `signature_preview`. The
 symbol's source range remains available for reading the complete declaration.
