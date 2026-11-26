@@ -124,11 +124,61 @@ def test_repeated_declaration_preview_reports_omissions(tmp_path: Path) -> None:
         assert (
             sum(
                 len(assert_text(choice["signature_preview"]).encode())
-                for choice in choices
+                for choice in [source, *choices]
             )
             <= 64
         )
         assert codemap.source.read("codec.pyi::encode_record@L22")["lines"] == [22, 22]
+
+
+@pytest.mark.parametrize("budget", [16, 32, 128])
+def test_qualified_source_signature_budget_includes_primary_and_choices(
+    tmp_path: Path, budget: int
+) -> None:
+    names = ["界" * 600 + str(index) for index in range(4)]
+    (tmp_path / "codec.pyi").write_text(
+        "".join(f"def encode(x='{value}'): ...\n" for value in names)
+    )
+    with CodeMap(tmp_path) as repository:
+        source = repository.source.read("codec.pyi::encode", token_budget=budget)
+        broad = repository.source.read("codec.pyi::encode", token_budget=4000)
+    assert source["too_large"] is True and "content" not in source
+    assert broad["too_large"] is False and names[0] in assert_text(broad["content"])
+    matches = assert_records(source["matches"])
+    broad_matches = assert_records(broad["matches"])
+    assert len(matches) == 4 and source["matches_truncated"] is False
+    assert source["symbol_id"] == matches[0]["symbol_id"]
+    sizes = []
+    for row, reference in zip([source, *matches], [broad, *broad_matches], strict=True):
+        assert (row["symbol_id"], row["lines"]) == (
+            reference["symbol_id"],
+            reference["lines"],
+        )
+        assert row["signature"] is None and row["signature_truncated"] is True
+        preview = assert_text(row["signature_preview"])
+        assert preview and assert_text(reference["signature_preview"]).startswith(
+            preview
+        )
+        sizes.append(len(preview.encode()))
+    assert sum(sizes) <= 4 * budget
+    assert sizes[0] >= sizes[1]
+
+
+def test_qualified_source_keeps_exact_signatures_that_fit_together(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "codec.py").write_text(
+        "def encode(data: EncodingParameterDefinition): ...\ndef encode(): ...\n"
+    )
+    with CodeMap(tmp_path) as repository:
+        result = repository.source.read("codec.py::encode", token_budget=32)
+    rows = [result, *assert_records(result["matches"])]
+    assert [row["signature"] for row in rows] == [
+        "def encode(data: EncodingParameterDefinition): ...",
+        "def encode(data: EncodingParameterDefinition): ...",
+        "def encode(): ...",
+    ]
+    assert all("signature_truncated" not in row for row in rows)
 
 
 def test_symbol_metadata_and_dependency_candidates_bound_overload_signatures(

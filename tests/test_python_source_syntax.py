@@ -184,6 +184,48 @@ def test_bom_source_reuse_is_exact_and_returns_original_byte_positions(
         )
 
 
+def test_bom_occurrences_use_original_columns_and_exclude_the_mark_from_tokens(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "member.py").write_bytes(BOM_UTF8 + "é='v'\r\nother=2\n".encode())
+    with CodeMap(tmp_path) as codemap:
+        for literal, line, column, kind in (
+            ("\ufeff", 1, 1, "unknown"),
+            ("\ufeffé", 1, 1, "unknown"),
+            ("é", 1, 2, "identifier"),
+            ("'v'", 1, 4, "string-literal"),
+            ("other", 2, 1, "identifier"),
+        ):
+            packet = codemap.source.observe("member.py", literal=literal)
+            (hit,) = assert_records(packet["occurrences"])
+            assert (hit["line"], hit["column"], hit["occurrence_kind"]) == (
+                line,
+                column,
+                kind,
+            )
+            assert hit["kind_basis"] == (
+                "unknown" if kind == "unknown" else "python-tokenizer"
+            )
+
+
+def test_malformed_name_cannot_classify_an_interior_mark(tmp_path: Path) -> None:
+    (tmp_path / "member.py").write_text(
+        "valid = 1\n\ufeffbroken = 2\ntail = 'inside:\ufeff'\n"
+    )
+    with CodeMap(tmp_path) as codemap:
+        assert codemap.source.outline("member.py")["parse_error"]
+        observed = codemap.source.observe("member.py", literal="\ufeff")
+        assert [
+            (row["line"], row["occurrence_kind"])
+            for row in assert_records(observed["occurrences"])
+        ] == [(2, "unknown"), (3, "string-literal")]
+        for literal in ("valid", "tail"):
+            (hit,) = assert_records(
+                codemap.source.observe("member.py", literal=literal)["occurrences"]
+            )
+            assert hit["occurrence_kind"] == "identifier"
+
+
 def test_bom_index_bindings_and_source_reads_share_exact_member_bytes(
     tmp_path: Path,
 ) -> None:

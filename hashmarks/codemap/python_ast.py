@@ -532,7 +532,13 @@ def parse_python(source: str | bytes, *, file_digest: str) -> ParsedArtifact:
             full_tokens=estimate_tokens(text),
             outline="",
             lexical=lexical_records(text),
-            parse_error=f"{type(exc).__name__}: {exc}",
+            parse_error=(
+                python_ast_cache.UNQUALIFIED_SOURCE_ENCODING
+                if isinstance(
+                    exc, (python_ast_cache.PythonSourceEncodingError, UnicodeError)
+                )
+                else f"{type(exc).__name__}: {exc}"
+            ),
         )
     collector = _Collector(
         python_source_byte_lines(source), _AnnotationTargets(tree, source)

@@ -55,6 +55,18 @@ def test_static_string_names_rejects_runtime_or_mixed_values() -> None:
             False,
         ),
         ("if TYPE_CHECKING:\n    from .first import Public", "ambiguous", [], False),
+        (
+            "try:\n    from .first import *\nexcept ImportError:\n    pass",
+            "ambiguous",
+            [],
+            False,
+        ),
+        (
+            "if condition:\n    from .first import *\nclass Public: pass",
+            "local",
+            [],
+            True,
+        ),
         ("try:\n    call()\nexcept Error as Public:\n    pass", "ambiguous", [], False),
         (
             "match value:\n    case {'key': item, **Public}: pass",

@@ -300,6 +300,15 @@ def test_annotation_only_module_target_has_no_qualified_binding(tmp_path: Path) 
     [
         ("_build", "__all__ = ['_build']\n", True),
         ("_build", "__all__ = []\n__all__.append('_build')\n", True),
+        ("_build", "__all__ = []\n__all__.extend(['_build'])\n", True),
+        ("build", "__all__ = ['build']\n__all__.copy()\n", True),
+        ("build", "__all__ = ['build']\ndef deferred(): __all__.clear()\n", True),
+        ("build", "__all__ = ['build']\n__all__.clear()\n", False),
+        ("build", "__all__ = ['build']\nremoved = __all__.pop()\n", False),
+        ("build", "__all__ = ['build']\n__all__[:] = []\n", False),
+        ("build", "__all__ = ['build']\ndel __all__[0]\n", False),
+        ("build", "__all__ = ['build']\nif True: __all__.remove('build')\n", False),
+        ("build", "__all__ = ['build']\nif True: __all__ = []\n", False),
         ("_build", "", False),
         ("build", "", True),
         ("_build", "__all__ = ['other']\n", False),
@@ -360,6 +369,60 @@ def test_star_export_membership_qualifies_identity_calls_and_test_callers(
     assert identity["source_path"] == "tests/test_build.py"
     assert identity["requested_target"] == f"pkg.{name}"
     assert forward["repository_identity"] == reverse["repository_identity"]
+
+
+def test_conditional_wildcard_cannot_preserve_a_superseded_import_owner(
+    tmp_path: Path,
+) -> None:
+    for name in ("first", "second"):
+        _write(
+            tmp_path,
+            f"{name}.py",
+            f"__all__ = ['choose']\ndef choose(): return '{name}'\n",
+        )
+    _write(
+        tmp_path,
+        "consumer.py",
+        "from facade import choose as selected\ndef indirect(): return selected()\n",
+    )
+    first = "first.py::choose"
+    with _map(tmp_path) as codemap:
+        for wildcard in (True, False):
+            later = (
+                "from second import *"
+                if wildcard
+                else "from second import choose as other"
+            )
+            _write(
+                tmp_path,
+                "direct.py",
+                f"from first import choose\nif True:\n    {later}\ndef direct(): return choose()\n",
+            )
+            _write(
+                tmp_path, "facade.py", f"from first import *\nif True:\n    {later}\n"
+            )
+            direct = codemap.structure.locality("direct.py::direct", max_depth=1)
+            indirect = codemap.structure.locality("consumer.py::indirect", max_depth=1)
+            for packet in (direct, indirect):
+                calls = assert_records(packet["edges"])
+                assert [row["resolved_symbol_id"] for row in calls] == [
+                    None if wildcard else first
+                ]
+                assert bool(packet["unresolved_calls"]) is wildcard
+            identity = qualified_import_identity(
+                codemap._imports, source_path="consumer.py", target="facade.choose"
+            )
+            assert identity["status"] == ("ambiguous" if wildcard else "resolved")
+            assert (identity["qualified_identity"] is None) is wildcard
+            for owner in (first, "second.py::choose"):
+                reverse = codemap.structure.locality(owner, max_depth=0)
+                node = assert_records(reverse["nodes"])[0]
+                callers = {
+                    row["source"] for row in assert_records(node["exact_callers"])
+                }
+                assert callers == (
+                    {"direct", "indirect"} if not wildcard and owner == first else set()
+                )
 
 
 def _shared_repo(root: Path) -> None:

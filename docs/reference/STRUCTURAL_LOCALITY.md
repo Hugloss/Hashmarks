@@ -500,6 +500,12 @@ copying the receiver expression into the packet. A separate inner call in
 Static `__all__` declarations define star-export membership, including explicitly
 listed leading-underscore names. Implicit exports exclude those names; dynamic
 or deleted `__all__` declarations retain unresolved export authority.
+Supported unconditional `append` and `extend` operations preserve explicit
+membership. Operations such as `clear()`, slice writes and conditional
+reassignment withdraw it while the original declaration remains readable.
+A wildcard import inside a compound statement can rebind a name previously
+declared or imported at module scope. Until a later unconditional binding
+qualifies that name, its call and re-export identity remain uncertain.
 
 The verification projection composes existing impact-test evidence with already
 qualified test callers of the selected symbol. It preserves the selected edit
