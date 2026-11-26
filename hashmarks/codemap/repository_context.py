@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, replace
+from pathlib import PurePosixPath
 from typing import TYPE_CHECKING, TypedDict
 
 from hashmarks.operation_contract import operation_schema, validate_operation_response
@@ -10,6 +11,7 @@ from hashmarks.paths import normalize_relative_path
 from .context_defaults import REPOSITORY_CONTEXT_DEFAULTS
 from .decision_session import ReadScopeOwner, decision_scoped
 from .model import (
+    PYTHON_SIGNATURE_PREVIEW_BYTES,
     ContextDisclosure,
     ContextItem,
     ContextPack,
@@ -21,7 +23,9 @@ from .query_primitives import _TASK_EVIDENCE_FAMILIES, _TASK_GOVERNANCE_CUES, _W
 from .query_router import route_query
 from .repository_domains import is_test_path
 from .repository_source import SourceSymbolNotFound
+from .signature_preview import outline_disclosure, signature_disclosure
 from .singleflight import SingleFlight
+from .source_languages import SOURCE_LANGUAGES
 from .work_context import WorkContextProjection
 
 if TYPE_CHECKING:
@@ -30,6 +34,13 @@ if TYPE_CHECKING:
     from .evidence_graph import RepositoryRelationships
     from .find_engine import RepositorySearch
     from .repository_source import RepositorySource
+
+
+def _signature_context(path: str, signature: str) -> tuple[str, str]:
+    disclosure = signature_disclosure(path, signature)
+    if "signature_preview" in disclosure:
+        return "signature-preview", disclosure["signature_preview"]
+    return "signature", signature
 
 
 @dataclass(frozen=True, slots=True)
@@ -143,7 +154,7 @@ class RepositoryContext(WorkContextProjection, ReadScopeOwner):
     ) -> dict[str, object]:
         return {
             "schema": "hashmarks.context-action.v1",
-            "retrieval_protocol": "hashmarks.progressive-context.v0.10.14",
+            "retrieval_protocol": "hashmarks.progressive-context.v0.10.15",
             "workspace_fingerprint": self.store.meta("workspace_fingerprint", "") or "",
             "codemap_generation": generation,
             "policy_fingerprint": self.files.policy_fingerprint(),
@@ -388,6 +399,38 @@ class RepositoryContext(WorkContextProjection, ReadScopeOwner):
             used += tokens
         return items, used
 
+    def _context_hit_outline(
+        self, hit: SearchHit
+    ) -> tuple[str, str, str | None] | None:
+        if hit.qualname is not None and hit.signature is not None:
+            representation, content = _signature_context(hit.path, hit.signature)
+            return representation, content, hit.qualname
+        python_member = (
+            SOURCE_LANGUAGES.get(PurePosixPath(hit.path).suffix.lower()) == "python"
+        )
+        row = self.store.outline(
+            hit.path,
+            signature_token_limit=PYTHON_SIGNATURE_PREVIEW_BYTES // 4
+            if python_member
+            else None,
+        )
+        if (
+            row is None
+            or EvidenceVisibility(str(row["evidence_visibility"]))
+            is EvidenceVisibility.DENY
+        ):
+            return None
+        content = str(row["outline"] or hit.path)
+        if row.get("has_oversized_signature"):
+            projection = outline_disclosure(
+                hit.path,
+                content,
+                [symbol.copy() for symbol in self.reads.symbols_for_path(hit.path)],
+                inline_previews=True,
+            )
+            content = str(projection["outline"])
+        return "outline", content, None
+
     def _context_outline_items(
         self,
         hits: tuple[SearchHit, ...],
@@ -411,21 +454,10 @@ class RepositoryContext(WorkContextProjection, ReadScopeOwner):
                 existing_path == hit.path for existing_path, _ in seen
             ):
                 continue
-            if hit.qualname is not None and hit.signature is not None:
-                content = hit.signature
-                representation = "signature"
-                symbol = hit.qualname
-            else:
-                row = self.store.outline(hit.path)
-                if (
-                    row is None
-                    or EvidenceVisibility(str(row["evidence_visibility"]))
-                    is EvidenceVisibility.DENY
-                ):
-                    continue
-                content = str(row["outline"] or hit.path)
-                representation = "outline"
-                symbol = None
+            outline = self._context_hit_outline(hit)
+            if outline is None:
+                continue
+            representation, content, symbol = outline
             tokens = estimate_tokens(content)
             if tokens <= 0 or used + tokens > token_budget:
                 continue
@@ -460,13 +492,15 @@ class RepositoryContext(WorkContextProjection, ReadScopeOwner):
         key = (str(dep["path"]), str(dep["qualname"]))
         if key in seen:
             return None
-        content = str(dep["signature"] or dep["qualname"])
+        representation, content = _signature_context(
+            key[0], str(dep["signature"] or dep["qualname"])
+        )
         tokens = estimate_tokens(content)
         if tokens <= 0 or tokens > remaining_tokens:
             return None
         return key, ContextItem(
             path=str(dep["path"]),
-            representation="signature",
+            representation=representation,
             content=content,
             estimated_tokens=tokens,
             symbol=str(dep["qualname"]),
@@ -579,7 +613,10 @@ class RepositoryContext(WorkContextProjection, ReadScopeOwner):
             delta = body_tokens - current.estimated_tokens
             if (
                 not body
-                or body_tokens <= current.estimated_tokens
+                or (
+                    current.representation != "signature-preview"
+                    and body_tokens <= current.estimated_tokens
+                )
                 or used + delta > token_budget
             ):
                 continue

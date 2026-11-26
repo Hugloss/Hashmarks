@@ -265,3 +265,33 @@ def test_empty_for_preserves_qualified_literal_read_in_loop_else(
         changed = repository.verification.changed_set(["docs/guide.md"])
     assert bool(changed["targets"]) is observed
     assert changed["negative_evidence_admissible"] is False
+
+
+@pytest.mark.parametrize(
+    ("suites", "observed"),
+    [
+        ("while not True: pass\n    else: READ", True),
+        ("while False: READ\n    else: pass", False),
+        ("while 0: pass\n    else: return\n    READ", False),
+        (
+            "try:\n        while False: pass\n        else: return\n    finally: READ",
+            True,
+        ),
+        (
+            "try:\n        while False: pass\n        else: raise ValueError\n    except ValueError: READ",
+            True,
+        ),
+    ],
+)
+def test_zero_iteration_while_retains_only_possible_literal_read(
+    tmp_path: Path, suites: str, observed: bool
+) -> None:
+    _fixture(
+        tmp_path,
+        "    " + suites.replace("READ", "(ROOT / 'docs/guide.md').read_text()") + "\n",
+    )
+    with CodeMap(tmp_path) as repository:
+        repository.index.sync()
+        changed = repository.verification.changed_set(["docs/guide.md"])
+    assert bool(changed["targets"]) is observed
+    assert changed["negative_evidence_admissible"] is False

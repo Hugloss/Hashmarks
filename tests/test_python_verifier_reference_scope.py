@@ -1063,3 +1063,78 @@ def test_empty_loop_else_exit_affects_only_the_surrounding_suite(
         assert assert_object(verify["plan"]).get("test_symbol") == (
             "test_amount" if reachable else None
         )
+
+
+def test_literal_while_condition_cannot_select_inactive_body_or_else(
+    tmp_path: Path,
+) -> None:
+    with _repository(
+        tmp_path,
+        "from owner import calculate_tax\n"
+        "def test_calculate_tax():\n"
+        "    while False: calculate_tax()\n"
+        "    while True: break\n"
+        "    else: calculate_tax()\n",
+    ) as repository:
+        active = "tests/test_live.py"
+        (tmp_path / active).write_text(
+            "from owner import calculate_tax\ndef test_amount():\n"
+            "    while not True: pass\n    else: assert calculate_tax() == 2\n"
+        )
+        repository.index.sync()
+        result = repository.tasks.evidence("Change calculate_tax in owner.py")
+        changed = repository.verification.changed_set(["owner.py"])
+        callers = repository.structure.locality("owner.py::calculate_tax", max_depth=0)
+    verify = result["verification"]
+    decoy = next(
+        row
+        for row in verify["relevance"]["candidates"]
+        if row["path"] == "tests/test_amounts.py"
+    )
+    assert decoy.get("reference_strength") == "reachable-import"
+    assert decoy.get("direct_reference") is False
+    assert decoy.get("test_symbol") is None
+    assert assert_object(verify["plan"])["test_symbol"] == "test_amount"
+    assert [r["path"] for r in assert_records(changed["targets"])] == [active]
+    assert changed["negative_evidence_admissible"] is False
+    assert {
+        r["source"]
+        for r in assert_records(assert_records(callers["nodes"])[0]["exact_callers"])
+    } == {"test_amount", "test_calculate_tax"}
+
+
+@pytest.mark.parametrize(
+    ("body", "expected"),
+    [
+        ("while 0: calculate_tax()", False),
+        ("while not False: break\n    else: calculate_tax()", False),
+        ("while True:\n        calculate_tax()\n        break", True),
+        ("while flag:\n        flag = False\n    else: calculate_tax()", True),
+        (
+            "import typing\n    while not typing.TYPE_CHECKING: flag()\n    else: calculate_tax()",
+            True,
+        ),
+        ("while calculate_tax(): break", True),
+        ("while False: pass\n    else: return\n    calculate_tax()", False),
+        ("while True: break\n    else: return\n    calculate_tax()", True),
+        (
+            "try:\n        while False: pass\n        else: raise ValueError\n    except ValueError: calculate_tax()",
+            True,
+        ),
+        (
+            "try:\n        while False: pass\n        else: return\n    finally: calculate_tax()",
+            True,
+        ),
+    ],
+)
+def test_literal_while_qualifies_only_proven_arms(
+    tmp_path: Path, body: str, expected: bool
+) -> None:
+    with _repository(
+        tmp_path,
+        "from owner import calculate_tax\ndef test_amount(flag):\n    " + body + "\n",
+    ) as repository:
+        repository.index.sync()
+        changed = repository.verification.changed_set(["owner.py"])
+    assert bool(changed["targets"]) is expected
+    assert changed["negative_evidence_admissible"] is False

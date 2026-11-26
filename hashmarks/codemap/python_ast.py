@@ -116,12 +116,15 @@ def _target_name(node: ast.AST, *, computed_receiver: str = "") -> str | None:
     if isinstance(node, ast.Attribute):
         left = _target_name(node.value, computed_receiver=computed_receiver)
         receiver = left or computed_receiver
-        return f"{receiver}.{node.attr}" if receiver else node.attr
+        return f"{receiver}.{node.attr}" if receiver else None
     return None
 
 
-_VALUE_TYPING_FORMS = frozenset({"Annotated", "Literal"})
+_SPECIAL_TYPING_FORMS = frozenset({"Annotated", "Literal", "Callable"})
 _TYPING_MODULES = frozenset({"typing", "typing_extensions"})
+_CALLABLE_ORIGINS = frozenset(
+    {("collections.abc", ("Callable",)), ("collections", ("abc", "Callable"))}
+)
 _NON_INDENT_BYTE = re.compile(rb"[^ \t\f]")
 
 
@@ -133,7 +136,7 @@ class _AnnotationTargets:
     @cached_property
     def _candidate_names(self) -> set[str]:
         """Narrow lexical work; only the source binding can establish a form."""
-        names = set(_VALUE_TYPING_FORMS)
+        names = set(_SPECIAL_TYPING_FORMS)
         aliases: dict[str, set[str]] = {}
         # Only statements can declare imports or assignment aliases. Avoid a
         # second walk over every expression in ordinary annotated members.
@@ -145,11 +148,13 @@ class _AnnotationTargets:
                 for child in ast.iter_child_nodes(node)
                 if isinstance(child, (ast.stmt, ast.ExceptHandler, ast.match_case))
             )
-            if isinstance(node, ast.ImportFrom) and node.module in _TYPING_MODULES:
+            if isinstance(node, ast.ImportFrom) and (
+                node.module in _TYPING_MODULES or node.module == "collections.abc"
+            ):
                 names.update(
                     alias.asname or alias.name
                     for alias in node.names
-                    if alias.name in _VALUE_TYPING_FORMS
+                    if alias.name in _SPECIAL_TYPING_FORMS
                 )
             elif isinstance(node, (ast.Assign, ast.AnnAssign)) and isinstance(
                 node.value, (ast.Name, ast.Attribute)
@@ -197,43 +202,71 @@ class _AnnotationTargets:
         origin = binding.qualified_absolute_import
         if origin and origin[0] in _TYPING_MODULES and len(origin[1]) == 1:
             return origin[1][0]
-        return None
+        return "Callable" if origin in _CALLABLE_ORIGINS else None
 
     def _type_arguments(
         self, node: ast.Subscript, anchor: ast.Constant | None
-    ) -> tuple[ast.AST, ...]:
+    ) -> tuple[ast.expr, ...]:
         form = self._typing_form(node.value, anchor)
         if form in {"Literal", "unknown"}:
             return ()
         if form == "Annotated":
             items = node.slice.elts if isinstance(node.slice, ast.Tuple) else []
             return tuple(items[:1]) if len(items) >= 2 else ()
-        return (node.slice,)
+        arguments = (
+            node.slice.elts if isinstance(node.slice, ast.Tuple) else [node.slice]
+        )
+        if (
+            form == "Callable"
+            and len(arguments) == 2
+            and isinstance(arguments[0], ast.List)
+        ):
+            return (*arguments[0].elts, arguments[1])
+        return tuple(arguments)
+
+    def _type_children(
+        self, node: ast.expr, anchor: ast.Constant | None
+    ) -> tuple[ast.expr, ...]:
+        if isinstance(node, ast.Subscript) and _target_name(node.value) is not None:
+            return (node.value, *self._type_arguments(node, anchor))
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitOr):
+            return (node.left, node.right)
+        if isinstance(node, ast.IfExp):
+            if isinstance(node.test, ast.Constant):
+                return (node.body if node.test.value else node.orelse,)
+            return (node.body, node.orelse)
+        if isinstance(node, ast.Starred):
+            return (node.value,)
+        return ()
 
     def targets(
-        self, node: ast.AST | None, anchor: ast.Constant | None = None
-    ) -> tuple[str, ...]:
+        self, node: ast.expr | None, anchor: ast.Constant | None = None
+    ) -> dict[str, int]:
+        """Map syntactic type names to the start line of their first written reference."""
         if node is None:
-            return ()
+            return {}
         if isinstance(node, ast.Constant):
             if not isinstance(node.value, str):
-                return ()
+                return {}
             try:
                 expression = ast.parse(node.value.strip(), mode="eval").body
             except (SyntaxError, ValueError, RecursionError):
-                return ()
+                return {}
             container = anchor or node
             # Decoded expression coordinates cannot qualify source binding order.
             PythonBindings.locate_annotation_reference(expression, container)
             return self.targets(expression, container)
-        target = _target_name(node)
+        # A named factory is written in the annotation. Its string arguments
+        # are values; they are not quoted forward references.
+        reference = node.func if isinstance(node, ast.Call) else node
+        target = _target_name(reference)
         if target is not None:
-            return (target,)
-        children: Iterable[ast.AST] = ast.iter_child_nodes(node)
-        if isinstance(node, ast.Subscript):
-            children = (node.value, *self._type_arguments(node, anchor))
-        names = (name for child in children for name in self.targets(child, anchor))
-        return tuple(dict.fromkeys(names))
+            return {target: reference.lineno}
+        targets: dict[str, int] = {}
+        for child in self._type_children(node, anchor):
+            for name, line in self.targets(child, anchor).items():
+                targets.setdefault(name, line)
+        return targets
 
 
 @dataclass
@@ -276,19 +309,18 @@ class _Collector(PythonReferenceVisitor):
         )
 
     def _function_annotation_edges(
-        self, node: ast.FunctionDef | ast.AsyncFunctionDef, qualname: str, start: int
+        self, node: ast.FunctionDef | ast.AsyncFunctionDef, qualname: str
     ) -> None:
-        for target in self.annotations.targets(node.returns):
+        for target, line in self.annotations.targets(node.returns).items():
             self.edges.append(
-                EdgeRecord(qualname, "return-type", target, start, "annotation")
+                EdgeRecord(qualname, "return-type", target, line, "annotation")
             )
         positional = [*node.args.posonlyargs, *node.args.args, *node.args.kwonlyargs]
         positional.extend(
             arg for arg in (node.args.vararg, node.args.kwarg) if arg is not None
         )
         for arg in positional:
-            line = int(getattr(arg, "lineno", start))
-            for target in self.annotations.targets(arg.annotation):
+            for target, line in self.annotations.targets(arg.annotation).items():
                 self.edges.append(
                     EdgeRecord(qualname, "parameter-type", target, line, "annotation")
                 )
@@ -297,16 +329,19 @@ class _Collector(PythonReferenceVisitor):
         self,
         node: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef,
         qualname: str,
-        start: int,
     ) -> None:
         if isinstance(node, ast.ClassDef):
             for base in node.bases:
-                for target in self.annotations.targets(base):
+                head = base.value if isinstance(base, ast.Subscript) else base
+                target = _target_name(head)
+                if target is not None:
                     self.edges.append(
-                        EdgeRecord(qualname, "inherits", target, start, "annotation")
+                        EdgeRecord(
+                            qualname, "inherits", target, head.lineno, "annotation"
+                        )
                     )
         else:
-            self._function_annotation_edges(node, qualname, start)
+            self._function_annotation_edges(node, qualname)
 
     def _symbol(
         self, node: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef, kind: str
@@ -320,7 +355,7 @@ class _Collector(PythonReferenceVisitor):
         self.symbols.append(
             self._symbol_record(node, kind, occurrence, signature, (start, end))
         )
-        self._annotation_edges(node, occurrence, start)
+        self._annotation_edges(node, occurrence)
         # Definition expressions belong to the surrounding scope. A decorator,
         # default or base expression is not a call made by the declared body.
         for expression in definition_time_expressions(
@@ -429,13 +464,13 @@ class _Collector(PythonReferenceVisitor):
     def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
         if node.value is not None and isinstance(node.target, ast.Name):
             self._module_bindings(node, (node.target,), "binding")
-        for target in self.annotations.targets(node.annotation):
+        for target, line in self.annotations.targets(node.annotation).items():
             self.edges.append(
                 EdgeRecord(
                     self.source_occurrence,
                     "attribute-type",
                     target,
-                    int(node.lineno),
+                    line,
                     "annotation",
                 )
             )

@@ -123,6 +123,10 @@ reference on the method's receiver parameter at that call site. An observed
 assignment through that receiver or its alias can invalidate the member
 binding. The call remains visible in `unresolved_calls`; an exact caller
 is reported only when the class declaration and the receiver evidence agree.
+A source-visible write or deletion on the named class also makes that member
+uncertain, including lookup through an inherited base. The same rule applies
+when the caller's source writes to a qualified imported class through an alias.
+The declaration remains readable and the observer does not select a replacement.
 
 For the target member, ordinary methods and qualified static or class methods
 can identify a direct callable declaration. With `self.prop()`, the call uses
