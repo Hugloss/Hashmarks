@@ -57,7 +57,11 @@ class _OwnerWalk:
         if kind in {"local", "module"}:
             self.leaves.add(facade_path)
             if qualified and observed.declaration is not None:
-                self.symbol_leaves.add((facade_path, exported_name))
+                rows = observed.declaration_rows(exported_name, symbols)
+                if len(rows) == 1:
+                    self.symbol_leaves.add((facade_path, str(rows[0]["qualname"])))
+                else:
+                    self.symbol_unresolved = True
             return None
         targets = (
             binding_targets

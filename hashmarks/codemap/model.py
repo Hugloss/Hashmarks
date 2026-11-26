@@ -7,7 +7,7 @@ from typing import Any
 from hashmarks.operation_contract import operation_response, operation_schema
 
 CODEMAP_SCHEMA = "hashmarks.codemap.v1"
-PYTHON_PARSER = "hashmarks.python-ast.v18"
+PYTHON_PARSER = "hashmarks.python-ast.v19"
 _OCCURRENCE_MARKER = "@L"
 
 

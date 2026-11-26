@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import ast
 from collections.abc import Iterator, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 from functools import cached_property, lru_cache
 from types import MappingProxyType
@@ -47,6 +47,23 @@ class PythonExportBinding:
     targets: tuple[str, ...] = ()
     declaration: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef | None = None
     module_import: ast.alias | None = None
+    replaces_assignment: bool = False
+
+    def declaration_rows(
+        self, name: str, rows: Sequence[dict[str, object]]
+    ) -> list[dict[str, object]]:
+        if self.declaration is None:
+            return []
+        return [
+            row
+            for row in rows
+            if row.get("parent") is None
+            and row.get("name") == name
+            and (
+                not self.replaces_assignment
+                or row.get("start_line") == self.declaration.lineno
+            )
+        ]
 
 
 @dataclass(frozen=True)
@@ -152,7 +169,16 @@ def _export_binding(
     if len(reexports) > 1:
         targets = tuple(dict.fromkeys(t for row in reexports for t in row.targets))
         return PythonExportBinding("ambiguous", targets)
-    return bindings[-1] if bindings else PythonExportBinding("unknown")
+    if not bindings:
+        return PythonExportBinding("unknown")
+    last = bindings[-1]
+    if last.declaration is not None and len(bindings) > 1:
+        previous = bindings[-2]
+        # An unconditional data assignment ended the earlier declaration's
+        # binding. The following declaration has an exact source occurrence.
+        if previous.kind == "local" and previous.declaration is None:
+            return replace(last, replaces_assignment=True)
+    return last
 
 
 def python_export_binding(

@@ -287,48 +287,46 @@ class RepositoryStructure(ReadScopeOwner):
         source_path = str(edge["path"])
         source_qualname = str(edge.get("source") or "")
         line = locality_coordinate(edge.get("line") or 0)
-        if (
-            source_path.endswith(".py")
-            and source_qualname
-            and python_function_scope_binds(
-                snapshot.function_definitions_by_qualname, source_qualname, short
-            )
+        if not source_path.endswith(".py"):
+            return None, candidate_ids, False
+        visible = (
+            self.files.decide(source_path).evidence_visibility
+            is EvidenceVisibility.SOURCE
+        )
+        if source_qualname and python_function_scope_binds(
+            snapshot.function_definitions_by_qualname, source_qualname, short
         ):
-            visible = (
-                self.files.decide(source_path).evidence_visibility
-                is EvidenceVisibility.SOURCE
-            )
             site = (
                 python_nested_call_site(snapshot, source_qualname, short, line)
                 if visible
                 else None
             )
-            if site is not None:
-                owned = [
+            owned = (
+                [
                     row
                     for row in self._qualified_path_symbols(source_path)
                     if (row.get("parent"), row.get("start_line")) == site
                     and row.get("name") == short
                 ]
-                return _binding_result(owned, candidates, unresolved=True)
-            return None, candidate_ids, False
-        kind, targets = self.imports._python_export_binding(
+                if site is not None
+                else []
+            )
+            return _binding_result(owned, candidates, unresolved=site is not None)
+        observed = self.imports._python_export_observation(
             source_path, short, before_line=None if source_qualname else line
         )
+        kind, targets = observed.kind, observed.targets
         if kind in {"ambiguous", "star"} or (kind == "local" and not evidence.complete):
             return None, candidate_ids, True
         if kind == "local":
-            declared = self.imports._python_export_is_declaration(source_path, short)
-            local = [
-                row
-                for row in candidates
-                if declared
-                and row.get("path") == source_path
-                and row.get("parent") is None
-            ]
-            return _binding_result(
-                local, candidates, unresolved=not declared or len(local) > 1
+            local = (
+                observed.declaration_rows(
+                    short, [row for row in candidates if row.get("path") == source_path]
+                )
+                if visible
+                else []
             )
+            return _binding_result(local, candidates, unresolved=len(local) != 1)
         if kind == "reexport" and len(targets) == 1:
             symbols, unresolved = self.imports._resolve_import_symbol_evidence(
                 source_path, targets[0]
@@ -344,14 +342,12 @@ class RepositoryStructure(ReadScopeOwner):
     ) -> tuple[dict[str, object] | None, list[str], bool]:
         if unresolved:
             return _binding_result([], candidates, unresolved=True)
-        owned: list[dict[str, object]] = []
-        for path, qualname in symbols:
-            parent, _, name = qualname.rpartition(".")
-            owned.extend(
-                row
-                for row in self._qualified_path_symbols(path)
-                if row.get("parent") == (parent or None) and row.get("name") == name
-            )
+        owned = [
+            row
+            for path, qualname in symbols
+            for row in self._qualified_path_symbols(path)
+            if row.get("qualname") == qualname
+        ]
         return _binding_result(owned, candidates, unresolved=bool(symbols))
 
     def _python_class_node(self, path: str, qualname: str) -> ast.ClassDef | None:

@@ -501,6 +501,10 @@ unpacking and augmented assignment), ordinary imports, deletion and conditional
 writes. Unsupported or conditional rebinding preserves uncertainty. Annotation-only
 targets preserve existing module/class declarations, including inside compound
 statements; function-local annotation targets still establish lexical locals.
+When an unconditional module assignment replaces a declaration and a subsequent
+declaration rebinds that name, local calls and imported aliases refer to the
+new declaration's indexed occurrence. The intervening assignment retains its
+own source span. Consecutive same-name callable declarations remain ambiguous.
 Possible annotation-expression effects retain uncertainty without assuming a
 runtime's annotation evaluation timing. Incidental expression writes do not gain
 the unconditional authority of actual assignment targets.
