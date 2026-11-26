@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import io
+import keyword
 import stat
 import sys
+import tokenize
 from collections.abc import Iterator, Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass, field
@@ -100,6 +102,29 @@ def _literal_source_lines(
             offset = 0
         else:
             offset += len(raw)
+
+
+def _python_token_kind(token: tokenize.TokenInfo, previous: str) -> str | None:
+    kind = tokenize.tok_name[token.type]
+    if kind == "NAME":
+        if (
+            token.string.isidentifier()
+            and not keyword.iskeyword(token.string)
+            and previous != "!"
+        ):
+            return "identifier"
+    elif kind == "STRING":
+        # Older tokenizers expose an entire f-string as STRING, including
+        # the expressions inside its replacement fields.
+        if not (
+            token.string[:2].lower().startswith(("f", "rf")) and "{" in token.string
+        ):
+            return "string-literal"
+    elif kind in {"FSTRING_MIDDLE", "TSTRING_MIDDLE"}:
+        return "string-literal"
+    elif kind == "COMMENT":
+        return "comment"
+    return None
 
 
 def _symbol_columns(row: Mapping[str, object]) -> tuple[int, int] | None:
@@ -460,25 +485,19 @@ class RepositorySource(
         """Classify exact lexical tokens without guessing semantic ownership."""
         if source_grammar(path) != "python":
             return {}
-        import tokenize
 
         kinds: dict[int, list[tuple[int, int, str]]] = {}
-        names = {
-            tokenize.NAME: "identifier",
-            tokenize.STRING: "string-literal",
-            tokenize.COMMENT: "comment",
-        }
         try:
             qualify_python_source_encoding(text, filename=path)
             token_text = text.removeprefix("\ufeff")
             bom_columns = len(text) - len(token_text)
+            previous = ""
             for token in tokenize.generate_tokens(
                 io.StringIO(token_text, newline=None).readline
             ):
-                kind = names.get(token.type)
+                kind = _python_token_kind(token, previous)
+                previous = token.string
                 if kind is None or token.start[0] != token.end[0]:
-                    continue
-                if token.type == tokenize.NAME and not token.string.isidentifier():
                     continue
                 # Token columns are Unicode code points in the original source.
                 offset = bom_columns if token.start[0] == 1 else 0

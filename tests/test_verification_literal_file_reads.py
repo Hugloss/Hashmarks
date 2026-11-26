@@ -195,3 +195,18 @@ def test_warm_document_relation_refuses_unavailable_reader(tmp_path: Path) -> No
                 codemap.tasks.verification_ownership_graph("Verify docs/guide.md")
         finally:
             reader.chmod(0o600)
+
+
+@pytest.mark.parametrize(
+    ("condition", "observed"),
+    [("True or", False), ("False and", False), ("False or", True), ("True and", True)],
+)
+def test_literal_read_relationship_obeys_boolean_short_circuit(
+    tmp_path: Path, condition: str, observed: bool
+) -> None:
+    _fixture(tmp_path, f"    assert {condition} (ROOT / 'docs/guide.md').read_text()\n")
+    with CodeMap(tmp_path) as repository:
+        repository.index.sync()
+        packet = repository.verification.changed_set(["docs/guide.md"])
+    assert bool(packet["targets"]) is observed
+    assert packet["negative_evidence_admissible"] is False

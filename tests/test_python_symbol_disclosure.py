@@ -7,6 +7,37 @@ from hashmarks import CodeMap
 from hashmarks.codemap.python_ast import estimate_tokens
 
 
+def test_outline_groups_shared_binding_statement_but_preserves_each_occurrence(
+    tmp_path: Path,
+) -> None:
+    header = "PRIMARY = PREVIOUS = FALLBACK = 'cache-v1'"
+    separate = "mirror = spare = 0"
+    mixed = "pair = (left, right) = fallback = (1, 2)"
+    (tmp_path / "settings.py").write_text(
+        f"{header}\n{separate}; {separate}\n{header}\n{mixed}\n"
+    )
+    with CodeMap(tmp_path) as repository:
+        packet = repository.source.outline("settings.py")
+        rows = assert_records(packet["symbols"])
+        occurrences = [row for row in rows if row["signature"] == header]
+        assert len(occurrences) == 6
+        for row in occurrences:
+            selected = repository.source.read(f"settings.py::{row['qualname']}")
+            assert selected["content"] == header
+            assert selected["lines"] == [row["start_line"], row["end_line"]]
+    outline = assert_text(packet["outline"])
+    assert outline.split("\n") == [
+        f"{header}  [1-1]",
+        *[f"{separate}  [2-2]"] * 4,
+        f"{header}  [3-3]",
+        f"{mixed}  [4-4]",
+        "left  [4-4]",
+        "right  [4-4]",
+    ]
+    assert packet["outline_tokens"] == estimate_tokens(outline)
+    assert len([row for row in rows if row["signature"] == separate]) == 4
+
+
 def test_python_outline_discloses_long_signature_once_with_its_exact_occurrence(
     tmp_path: Path,
 ) -> None:

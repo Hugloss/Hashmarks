@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+from collections.abc import Iterator
 from dataclasses import dataclass
 from functools import lru_cache
 
@@ -16,6 +17,26 @@ from .python_binding_scope import (
 from .python_bindings import PythonBindings
 
 MAX_KEYWORD_IDENTIFIER_CHARS = 128
+
+
+def _unnegated_test(test: ast.expr) -> tuple[ast.expr, bool]:
+    negated = False
+    while isinstance(test, ast.UnaryOp) and isinstance(test.op, ast.Not):
+        negated = not negated
+        test = test.operand
+    return test, negated
+
+
+def possible_boolean_operands(node: ast.BoolOp) -> Iterator[ast.expr]:
+    """Yield possibly evaluated operands up to and including a decisive literal."""
+    stop_if_true = isinstance(node.op, ast.Or)
+    for operand in node.values:
+        yield operand
+        test, negated = _unnegated_test(operand)
+        if isinstance(test, ast.Constant):
+            operand_truth = bool(test.value) != negated
+            if operand_truth == stop_if_true:
+                break
 
 
 @dataclass(frozen=True)
@@ -120,10 +141,7 @@ class _VerificationReferenceIndexVisitor(PythonReferenceVisitor):
                 self.visit(value)
 
     def _guarded_branches(self, test: ast.expr) -> tuple[str | None, str | None]:
-        negated = False
-        while isinstance(test, ast.UnaryOp) and isinstance(test.op, ast.Not):
-            negated = not negated
-            test = test.operand
+        test, negated = _unnegated_test(test)
         if isinstance(test, ast.Constant) and isinstance(test.value, bool):
             reason = "statically-dead"
             truth = test.value
@@ -136,6 +154,10 @@ class _VerificationReferenceIndexVisitor(PythonReferenceVisitor):
         else:
             return None, None
         return (None, reason) if truth != negated else (reason, None)
+
+    def visit_BoolOp(self, node: ast.BoolOp) -> None:
+        for operand in possible_boolean_operands(node):
+            self.visit(operand)
 
     def visit_If(self, node: ast.If) -> None:
         previous = self.guard

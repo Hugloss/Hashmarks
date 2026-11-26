@@ -73,11 +73,20 @@ def _binding_header(first_line: bytes) -> tuple[str, int]:
     return encoded[:retained].decode("utf-8", errors="ignore") + marker, cost
 
 
+def _declaration_name(
+    node: ast.ClassDef | ast.FunctionDef | ast.AsyncFunctionDef,
+) -> str:
+    parameters = getattr(node, "type_params", ())
+    if parameters:
+        return f"{node.name}[{', '.join(ast.unparse(p) for p in parameters)}]"
+    return node.name
+
+
 def _function_signature(node: ast.FunctionDef | ast.AsyncFunctionDef) -> str:
     prefix = "async def" if isinstance(node, ast.AsyncFunctionDef) else "def"
     args = ast.unparse(node.args)
     returns = "" if node.returns is None else f" -> {ast.unparse(node.returns)}"
-    signature = f"{prefix} {node.name}({args}){returns}"
+    signature = f"{prefix} {_declaration_name(node)}({args}){returns}"
     # Preserve the authored stub shape without interpreting decorators or
     # selecting a runtime implementation among repeated declarations.
     match node.body:
@@ -88,9 +97,9 @@ def _function_signature(node: ast.FunctionDef | ast.AsyncFunctionDef) -> str:
 
 def _class_signature(node: ast.ClassDef) -> str:
     bases = [ast.unparse(value) for value in node.bases]
-    bases.extend(f"{kw.arg}={ast.unparse(kw.value)}" for kw in node.keywords if kw.arg)
+    bases.extend(ast.unparse(keyword) for keyword in node.keywords)
     suffix = "" if not bases else f"({', '.join(bases)})"
-    return f"class {node.name}{suffix}"
+    return f"class {_declaration_name(node)}{suffix}"
 
 
 def _signature(node: ast.AST) -> str:

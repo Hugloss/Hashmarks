@@ -8,7 +8,7 @@ from hashmarks.operation_contract import operation_response, operation_schema
 
 CODEMAP_SCHEMA = "hashmarks.codemap.v1"
 PYTHON_SIGNATURE_PREVIEW_BYTES = 512
-PYTHON_PARSER = "hashmarks.python-ast.v20"
+PYTHON_PARSER = "hashmarks.python-ast.v21"
 _OCCURRENCE_MARKER = "@L"
 
 

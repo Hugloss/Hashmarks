@@ -806,3 +806,72 @@ def test_import_after_direct_return_retains_its_dead_syntax(tmp_path: Path) -> N
     assert row["reference_strength"] == "statically-dead"
     assert row["direct_reference"] is False
     assert changed["targets"] == []
+
+
+@pytest.mark.parametrize(
+    "dead", ["False and calculate_tax()", "True or calculate_tax()"]
+)
+def test_literal_short_circuit_cannot_nominate_a_decoy_test(
+    tmp_path: Path, dead: str
+) -> None:
+    with _repository(
+        tmp_path,
+        "from owner import calculate_tax\ndef test_calculate_tax():\n    result = "
+        + dead
+        + "\n",
+    ) as repository:
+        live = "tests/test_live.py"
+        (tmp_path / live).write_text(
+            "from owner import calculate_tax\ndef test_charges(): assert calculate_tax() == 2\n"
+        )
+        repository.index.sync()
+        packet = repository.tasks.evidence("Change calculate_tax in owner.py")
+        changed = repository.verification.changed_set(["owner.py"])
+        callers = repository.structure.locality("owner.py::calculate_tax", max_depth=0)
+    verify = packet["verification"]
+    row = next(
+        r
+        for r in verify["relevance"]["candidates"]
+        if r["path"] == "tests/test_amounts.py"
+    )
+    assert (
+        row.get("reference_strength") == "reachable-import"
+        and row.get("direct_reference") is False
+    )
+    assert row.get("test_symbol") is None
+    assert assert_object(verify["plan"])["test_symbol"] == "test_charges"
+    assert [r["path"] for r in assert_records(changed["targets"])] == [live]
+    assert changed["negative_evidence_admissible"] is False
+    assert {
+        r["source"]
+        for r in assert_records(assert_records(callers["nodes"])[0]["exact_callers"])
+    } == {"test_charges", "test_calculate_tax"}
+
+
+@pytest.mark.parametrize(
+    ("expression", "direct"),
+    [
+        ("flag and False and calculate_tax()", False),
+        ("flag or not False or calculate_tax()", False),
+        ("None and calculate_tax()", False),
+        ("'always' or calculate_tax()", False),
+        ("flag and calculate_tax() and False", True),
+        ("flag or calculate_tax() or True", True),
+        ("True and calculate_tax()", True),
+        ("False or calculate_tax()", True),
+        ("(False and unknown()) or calculate_tax()", True),
+    ],
+)
+def test_boolean_operands_keep_possible_uses_in_evaluation_order(
+    tmp_path: Path, expression: str, direct: bool
+) -> None:
+    with _repository(
+        tmp_path,
+        "from owner import calculate_tax\ndef test_amount(flag): return "
+        + expression
+        + "\n",
+    ) as repository:
+        repository.index.sync()
+        changed = repository.verification.changed_set(["owner.py"])
+    assert bool(changed["targets"]) is direct
+    assert changed["negative_evidence_admissible"] is False
