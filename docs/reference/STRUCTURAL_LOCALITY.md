@@ -48,6 +48,17 @@ When a header calls the name its declaration will publish, the final file
 binding cannot prove that earlier call's target. Such calls remain unresolved;
 ordinary body recursion and parameter names do not change that boundary.
 The per-symbol call limit applies after selecting that source's own calls.
+Repeated Python declarations retain separate outgoing calls, imports and type
+references. A later occurrence such as `Codec.encode@L6` can appear as the
+exact caller of a helper. The preceding overload stub keeps its own evidence,
+and resolving a call *to* a repeated name still requires a unique target.
+
+For a bare `helper()` inside a function that defines its own `helper`, the
+source binding at the call site can establish the nested declaration as an
+exact callee and the enclosing function as its caller. This requires a
+preceding, unconditional, undecorated declaration in the same function scope.
+Reassignment, a competing binding, and calls before the declaration preserve
+uncertainty. Passing the helper as a value supplies no call edge.
 Passing a callback to a task group does not establish an invocation edge, and
 two observed direct edges do not establish a transitive shortcut or runtime path.
 
@@ -56,6 +67,12 @@ function bindings. Another class's same-named method or an unrelated nested body
 cannot shadow that import. Actual argument, assignment, function, class and
 closure bindings preserve unresolved identity; duplicate declarations in the
 same qualified scope also remain unresolved.
+Python outlines identify functions declared in a class as methods and functions
+declared inside another function as functions, retaining their lexical qualified names.
+A bare call can refer to a module function even when a nested helper or class
+method shares its name. Module-level calls and definition headers require the
+supporting binding to occur on an earlier line. A same-line call retains
+uncertainty at the index's line precision.
 An immediately executed class body can explicitly write a module name through
 `global`; those writes also prevent exact import qualification. Ordinary class
 attributes and writes inside deferred function or method bodies do not escape
@@ -76,6 +93,19 @@ and unresolved identity continue to define the observation scope. An empty
 observed collection does not establish repository-wide or runtime absence.
 
 For Python class methods, `self.member(...)` and `cls.member(...)` may be promoted to an exact call only when the containing method/class is statically known and the member has one unambiguous owner through the local/import-resolved class inheritance graph. Competing inherited owners, unsupported/dynamic bases, or receiver shapes other than proven `self`/`cls` remain unresolved or external evidence rather than being guessed.
+
+A named base must qualify at the class header. A nested header looks in its
+enclosing class namespace before the module, and a later redefinition leaves
+the earlier base uncertain. A renamed import retains its underlying class
+declaration. Two inheritance paths reaching that declaration contribute one
+owner to the caller evidence.
+
+The source binding of a method decorator qualifies its receiver. A single
+unshadowed `classmethod` or an explicit alias can qualify `cls`, and an
+ordinary method or a qualified `property` getter can qualify `self`. A
+`staticmethod` takes its arguments from the caller. Custom or stacked
+decorators leave receiver identity uncertain, including a custom attribute
+whose final name happens to be `classmethod`.
 
 ## Forwarding-only syntax
 
@@ -436,6 +466,18 @@ repository declaration identity, source visibility, shadowing, ambiguity, cycles
 and the eight-hop bound still qualify resolution. Later assignments do not leave
 an earlier function declaration authoritative. Renamed facade chains retain the
 actual declaration's path and qualified name.
+
+An explicit module import can also qualify a direct call. For example,
+`import pkg.service as svc` can bind `svc.publish()` to a unique repository
+declaration, including one re-exported by `pkg.service`. Qualification uses
+the indexed module identity, the imported spelling and the existing member
+resolver. Local shadowing, visible writes through the imported receiver,
+and competing module paths keep the call unqualified.
+
+For a computed receiver such as `items[0].save()`, the indexed call spells
+the target `<expression>.save`. The named suffix remains visible without
+copying the receiver expression into the packet. A separate inner call in
+`factory().save()` retains its own evidence for `factory()`.
 
 Static `__all__` declarations define star-export membership, including explicitly
 listed leading-underscore names. Implicit exports exclude those names; dynamic

@@ -13,6 +13,7 @@ from .query_primitives import _WORD_RE, _query_terms
 from .query_router import QueryRoute, route_query
 from .repository_domains import RepositoryDomain, classify_repository_path
 from .retrieval_diagnostics import RetrievalDiagnosticsMixin
+from .signature_preview import signature_disclosure
 from .singleflight import SingleFlight
 from .task_retrieval import TaskRetrievalMixin, _TaskRetrievalResult
 
@@ -87,6 +88,13 @@ def _find_exact_targets(
             (hit.path, hit.qualname or hit.name, hit.start_line)
             for hit in hits
             if query in {hit.name, hit.qualname}
+            or (
+                hit.qualname is not None
+                and hit.kind != "native-definition"
+                and hit.path.lower().endswith((".py", ".pyi"))
+                and hit.name == query.rsplit(".", 1)[-1]
+                and query == hit.qualname.partition("@L")[0]
+            )
         }
     if intent == "path":
         normalized = query[2:] if query.startswith("./") else query
@@ -226,7 +234,10 @@ class RepositorySearch(TaskRetrievalMixin, RetrievalDiagnosticsMixin):
             "schema": operation_schema("find"),
             "query": query,
             "query_intent": route.intent.value,
-            "results": [hit.as_dict() for hit in evidence.hits],
+            "results": [
+                {**hit.as_dict(), **signature_disclosure(hit.path, hit.signature)}
+                for hit in evidence.hits
+            ],
             "truncated": "find-result-limit" in evidence.bound_reasons,
             "generation": generation,
             "identity_generation": identity_generation,
@@ -270,9 +281,11 @@ class RepositorySearch(TaskRetrievalMixin, RetrievalDiagnosticsMixin):
         rows = self.reads.exact_symbol_candidates(ctx.terms, limit=bound)
         if len(rows) >= bound:
             ctx.bound_reasons.add("find-exact-symbol-limit")
-        if ctx.route.intent.value == "identifier" and not ctx.query.isascii():
-            # SQLite lower() does not fold non-ASCII names. The existing exact
-            # visible-symbol index preserves their original spelling.
+        if ctx.route.intent.value == "identifier" and (
+            "." in ctx.query or not ctx.query.isascii()
+        ):
+            # Preserve dotted Python declaration occurrences and exact Unicode
+            # spelling, neither of which lexical terms reliably enumerate.
             exact_bound = min(bound, 1024)
             exact_rows = self.store.visible_symbol_candidates(
                 ctx.query.strip(), limit=exact_bound

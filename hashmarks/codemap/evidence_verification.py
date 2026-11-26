@@ -19,6 +19,7 @@ from .model import EvidenceVisibility
 from .query_primitives import _TASK_STOPWORDS, _query_terms
 from .repository_domains import RepositoryDomain, classify_repository_path
 from .repository_observation import evidence_identity
+from .source_binding_contract import BindingObservationBound
 from .task_evidence_contract import read_task_candidate
 from .verification_assets import VerificationAssetsMixin
 from .verification_changes import VerificationChangesMixin
@@ -32,6 +33,7 @@ from .verification_ownership import VerificationOwnershipMixin
 from .verification_plan import VerificationPlanMixin
 from .verification_reference_syntax import (
     MAX_KEYWORD_IDENTIFIER_CHARS,
+    AttributeUse,
 )
 from .verification_reference_syntax import (
     VerificationReferenceIndex as _VerificationReferenceIndex,
@@ -89,7 +91,9 @@ class _VerificationRelevanceState:
     import_owner_contributors: dict[str, set[str]] = field(default_factory=dict)
     unresolved_reference_identity_paths: set[str] = field(default_factory=set)
     unresolved_verifier_identity_paths: set[str] = field(default_factory=set)
-    qualified_attribute_refs: dict[str, set[str]] = field(default_factory=dict)
+    python_guards: dict[str, set[str | None]] = field(default_factory=dict)
+    direct_uses: dict[str, set[str | None]] = field(default_factory=dict)
+    indirect_tests: dict[str, set[str | None]] = field(default_factory=dict)
     reference_path_roles: dict[str, str] = field(default_factory=dict)
     lexical_test_paths: tuple[str, ...] | None = None
     module_test_paths: tuple[str, ...] | None = None
@@ -104,6 +108,16 @@ class _VerificationRelevanceState:
         self.unresolved_reference_identity_paths.add(path)
         if RepositoryDomain.TEST in classify_repository_path(path):
             self.unresolved_verifier_identity_paths.add(path)
+
+    def record_import_uses(
+        self, path: str, target: str, index: _VerificationReferenceIndex | None
+    ) -> None:
+        if index is None:
+            return
+        self.python_guards.setdefault(path, set()).update(index.guards.get(target, ()))
+        self.direct_uses.setdefault(path, set()).update(index.name_uses.get(target, ()))
+        if target in index.uncertain_imports:
+            self.record_unresolved_reference(path)
 
     @property
     def verifier_identity_ambiguous(self) -> bool:
@@ -440,6 +454,7 @@ class RepositoryVerification(
         self,
         state: _VerificationRelevanceState,
         symbol_refs: Sequence[Mapping[str, object]],
+        symbol: str = "",
     ) -> tuple[set[str], bool]:
         if TYPE_CHECKING:
             self = cast("RepositoryVerification", self)
@@ -459,19 +474,9 @@ class RepositoryVerification(
                 import_resolution_available = True
             if state.edit_path in resolved_paths:
                 exact_import_paths.add(ref_path)
-                index = self._verification_reference_index_for_path(state, ref_path)
-                if (
-                    RepositoryDomain.TEST in classify_repository_path(ref_path)
-                    and index is not None
-                    and (
-                        index.star_import
-                        or any(
-                            imported == target and bound in index.bound_names
-                            for imported, bound, _guard in index.module_bindings
-                        )
-                    )
-                ):
-                    state.record_unresolved_reference(ref_path)
+                if ref_path.endswith(".py") and "." not in symbol:
+                    index = self._verification_reference_index_for_path(state, ref_path)
+                    state.record_import_uses(ref_path, target, index)
         return exact_import_paths, import_resolution_available
 
     def _verification_reference_index_for_path(
@@ -485,16 +490,36 @@ class RepositoryVerification(
             return state.reference_indexes[path]
         try:
             snapshot = read_python_ast(self.workspace / path)
-            index = _verification_reference_index(
+            binding = (
                 os.path.abspath(os.fspath(self.workspace / path)),
                 snapshot.identity,
                 snapshot.tree,
+                snapshot.source,
             )
-        except (OSError, SyntaxError):
+            index = _verification_reference_index(*binding)
+            if index.used_typing_guard and self._verification_local_typing_module(
+                state, path
+            ):
+                index = _verification_reference_index(*binding, typing_guards=False)
+        except BindingObservationBound:
+            if state is not None:
+                state.search_bound_reasons.add("python-binding-observation-bound")
+            index = None
+        except (OSError, SyntaxError, UnicodeError):
             index = None
         if state is not None:
             state.reference_indexes[path] = index
         return index
+
+    def _verification_local_typing_module(
+        self, state: _VerificationRelevanceState | None, path: str
+    ) -> bool:
+        # An unqualified import context or a repository module called typing
+        # cannot establish the standard-library flag's static semantics.
+        if state is None:
+            return True
+        owners = self._verification_resolved_import_paths(state, path, "typing")
+        return bool(owners) or state.import_owner_evidence[(path, "typing")][1]
 
     def _verification_task_keyword_syntax(
         self,
@@ -561,19 +586,11 @@ class RepositoryVerification(
         self,
         state: _VerificationRelevanceState,
         ref_path: str,
-        target: str,
+        binding: AttributeUse,
         symbol: str,
     ) -> bool | None:
         self = cast("RepositoryVerification", self)
-        index = (
-            self._verification_reference_index_for_path(state, ref_path)
-            if ref_path.endswith(".py") and "." in target
-            else None
-        )
-        binding = None if index is None else index.imported_attribute(target)
-        if binding is None:
-            return None
-        imported, suffix = binding
+        imported, suffix = binding.imported, binding.suffix
         module = (
             self.imports._python_relative_module_candidate(ref_path, imported)
             if imported.startswith(".")
@@ -595,17 +612,13 @@ class RepositoryVerification(
         self,
         state: _VerificationRelevanceState,
         ref_path: str,
-        target: str,
+        binding: AttributeUse,
         symbol: str,
     ) -> bool | None:
         """Qualify an explicit imported member; instance receivers stay unknown."""
         if TYPE_CHECKING:
             self = cast("RepositoryVerification", self)
-        index = self._verification_reference_index_for_path(state, ref_path)
-        binding = None if index is None else index.imported_attribute(target)
-        if binding is None:
-            return None
-        imported, suffix = binding
+        imported, suffix = binding.imported, binding.suffix
         qualified = imported + "." + suffix
         if imported.startswith("."):
             qualified = self.imports._python_relative_module_candidate(
@@ -630,31 +643,28 @@ class RepositoryVerification(
         path, target = str(ref.get("path") or ""), str(ref.get("target") or "")
         if str(ref.get("target_short") or "") != symbol.rsplit(".", 1)[-1]:
             return False
-        if "." in symbol and path.endswith(".py"):
-            member = self._verification_member_reference_owner_match(
-                state, path, target, symbol
+        if path.endswith(".py") and (
+            "." in symbol or ("." in target and ref["kind"] != "import")
+        ):
+            index = self._verification_reference_index_for_path(state, path)
+            line = int(cast("int", ref.get("line") or 0))
+            binding = index.imported_attribute(target, line) if index else None
+            match = (
+                self._verification_member_reference_owner_match
+                if "." in symbol
+                else self._verification_module_alias_reference_owner_match
             )
-            if member is None:
+            qualified = match(state, path, binding, symbol) if binding else None
+            if qualified and binding is not None:
+                state.direct_uses.setdefault(path, set()).add(binding.test)
+            elif qualified is None:
                 state.record_unresolved_reference(path)
-            return member is True
-        alias_owner = self._verification_module_alias_reference_owner_match(
-            state, path, target, symbol
-        )
-        if path.endswith(".py") and "." in target and str(ref.get("kind")) != "import":
-            if alias_owner is None:
-                state.record_unresolved_reference(path)
-            return alias_owner is True
+            return qualified is True
         exact_import_paths, resolution_available = imports
         if path.endswith(".py") and not resolution_available:
             state.record_unresolved_reference(path)
             return False
-        return (
-            alias_owner
-            if alias_owner is not None
-            else path in exact_import_paths
-            if resolution_available
-            else True
-        )
+        return path in exact_import_paths if resolution_available else True
 
     def _verification_support_reference(
         self, state: _VerificationRelevanceState, path: str
@@ -676,7 +686,7 @@ class RepositoryVerification(
         symbol_refs: Sequence[Mapping[str, object]],
     ) -> None:
         short = symbol.rsplit(".", 1)[-1]
-        imports = self._verification_exact_import_paths(state, symbol_refs)
+        imports = self._verification_exact_import_paths(state, symbol_refs, symbol)
         for ref in symbol_refs:
             path = str(ref.get("path") or "")
             if not path or not self._verification_ref_visible(ref):
@@ -687,12 +697,6 @@ class RepositoryVerification(
             exact_reference = exact_reference and (
                 path not in state.unresolved_import_identity_paths
             )
-            if (
-                exact_reference
-                and "." in str(ref.get("target") or "")
-                and str(ref.get("kind")) != "import"
-            ):
-                state.qualified_attribute_refs.setdefault(path, set()).add(short)
             domains = set(classify_repository_path(path))
             if RepositoryDomain.TEST in domains:
                 state.candidate_paths.add(path)
@@ -912,13 +916,17 @@ class RepositoryVerification(
             candidate_paths=set(),
             refs_by_path={},
             source_ref_paths=set(),
-            qualified_attribute_refs={},
+            direct_uses={},
+            python_guards={},
         )
         self._verification_collect_direct_symbol_refs(endpoint, symbol, refs)
         state.candidate_paths.update(endpoint.candidate_paths)
         for path, symbols in endpoint.refs_by_path.items():
             state.indirect_refs_by_path.setdefault(path, set()).update(symbols)
             state.indirect_via_paths.setdefault(path, set()).add(via_path)
+            state.indirect_tests.setdefault(path, set()).update(
+                endpoint.direct_uses.get(path, ())
+            )
 
     @staticmethod
     def _verification_relevance_test_symbol(
@@ -941,52 +949,6 @@ class RepositoryVerification(
             return None
         return scored[0][1] if scored[0][0] > 0 or len(scored) == 1 else None
 
-    @staticmethod
-    def _verification_index_strength(
-        index: _VerificationReferenceIndex,
-        symbols: Sequence[str],
-        *,
-        attribute_use: bool = False,
-    ) -> dict[str, object]:
-        symbol_set = set(symbols)
-        bindings = [
-            (bound_name, guard)
-            for imported_name, bound_name, guard in index.bindings
-            if imported_name in symbol_set
-        ]
-        if not bindings:
-            if attribute_use:
-                return {
-                    "syntactic_reference": True,
-                    "reachable_import": True,
-                    "reachable_symbol_use": True,
-                    "reference_strength": "reachable-symbol-use",
-                }
-            return {"syntactic_reference": True, "reference_strength": "syntactic"}
-        live_names = {name for name, guard in bindings if guard is None}
-        guards = {guard for _name, guard in bindings if guard is not None}
-        symbol_use = bool(
-            (
-                not index.star_import
-                and (live_names - index.bound_names).intersection(index.reachable_names)
-            )
-            or attribute_use
-        )
-        if symbol_use:
-            strength = "reachable-symbol-use"
-        elif live_names:
-            strength = "reachable-import"
-        elif "type-checking-only" in guards:
-            strength = "type-checking-only"
-        else:
-            strength = "statically-dead"
-        return {
-            "syntactic_reference": True,
-            "reachable_import": bool(live_names),
-            "reachable_symbol_use": symbol_use,
-            "reference_strength": strength,
-        }
-
     def _verification_reference_strength(
         self,
         path: str,
@@ -1007,12 +969,40 @@ class RepositoryVerification(
         index = self._verification_reference_index_for_path(state, path)
         if index is None:
             return {"syntactic_reference": True, "reference_strength": "syntactic"}
-        attribute_use = state is not None and bool(
-            set(symbols).intersection(state.qualified_attribute_refs.get(path, set()))
-        )
-        return self._verification_index_strength(
-            index, symbols, attribute_use=attribute_use
-        )
+        guards = state.python_guards.get(path, set()) if state else set()
+        used = bool(state and state.direct_uses.get(path))
+        return index.strength(guards, used)
+
+    def _verification_candidate_test_symbol(
+        self,
+        state: _VerificationRelevanceState,
+        path: str,
+        symbols: Sequence[Mapping[str, object]],
+    ) -> str | None:
+        if path.endswith(".py"):
+            # A class method has no flat file::function selector. A lexical
+            # candidate may still disclose a name; only witnessed uses narrow a
+            # selected reference to a particular declaration.
+            symbols = [row for row in symbols if row.get("qualname") == row.get("name")]
+            reads = state.file_read_references.get(path, ())
+            if (
+                state.refs_by_path.get(path)
+                or state.indirect_refs_by_path.get(path)
+                or reads
+            ):
+                tests = set(
+                    state.direct_uses.get(path) or state.indirect_tests.get(path, ())
+                )
+                if reads:
+                    index = self._verification_reference_index_for_path(state, path)
+                    if index is not None:
+                        tests.update(
+                            index.flat_tests.intersection(
+                                str(read.get("test_symbol")) for read in reads
+                            )
+                        )
+                symbols = [row for row in symbols if row.get("name") in tests]
+        return self._verification_relevance_test_symbol(symbols, state.task_terms)
 
     def _verification_candidate_row(
         self,
@@ -1033,9 +1023,6 @@ class RepositoryVerification(
             evidence_terms.update(_query_terms(str(symbol.get("name") or "")))
             evidence_terms.update(_query_terms(str(symbol.get("qualname") or "")))
         anchor_terms = sorted(state.task_terms.intersection(evidence_terms))
-        test_symbol = self._verification_relevance_test_symbol(
-            test_symbols, state.task_terms
-        )
         direct_symbols = sorted(state.refs_by_path.get(path, set()))
         indirect_symbols = sorted(state.indirect_refs_by_path.get(path, set()))
         reference = self._verification_reference_strength(
@@ -1071,7 +1058,9 @@ class RepositoryVerification(
             "task_anchor_count": len(anchor_terms),
             "task_anchor_terms": anchor_terms,
             "canonical_rank": state.canonical_rank.get(path),
-            "test_symbol": test_symbol,
+            "test_symbol": self._verification_candidate_test_symbol(
+                state, path, test_symbols
+            ),
             # This is repository-declared nomination availability. Installed
             # executables and physical commands are external consumer concerns.
             "runner_available": self._verification_nomination_available(path),
@@ -1455,6 +1444,14 @@ class RepositoryVerification(
                 {**selected_row, "selection_reason": selection_reason}
             )
         )
+        if (
+            selected
+            and selected["path"].endswith(".py")
+            and not (
+                selected.get("direct_reference") or selected.get("indirect_reference")
+            )
+        ):
+            selected["test_symbol"] = None
         identity_ambiguous = bool(
             state.unresolved_import_identity_paths
             or state.unresolved_reference_identity_paths

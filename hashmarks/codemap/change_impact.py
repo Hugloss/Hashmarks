@@ -546,13 +546,7 @@ class ChangeImpactMixin(ReadScopeOwner):
         )
         if not changed_hits_task or verify is None:
             return
-        plan = self.verification.plan(
-            verify_path,
-            symbol=str(verify.get("verification_test_symbol") or "")
-            or str(verify.get("name") or "")
-            or None,
-            qualname=str(verify.get("qualname") or "") or None,
-        )
+        plan = self.verification._task_selection_plan(verify)
         verification_meta: dict[str, object] = {
             "available": bool(plan.get("available"))
         }

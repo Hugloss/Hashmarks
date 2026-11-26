@@ -7,7 +7,9 @@ operation-local index does not parse, read files, or resolve repository imports.
 from __future__ import annotations
 
 import ast
+import sys
 from collections import Counter
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 
 from .python_exports import _binding_children, _binding_writes
@@ -47,6 +49,53 @@ class PythonBinding:
     value: ast.AST | None = None
     imported: ast.Import | ast.ImportFrom | None = None
     reason: str | None = None
+
+
+def annotations_are_deferred(tree: ast.Module) -> bool:
+    """Whether this module's annotations are separate from definition-time evaluation."""
+    if sys.version_info >= (3, 14):
+        return True
+    start = 1 if ast.get_docstring(tree, clean=False) is not None else 0
+    for index in range(start, len(tree.body)):
+        node = tree.body[index]
+        if (
+            not isinstance(node, ast.ImportFrom)
+            or node.module != "__future__"
+            or node.level
+        ):
+            break
+        if any(alias.name == "annotations" for alias in node.names):
+            return True
+    return False
+
+
+def definition_time_expressions(
+    node: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef, *, deferred: bool
+) -> Iterator[ast.AST]:
+    """Keep evaluated defaults, decorators and bases in their defining scope."""
+    for field, value in ast.iter_fields(node):
+        # PEP 695/696 bounds, constraints and parameter defaults evaluate on access.
+        if field in {"body", "type_params"} or (deferred and field == "returns"):
+            continue
+        if deferred and isinstance(value, ast.arguments):
+            yield from value.defaults
+            yield from (default for default in value.kw_defaults if default is not None)
+        elif isinstance(value, list):
+            yield from (item for item in value if isinstance(item, ast.AST))
+        elif isinstance(value, ast.AST):
+            yield value
+
+
+def annotated_assignment_expressions(
+    node: ast.AnnAssign, scope: ast.AST | None, *, deferred: bool
+) -> Iterator[ast.expr]:
+    """Expose possible evaluated expressions separately from annotation evidence."""
+    yield node.target
+    if node.value is not None:
+        yield node.value
+    # A function's local variable annotation never evaluates its expression.
+    if not deferred and isinstance(scope, (ast.ClassDef, ast.Module)):
+        yield node.annotation
 
 
 def function_parameters(node: FunctionNode) -> list[ast.arg]:

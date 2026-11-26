@@ -7,7 +7,7 @@ bounds, reference escaping, counting and omission accounting.
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from copy import deepcopy
 from typing import TYPE_CHECKING, Any
 
@@ -638,13 +638,11 @@ def _initial_field_declarations_text(rows: list[dict[str, Any]]) -> list[str]:
         "Declared field syntax @ /retrieval/results/"
         + str(index)
         + "/field_declarations: "
-        + json.dumps(
+        + _initial_json_record(
             field_declaration_scope(
                 row["field_declarations"],
                 f"/retrieval/results/{index}/field_declarations",
-            ),
-            sort_keys=True,
-            separators=(",", ":"),
+            )
         )
         for index, row in enumerate(rows)
         if isinstance(row.get("field_declarations"), Mapping)
@@ -696,6 +694,48 @@ def _project_initial_source_context(
         )
 
 
+def _source_excerpt_text_cells(
+    anchors: list[Any],
+) -> Iterator[tuple[str, dict[str, Any]]]:
+    for index, anchor in enumerate(anchors):
+        rows = anchor.get("context_excerpt") if isinstance(anchor, dict) else None
+        if isinstance(rows, list):
+            for offset, row in enumerate(rows):
+                if isinstance(row, dict):
+                    yield f"/line_anchors/{index}/context_excerpt/{offset}/text", row
+
+
+def _initial_source_text_record(observation: Mapping[str, object], ref: str) -> str:
+    view = _source_context_view(observation, ref)
+    anchors = view.get("line_anchors")
+    if not isinstance(anchors, list) or len(anchors) < 2:
+        return _initial_json_record(view)
+    # Keep roles, byte/column bounds and hashes on each original row. The
+    # references only supply identical text at the same observed source line.
+    anchors = deepcopy(anchors)
+    first_text: dict[tuple[int, str], str] = {}
+    references: dict[str, str] = {}
+    for pointer, row in _source_excerpt_text_cells(anchors):
+        line, text = row.get("line"), row.get("text")
+        if type(line) is not int or not isinstance(text, str):
+            continue
+        first = first_text.setdefault((line, text), pointer)
+        if first != pointer and len(text.encode("utf-8")) > len(pointer) + len(first):
+            references[pointer] = first
+            del row["text"]
+    original = _initial_json_record(view)
+    if not references:
+        return original
+    shared = _initial_json_record(
+        {**view, "line_anchors": anchors, "excerpt_text_refs": references}
+    )
+    return (
+        shared
+        if len(shared.encode("utf-8")) < len(original.encode("utf-8"))
+        else original
+    )
+
+
 def _initial_source_context_text(rows: list[dict[str, Any]]) -> list[str]:
     lines = []
     for index, row in enumerate(rows):
@@ -704,17 +744,13 @@ def _initial_source_context_text(rows: list[dict[str, Any]]) -> list[str]:
             ref = f"/retrieval/results/{index}/source_observation"
             lines.append(
                 f"Source observation @ {ref}: "
-                + json.dumps(
-                    _source_context_view(observation, ref),
-                    sort_keys=True,
-                    separators=(",", ":"),
-                )
+                + _initial_source_text_record(observation, ref)
             )
         selection = row.get("source_selection")
         if isinstance(selection, Mapping):
             lines.append(
                 f"Source selection @ /retrieval/results/{index}/source_selection: "
-                + json.dumps(selection, sort_keys=True, separators=(",", ":"))
+                + _initial_json_record(selection)
             )
     return lines
 
@@ -727,9 +763,7 @@ def _initial_inline_text(value: object) -> str:
     )
 
 
-def _initial_locator_json(
-    value: Mapping[str, object], *, sort_keys: bool = True
-) -> str:
+def _initial_json_record(value: Mapping[str, object], *, sort_keys: bool = True) -> str:
     """Retain printable Unicode, escaping separators JSON otherwise leaves raw."""
     encoded = json.dumps(
         value, sort_keys=sort_keys, ensure_ascii=False, separators=(",", ":")
@@ -767,7 +801,7 @@ def _initial_ambiguity_text(ambiguity: Mapping[str, Any]) -> list[str]:
         }
         lines.append(
             "Owner alternative: "
-            + _initial_locator_json(locator, sort_keys=False)
+            + _initial_json_record(locator, sort_keys=False)
             + f" (@ /ownership/ambiguity/alternatives/{index})."
         )
     return lines
@@ -783,7 +817,7 @@ def _initial_next_read_text(ownership: Mapping[str, object]) -> list[str]:
     displayed = {
         key: value for key, value in next_read.items() if key in _NEXT_READ_TEXT_FIELDS
     }
-    payload = _initial_locator_json(displayed)
+    payload = _initial_json_record(displayed)
     omitted = len(next_read) - len(displayed)
     if len(payload.encode("utf-8")) > _MAX_INITIAL_INLINE_TEXT_BYTES:
         payload = '{"display":"native-details-only;inline-budget-exceeded"}'
@@ -861,7 +895,7 @@ def initial_evidence_text(packet: Mapping[str, object]) -> str:
         if isinstance(relevance.get("candidates_encoding"), dict):
             rows = decode_initial_collection(rows, relevance["candidates_encoding"])
         for index, row in enumerate(rows):
-            locator = _initial_locator_json(_initial_verification_locator(row))
+            locator = _initial_json_record(_initial_verification_locator(row))
             lines.append(
                 f"Verification candidate: {locator} (@ /verification/relevance/candidates/{index})."
             )

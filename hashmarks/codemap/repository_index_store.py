@@ -202,6 +202,8 @@ def _symbol_from(value: dict[str, object]) -> SymbolRecord:
         signature_tokens=int(cast(int, value.get("signature_tokens", 0))),
         body_tokens=int(cast(int, value.get("body_tokens", 0))),
         parent=None if value.get("parent") is None else str(value["parent"]),
+        start_byte_column=cast("int | None", value.get("start_byte_column")),
+        end_byte_column=cast("int | None", value.get("end_byte_column")),
     )
 
 
@@ -330,6 +332,8 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
               signature_tokens INTEGER NOT NULL,
               body_tokens INTEGER NOT NULL,
               parent TEXT,
+              start_byte_column INTEGER,
+              end_byte_column INTEGER,
               PRIMARY KEY(path, qualname)
             );
             CREATE INDEX IF NOT EXISTS symbol_name_idx ON symbol(name);
@@ -599,7 +603,20 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
         }
         if not tables:
             return True
-        if tables != self._CURRENT_TABLES:
+        if tables != self._CURRENT_TABLES or self._column_names(self._db, "symbol") != (
+            "path",
+            "name",
+            "qualname",
+            "kind",
+            "signature",
+            "start_line",
+            "end_line",
+            "signature_tokens",
+            "body_tokens",
+            "parent",
+            "start_byte_column",
+            "end_byte_column",
+        ):
             return False
         if self._column_names(self._db, "native_definition") != (
             "path",
@@ -949,8 +966,8 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
                     ),
                 )
                 self._db.executemany(
-                    """INSERT INTO symbol(path,name,qualname,kind,signature,start_line,end_line,signature_tokens,body_tokens,parent)
-                    VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                    """INSERT INTO symbol(path,name,qualname,kind,signature,start_line,end_line,signature_tokens,body_tokens,parent,start_byte_column,end_byte_column)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
                     [
                         (
                             path,
@@ -963,6 +980,8 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
                             s.signature_tokens,
                             s.body_tokens,
                             s.parent,
+                            s.start_byte_column,
+                            s.end_byte_column,
                         )
                         for s in artifact.symbols
                     ],

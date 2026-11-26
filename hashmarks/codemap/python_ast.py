@@ -3,8 +3,10 @@ from __future__ import annotations
 import ast
 import hashlib
 import json
+import re
 from collections.abc import Iterable
 from dataclasses import dataclass
+from functools import cached_property
 
 from hashmarks import python_ast_cache
 
@@ -15,23 +17,57 @@ from .model import (
     LexicalRecord,
     ParsedArtifact,
     SymbolRecord,
+    allocate_symbol_occurrence,
 )
-from .python_exports import python_import_target
+from .python_binding_scope import (
+    annotated_assignment_expressions,
+    annotations_are_deferred,
+    definition_time_expressions,
+)
+from .python_bindings import PythonBindings
+from .python_exports import assignment_name_targets, python_import_target
+from .source_binding_contract import BindingObservationBound
 
 
-def estimate_tokens(text: str) -> int:
+def estimate_tokens(text: str | bytes) -> int:
     if not text:
         return 0
     # Intentionally tokenizer-independent. Context budgeting needs a stable,
     # cheap estimate; model-specific tokenizers can be adapters later.
-    return max(1, (len(text.encode("utf-8")) + 3) // 4)
+    size = len(text.encode("utf-8")) if isinstance(text, str) else len(text)
+    return max(1, (size + 3) // 4)
+
+
+def python_source_byte_lines(source: str | bytes) -> list[bytes]:
+    """Match AST universal newlines while preserving Unicode separators and form feeds."""
+    raw = source.encode("utf-8") if isinstance(source, str) else source
+    return raw.replace(b"\r\n", b"\n").replace(b"\r", b"\n").split(b"\n")
+
+
+def python_symbol_bytes(
+    lines: list[bytes], start: int, end: int, byte_columns: tuple[int, int] | None
+) -> bytes:
+    selected = lines[start - 1 : end]
+    if byte_columns is not None:
+        left, right = byte_columns
+        if start == end:
+            return selected[0][left:right]
+        selected[0] = selected[0][left:]
+        selected[-1] = selected[-1][:right]
+    return b"\n".join(selected)
 
 
 def _function_signature(node: ast.FunctionDef | ast.AsyncFunctionDef) -> str:
     prefix = "async def" if isinstance(node, ast.AsyncFunctionDef) else "def"
     args = ast.unparse(node.args)
     returns = "" if node.returns is None else f" -> {ast.unparse(node.returns)}"
-    return f"{prefix} {node.name}({args}){returns}"
+    signature = f"{prefix} {node.name}({args}){returns}"
+    # Preserve the authored stub shape without interpreting decorators or
+    # selecting a runtime implementation among repeated declarations.
+    match node.body:
+        case [ast.Expr(value=ast.Constant(value=value))] if value is Ellipsis:
+            return signature + ": ..."
+    return signature
 
 
 def _class_signature(node: ast.ClassDef) -> str:
@@ -49,69 +85,148 @@ def _signature(node: ast.AST) -> str:
     raise TypeError(type(node).__name__)
 
 
-def _target_name(node: ast.AST) -> str | None:
+def _target_name(node: ast.AST, *, computed_receiver: str = "") -> str | None:
     if isinstance(node, ast.Name):
         return node.id
     if isinstance(node, ast.Attribute):
-        left = _target_name(node.value)
-        return node.attr if left is None else f"{left}.{node.attr}"
+        left = _target_name(node.value, computed_receiver=computed_receiver)
+        receiver = left or computed_receiver
+        return f"{receiver}.{node.attr}" if receiver else node.attr
     return None
 
 
-def _string_annotation_targets(value: str) -> tuple[str, ...]:
-    try:
-        return _annotation_targets(ast.parse(value, mode="eval").body)
-    except (SyntaxError, ValueError):
-        stripped = value.strip()
-        return (
-            (stripped,)
-            if stripped and all(part.isidentifier() for part in stripped.split("."))
-            else ()
+_VALUE_TYPING_FORMS = frozenset({"Annotated", "Literal"})
+_TYPING_MODULES = frozenset({"typing", "typing_extensions"})
+_NON_INDENT_BYTE = re.compile(rb"[^ \t\f]")
+
+
+@dataclass
+class _AnnotationTargets:
+    tree: ast.Module
+    source: str | bytes
+
+    @cached_property
+    def _candidate_names(self) -> set[str]:
+        """Narrow lexical work; only the source binding can establish a form."""
+        names = set(_VALUE_TYPING_FORMS)
+        aliases: dict[str, set[str]] = {}
+        # Only statements can declare imports or assignment aliases. Avoid a
+        # second walk over every expression in ordinary annotated members.
+        pending: list[ast.AST] = list(self.tree.body)
+        while pending:
+            node = pending.pop()
+            pending.extend(
+                child
+                for child in ast.iter_child_nodes(node)
+                if isinstance(child, (ast.stmt, ast.ExceptHandler, ast.match_case))
+            )
+            if isinstance(node, ast.ImportFrom) and node.module in _TYPING_MODULES:
+                names.update(
+                    alias.asname or alias.name
+                    for alias in node.names
+                    if alias.name in _VALUE_TYPING_FORMS
+                )
+            elif isinstance(node, (ast.Assign, ast.AnnAssign)) and isinstance(
+                node.value, (ast.Name, ast.Attribute)
+            ):
+                spelling = (
+                    node.value.id
+                    if isinstance(node.value, ast.Name)
+                    else node.value.attr
+                )
+                targets = (
+                    node.targets if isinstance(node, ast.Assign) else [node.target]
+                )
+                aliases.setdefault(spelling, set()).update(
+                    t.id for t in targets if isinstance(t, ast.Name)
+                )
+        pending_names = list(names)
+        while pending_names:
+            new_names = aliases.get(pending_names.pop(), set()) - names
+            names.update(new_names)
+            pending_names.extend(new_names)
+        return names
+
+    @cached_property
+    def _bindings(self) -> PythonBindings | None:
+        raw = (
+            self.source.encode("utf-8") if isinstance(self.source, str) else self.source
         )
+        try:
+            return PythonBindings(self.tree, raw)
+        except BindingObservationBound:
+            return None
 
+    def _typing_form(self, value: ast.expr, anchor: ast.Constant | None) -> str | None:
+        if not isinstance(value, (ast.Name, ast.Attribute)):
+            return None
+        name = value.id if isinstance(value, ast.Name) else value.attr
+        if name not in self._candidate_names:
+            return None
+        if self._bindings is None:
+            return "unknown"
+        scope = self._bindings.syntax.owners[anchor or value]
+        binding = self._bindings.resolve(value, scope)
+        if binding.qualification != "qualified":
+            return "unknown"
+        origin = binding.qualified_absolute_import
+        if origin and origin[0] in _TYPING_MODULES and len(origin[1]) == 1:
+            return origin[1][0]
+        return None
 
-def _iterable_annotation_targets(nodes: Iterable[ast.AST]) -> tuple[str, ...]:
-    return tuple(value for node in nodes for value in _annotation_targets(node))
+    def _type_arguments(
+        self, node: ast.Subscript, anchor: ast.Constant | None
+    ) -> tuple[ast.AST, ...]:
+        form = self._typing_form(node.value, anchor)
+        if form in {"Literal", "unknown"}:
+            return ()
+        if form == "Annotated":
+            items = node.slice.elts if isinstance(node.slice, ast.Tuple) else []
+            return tuple(items[:1]) if len(items) >= 2 else ()
+        return (node.slice,)
 
-
-def _compound_annotation_targets(node: ast.AST) -> tuple[str, ...]:
-    if isinstance(node, ast.Subscript):
-        values = (*_annotation_targets(node.value), *_annotation_targets(node.slice))
-    elif isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitOr):
-        values = (*_annotation_targets(node.left), *_annotation_targets(node.right))
-    elif isinstance(node, (ast.Tuple, ast.List, ast.Set)):
-        values = _iterable_annotation_targets(node.elts)
-    else:
-        values = _iterable_annotation_targets(ast.iter_child_nodes(node))
-    return tuple(dict.fromkeys(values))
-
-
-def _annotation_targets(node: ast.AST | None) -> tuple[str, ...]:
-    """Return stable named references contained in a type annotation."""
-    if node is None:
-        return ()
-    if isinstance(node, ast.Constant):
-        return (
-            _string_annotation_targets(node.value)
-            if isinstance(node.value, str)
-            else ()
-        )
-    target = _target_name(node)
-    return (target,) if target is not None else _compound_annotation_targets(node)
+    def targets(
+        self, node: ast.AST | None, anchor: ast.Constant | None = None
+    ) -> tuple[str, ...]:
+        if node is None:
+            return ()
+        if isinstance(node, ast.Constant):
+            if not isinstance(node.value, str):
+                return ()
+            try:
+                expression = ast.parse(node.value.strip(), mode="eval").body
+            except (SyntaxError, ValueError, RecursionError):
+                return ()
+            container = anchor or node
+            # Decoded expression coordinates cannot qualify source binding order.
+            PythonBindings.locate_annotation_reference(expression, container)
+            return self.targets(expression, container)
+        target = _target_name(node)
+        if target is not None:
+            return (target,)
+        children: Iterable[ast.AST] = ast.iter_child_nodes(node)
+        if isinstance(node, ast.Subscript):
+            children = (node.value, *self._type_arguments(node, anchor))
+        names = (name for child in children for name in self.targets(child, anchor))
+        return tuple(dict.fromkeys(names))
 
 
 @dataclass
 class _Collector(ast.NodeVisitor):
-    source: str
+    lines: list[bytes]
+    annotations: _AnnotationTargets
 
     def __post_init__(self) -> None:
+        self.deferred_annotations = annotations_are_deferred(self.annotations.tree)
         self.symbols: list[SymbolRecord] = []
         self.edges: list[EdgeRecord] = []
-        self.stack: list[str] = []
+        self.stack: list[ast.ClassDef | ast.FunctionDef | ast.AsyncFunctionDef] = []
+        self.occurrences: set[str] = set()
+        self.source_occurrence: str | None = None
 
     @property
     def current(self) -> str | None:
-        return ".".join(self.stack) if self.stack else None
+        return ".".join(node.name for node in self.stack) if self.stack else None
 
     def _symbol_record(
         self,
@@ -122,7 +237,7 @@ class _Collector(ast.NodeVisitor):
         span: tuple[int, int],
     ) -> SymbolRecord:
         start, end = span
-        body = "\n".join(self.source.splitlines()[start - 1 : end])
+        body = python_symbol_bytes(self.lines, start, end, None)
         return SymbolRecord(
             name=node.name,
             qualname=qualname,
@@ -138,7 +253,7 @@ class _Collector(ast.NodeVisitor):
     def _function_annotation_edges(
         self, node: ast.FunctionDef | ast.AsyncFunctionDef, qualname: str, start: int
     ) -> None:
-        for target in _annotation_targets(node.returns):
+        for target in self.annotations.targets(node.returns):
             self.edges.append(
                 EdgeRecord(qualname, "return-type", target, start, "annotation")
             )
@@ -148,7 +263,7 @@ class _Collector(ast.NodeVisitor):
         )
         for arg in positional:
             line = int(getattr(arg, "lineno", start))
-            for target in _annotation_targets(arg.annotation):
+            for target in self.annotations.targets(arg.annotation):
                 self.edges.append(
                     EdgeRecord(qualname, "parameter-type", target, line, "annotation")
                 )
@@ -161,7 +276,7 @@ class _Collector(ast.NodeVisitor):
     ) -> None:
         if isinstance(node, ast.ClassDef):
             for base in node.bases:
-                for target in _annotation_targets(base):
+                for target in self.annotations.targets(base):
                     self.edges.append(
                         EdgeRecord(qualname, "inherits", target, start, "annotation")
                     )
@@ -176,39 +291,40 @@ class _Collector(ast.NodeVisitor):
         signature = _signature(node)
         start = int(getattr(node, "lineno", 1))
         end = int(getattr(node, "end_lineno", start))
+        occurrence = allocate_symbol_occurrence(self.occurrences, qualname, start)
         self.symbols.append(
-            self._symbol_record(node, kind, qualname, signature, (start, end))
+            self._symbol_record(node, kind, occurrence, signature, (start, end))
         )
-        self._annotation_edges(node, qualname, start)
+        self._annotation_edges(node, occurrence, start)
         # Definition expressions belong to the surrounding scope. A decorator,
         # default or base expression is not a call made by the declared body.
-        for field, value in ast.iter_fields(node):
-            if field == "body":
-                continue
-            if isinstance(value, list):
-                for item in value:
-                    if isinstance(item, ast.AST):
-                        self.visit(item)
-            elif isinstance(value, ast.AST):
-                self.visit(value)
-        self.stack.append(node.name)
+        for expression in definition_time_expressions(
+            node, deferred=self.deferred_annotations
+        ):
+            self.visit(expression)
+        self.stack.append(node)
+        previous = self.source_occurrence
+        self.source_occurrence = occurrence
         for statement in node.body:
             self.visit(statement)
+        self.source_occurrence = previous
         self.stack.pop()
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
         self._symbol(node, "class")
 
-    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
-        self._symbol(node, "method" if self.stack else "function")
+    def visit_FunctionDef(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> None:
+        parent = self.stack[-1] if self.stack else None
+        self._symbol(node, "method" if isinstance(parent, ast.ClassDef) else "function")
 
-    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
-        self._symbol(node, "method" if self.stack else "function")
+    visit_AsyncFunctionDef = visit_FunctionDef
 
     def visit_Import(self, node: ast.Import) -> None:
         for alias in node.names:
             self.edges.append(
-                EdgeRecord(self.current, "import", alias.name, int(node.lineno))
+                EdgeRecord(
+                    self.source_occurrence, "import", alias.name, int(node.lineno)
+                )
             )
         self.generic_visit(node)
 
@@ -216,63 +332,104 @@ class _Collector(ast.NodeVisitor):
         for alias in node.names:
             target = python_import_target(node, alias.name)
             self.edges.append(
-                EdgeRecord(self.current, "import", target, int(node.lineno))
+                EdgeRecord(self.source_occurrence, "import", target, int(node.lineno))
             )
         self.generic_visit(node)
 
-    def _module_binding(self, node: ast.AST, name: str, kind: str) -> None:
-        if self.current is not None:
+    def _module_bindings(
+        self, node: ast.stmt, targets: Iterable[ast.expr], kind: str
+    ) -> None:
+        if (
+            self.current is not None
+            or node.end_lineno is None
+            or node.end_col_offset is None
+        ):
             return
-        start = int(getattr(node, "lineno", 1))
-        end = int(getattr(node, "end_lineno", start))
-        lines = self.source.splitlines()
-        signature = lines[start - 1].strip()[:400]
-        self.symbols.append(
-            SymbolRecord(
-                name=name,
-                qualname=name,
-                kind=kind,
-                signature=signature,
-                start_line=start,
-                end_line=end,
-                signature_tokens=estimate_tokens(signature),
-                body_tokens=estimate_tokens("\n".join(lines[start - 1 : end])),
+        named = [
+            (item, item is root)
+            for root in targets
+            for item in assignment_name_targets(root)
+        ]
+        if not named:
+            return
+        start, end = node.lineno, node.end_lineno
+        left, right = node.col_offset, node.end_col_offset
+        # Keep ordinary line excerpts (including their comments/indentation).
+        # A shared line needs the exact AST statement's UTF-8 byte columns.
+        prefix = _NON_INDENT_BYTE.search(self.lines[start - 1], 0, left)
+        suffix = _NON_INDENT_BYTE.search(self.lines[end - 1], right)
+        columns = (left, right) if prefix or (suffix and suffix[0] == b";") else None
+        body = python_symbol_bytes(self.lines, start, end, columns)
+        header = body.partition(b"\n")[0].decode("utf-8").strip()[:400]
+        body_tokens = estimate_tokens(body)
+        for item, direct in named:
+            # Each unpacked name is observable; its individual value is not.
+            # Keep a compact target spelling and share the defining statement.
+            signature = (
+                header
+                if direct
+                else self.lines[item.lineno - 1][
+                    item.col_offset : item.end_col_offset
+                ].decode("utf-8")
             )
-        )
+            self.symbols.append(
+                SymbolRecord(
+                    name=item.id,
+                    qualname=allocate_symbol_occurrence(
+                        self.occurrences, item.id, start
+                    ),
+                    kind=kind,
+                    signature=signature,
+                    start_line=start,
+                    end_line=end,
+                    signature_tokens=estimate_tokens(signature),
+                    body_tokens=body_tokens,
+                    start_byte_column=columns[0] if columns else None,
+                    end_byte_column=columns[1] if columns else None,
+                )
+            )
 
     def visit_Assign(self, node: ast.Assign) -> None:
-        for target in node.targets:
-            if isinstance(target, ast.Name):
-                self._module_binding(node, target.id, "binding")
+        self._module_bindings(node, node.targets, "binding")
         self.generic_visit(node)
 
-    def visit_TypeAlias(self, node: ast.AST) -> None:
+    def visit_TypeAlias(self, node: ast.stmt) -> None:
         name = getattr(node, "name", None)
         if isinstance(name, ast.Name):
-            self._module_binding(node, name.id, "type")
-        self.generic_visit(node)
+            self._module_bindings(node, (name,), "type")
+        # Creating the alias binds its name; its parameters and value are lazy.
 
     def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
         if node.value is not None and isinstance(node.target, ast.Name):
-            self._module_binding(node, node.target.id, "binding")
-        for target in _annotation_targets(node.annotation):
+            self._module_bindings(node, (node.target,), "binding")
+        for target in self.annotations.targets(node.annotation):
             self.edges.append(
                 EdgeRecord(
-                    self.current,
+                    self.source_occurrence,
                     "attribute-type",
                     target,
                     int(node.lineno),
                     "annotation",
                 )
             )
-        self.generic_visit(node)
+        scope = self.stack[-1] if self.stack else self.annotations.tree
+        for expression in annotated_assignment_expressions(
+            node, scope, deferred=self.deferred_annotations
+        ):
+            self.visit(expression)
 
     def visit_Call(self, node: ast.Call) -> None:
-        target = _target_name(node.func)
+        # A computed receiver cannot establish a same-named bare function.
+        # Keep its named suffix without indexing arbitrary receiver source.
+        target = _target_name(node.func, computed_receiver="<expression>")
         if target:
             self.edges.append(
                 EdgeRecord(
-                    self.current, "call", target, int(node.lineno), "static-name"
+                    self.source_occurrence,
+                    "call",
+                    target,
+                    int(node.lineno),
+                    "static-name",
                 )
             )
         self.generic_visit(node)
@@ -359,7 +516,9 @@ def parse_python(source: str | bytes, *, file_digest: str) -> ParsedArtifact:
             lexical=lexical_records(text),
             parse_error=f"{type(exc).__name__}: {exc}",
         )
-    collector = _Collector(text)
+    collector = _Collector(
+        python_source_byte_lines(source), _AnnotationTargets(tree, source)
+    )
     collector.visit(tree)
     outline_lines: list[str] = []
     for symbol in collector.symbols:

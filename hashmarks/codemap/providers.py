@@ -555,7 +555,9 @@ class TreeSitterRangeProvider:
                     candidates,
                     key=lambda candidate: abs(candidate.start_line - row.start_line),
                 )
-            if best is None:
+            if best is None or row.start_byte_column is not None:
+                # Python's statement columns are bound to the original AST
+                # lines and body cost. Keep these together during enrichment.
                 merged.append(row)
                 continue
             used.add((best.qualname, best.start_line))

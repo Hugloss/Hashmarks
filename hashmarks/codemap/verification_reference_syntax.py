@@ -1,8 +1,4 @@
-"""Immutable Python reference syntax over one caller-qualified AST snapshot.
-
-This process-local projection owns no file reads, repository identity, import
-resolution or verification selection. The caller retains freshness authority.
-"""
+"""Python verifier references over one caller-qualified AST snapshot."""
 
 from __future__ import annotations
 
@@ -10,113 +6,160 @@ import ast
 from dataclasses import dataclass
 from functools import lru_cache
 
+from .python_binding_scope import (
+    annotated_assignment_expressions,
+    annotations_are_deferred,
+    definition_time_expressions,
+)
+from .python_bindings import PythonBindings
+
 MAX_KEYWORD_IDENTIFIER_CHARS = 128
 
 
 @dataclass(frozen=True)
+class AttributeUse:
+    imported: str
+    suffix: str
+    test: str | None
+
+
+@dataclass(frozen=True)
 class VerificationReferenceIndex:
-    bindings: tuple[tuple[str, str, str | None], ...]
-    module_bindings: tuple[tuple[str, str, str | None], ...]
-    reachable_names: frozenset[str]
-    reachable_attributes: frozenset[str]
-    reachable_attribute_chains: frozenset[str]
-    bound_names: frozenset[str]
-    star_import: bool
+    guards: dict[str, set[str | None]]
+    uncertain_imports: set[str]
+    name_uses: dict[str, set[str | None]]
+    attributes: dict[tuple[str, int], set[AttributeUse]]
+    flat_tests: set[str]
+    used_typing_guard: bool
     keyword_arguments: tuple[tuple[str, int, int], ...]
 
-    def imported_attribute(self, target: str) -> tuple[str, str] | None:
-        """Expand one unshadowed import alias, without resolving its owner."""
-        if target not in self.reachable_attribute_chains:
-            return None
-        alias, suffix = target.split(".", 1)
-        if alias in self.bound_names or self.star_import:
-            return None
-        targets = {
-            imported
-            for imported, bound, guard in self.module_bindings
-            if bound == alias and guard is None
+    @staticmethod
+    def strength(guards: set[str | None], used: bool) -> dict[str, object]:
+        if used:
+            strength = "reachable-symbol-use"
+        elif None in guards:
+            strength = "reachable-import"
+        elif "type-checking-only" in guards:
+            strength = "type-checking-only"
+        elif guards:
+            strength = "statically-dead"
+        else:
+            return {"syntactic_reference": True, "reference_strength": "syntactic"}
+        return {
+            "syntactic_reference": True,
+            "reachable_import": used or None in guards,
+            "reachable_symbol_use": used,
+            "reference_strength": strength,
         }
-        if len(targets) != 1:
-            return None
-        imported = next(iter(targets))
-        tail = imported.removeprefix(alias + ".")
-        if imported.startswith(alias + ".") and suffix.startswith(tail + "."):
-            suffix = suffix.removeprefix(tail + ".")
-        return imported, suffix
+
+    def imported_attribute(self, target: str, line: int) -> AttributeUse | None:
+        """Retain the lexical binding at the indexed reference site."""
+        uses = self.attributes.get((target, line), set())
+        return next(iter(uses)) if len(uses) == 1 else None
 
 
 class _VerificationReferenceIndexVisitor(ast.NodeVisitor):
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        bindings: PythonBindings,
+        typing_guards: bool,
+        *,
+        deferred_annotations: bool,
+    ) -> None:
+        self.deferred_annotations = deferred_annotations
+        self.bindings = bindings
+        self.typing_guards = typing_guards
+        self.used_typing_guard = False
         self.guard: str | None = None
-        self.bindings: list[tuple[str, str, str | None]] = []
-        self.module_bindings: list[tuple[str, str, str | None]] = []
-        self.reachable_names: set[str] = set()
-        self.reachable_attributes: set[str] = set()
-        self.reachable_attribute_chains: set[str] = set()
-        self.bound_names: set[str] = set()
-        self.star_import = False
+        self.imports: dict[ast.alias, str] = {}
+        self.by_name: dict[str, set[str]] = {}
+        self.guards: dict[str, set[str | None]] = {}
+        self.uncertain_imports: set[str] = set()
+        self.loads: list[ast.Name | ast.Attribute] = []
         self.keyword_arguments: dict[str, tuple[int, int]] = {}
+        self.flat_tests = {
+            name
+            for name, binding in bindings.syntax.root.bindings.items()
+            if name.startswith("test_")
+            and binding.kind == "declaration"
+            and isinstance(binding.node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        }
 
-    def visit(self, node: ast.AST) -> None:
-        match node:
-            case (
-                ast.FunctionDef(name=name)
-                | ast.AsyncFunctionDef(name=name)
-                | ast.ClassDef(name=name)
-                | ast.arg(arg=name)
-                | ast.ExceptHandler(name=name)
-                | ast.MatchAs(name=name)
-                | ast.MatchStar(name=name)
-                | ast.MatchMapping(rest=name)
-            ) if name is not None:
-                self.bound_names.add(name)
-        super().visit(node)
-
-    @staticmethod
-    def _guard_kind(test: ast.expr) -> str | None:
-        if isinstance(test, ast.Constant) and test.value is False:
-            return "statically-dead"
-        if isinstance(test, ast.Name) and test.id == "TYPE_CHECKING":
-            return "type-checking-only"
-        if isinstance(test, ast.Attribute) and test.attr == "TYPE_CHECKING":
-            return "type-checking-only"
-        return None
+    def _guarded_branches(self, test: ast.expr) -> tuple[str | None, str | None]:
+        negated = False
+        while isinstance(test, ast.UnaryOp) and isinstance(test.op, ast.Not):
+            negated = not negated
+            test = test.operand
+        if isinstance(test, ast.Constant) and isinstance(test.value, bool):
+            reason = "statically-dead"
+            truth = test.value
+        elif self.typing_guards and self.bindings.references_import_member(
+            test, "typing", "TYPE_CHECKING"
+        ):
+            self.used_typing_guard = True
+            reason = "type-checking-only"
+            truth = False
+        else:
+            return None, None
+        return (None, reason) if truth != negated else (reason, None)
 
     def visit_If(self, node: ast.If) -> None:
         previous = self.guard
-        self.guard = previous or self._guard_kind(node.test)
+        self.visit(node.test)
+        body, otherwise = self._guarded_branches(node.test)
+        self.guard = previous or body
         for child in node.body:
             self.visit(child)
-        self.guard = previous
+        self.guard = previous or otherwise
         for child in node.orelse:
             self.visit(child)
+        self.guard = previous
+
+    def _import(self, node: ast.Import | ast.ImportFrom, prefix: str) -> None:
+        syntax = self.bindings.syntax
+        for alias in node.names:
+            target = prefix + alias.name
+            self.guards.setdefault(target, set()).add(self.guard)
+            if self.guard is not None:
+                continue
+            self.imports[alias] = target
+            bound = alias.asname or alias.name.split(".")[0]
+            self.by_name.setdefault(bound, set()).add(target)
+            binding = syntax.lookup(bound, syntax.owners[node])
+            if binding is None or binding.node is not alias:
+                self.uncertain_imports.add(target)
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
-        if self.guard is None and any(alias.name == "*" for alias in node.names):
-            self.star_import = True
-        self.bindings.extend(
-            (alias.name, alias.asname or alias.name, self.guard) for alias in node.names
-        )
-        prefix = "." * int(node.level or 0)
-        module = str(node.module or "")
-        self.module_bindings.extend(
-            (
-                f"{prefix}{module + '.' if module else ''}{alias.name}",
-                alias.asname or alias.name,
-                self.guard,
-            )
-            for alias in node.names
-        )
+        module = node.module + "." if node.module else ""
+        self._import(node, "." * node.level + module)
 
     def visit_Import(self, node: ast.Import) -> None:
-        self.module_bindings.extend(
-            (
-                alias.name,
-                alias.asname or alias.name.split(".", 1)[0],
-                self.guard,
-            )
-            for alias in node.names
-        )
+        self._import(node, "")
+
+    def _visit_definition(
+        self, node: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef
+    ) -> None:
+        for expression in definition_time_expressions(
+            node, deferred=self.deferred_annotations
+        ):
+            self.visit(expression)
+        for statement in node.body:
+            self.visit(statement)
+
+    visit_FunctionDef = _visit_definition
+    visit_AsyncFunctionDef = _visit_definition
+    visit_ClassDef = _visit_definition
+
+    def visit_TypeAlias(self, node: ast.stmt) -> None:
+        # The parameters and RHS of a type statement are lazy source expressions.
+        return
+
+    def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
+        scope = self.bindings.syntax.owners.get(node)
+        for expression in annotated_assignment_expressions(
+            node, scope.node if scope else None, deferred=self.deferred_annotations
+        ):
+            self.visit(expression)
 
     def visit_keyword(self, node: ast.keyword) -> None:
         if (
@@ -129,35 +172,77 @@ class _VerificationReferenceIndexVisitor(ast.NodeVisitor):
             )
         self.generic_visit(node)
 
+    def visit_Name(self, node: ast.Name) -> None:
+        if self.guard is None and isinstance(node.ctx, ast.Load):
+            self.loads.append(node)
+
+    def visit_Attribute(self, node: ast.Attribute) -> None:
+        if self.guard is None and isinstance(node.ctx, ast.Load):
+            self.loads.append(node)
+        self.generic_visit(node)
+
+    def _test(self, node: ast.AST) -> str | None:
+        scope = self.bindings.syntax.owners.get(node)
+        if (
+            scope is not None
+            and scope.defining is self.bindings.syntax.root
+            and scope.name in self.flat_tests
+        ):
+            return scope.name
+        return None
+
     @staticmethod
-    def _attribute_chain(node: ast.Attribute) -> str | None:
-        parts = [node.attr]
-        value: ast.expr = node.value
+    def _attribute(
+        node: ast.Attribute, alias: ast.alias, imported: str
+    ) -> tuple[str, str] | None:
+        parts: list[str] = []
+        value: ast.expr = node
         while isinstance(value, ast.Attribute):
             parts.append(value.attr)
             value = value.value
         if not isinstance(value, ast.Name):
             return None
-        parts.append(value.id)
-        return ".".join(reversed(parts))
+        suffix = ".".join(reversed(parts))
+        target = f"{value.id}.{suffix}"
+        if imported.startswith(value.id + ".") and not alias.asname:
+            if not target.startswith(imported + "."):
+                return None
+            suffix = target[len(imported) + 1 :]
+        return target, suffix
 
-    def visit_Name(self, node: ast.Name) -> None:
-        if self.guard is None and isinstance(node.ctx, ast.Load):
-            self.reachable_names.add(node.id)
-        elif isinstance(node.ctx, (ast.Store, ast.Del)):
-            self.bound_names.add(node.id)
+    def _unresolved_use(self, node: ast.Name | ast.Attribute) -> None:
+        if isinstance(node, ast.Name) and self._test(node) is not None:
+            self.uncertain_imports.update(self.by_name.get(node.id, ()))
 
-    def visit_Attribute(self, node: ast.Attribute) -> None:
-        if self.guard is None and isinstance(node.ctx, ast.Load):
-            self.reachable_attributes.add(node.attr)
-            chain = self._attribute_chain(node)
-            if chain:
-                self.reachable_attribute_chains.add(chain)
-        elif isinstance(node.ctx, (ast.Store, ast.Del)):
-            chain = self._attribute_chain(node)
-            if chain:
-                self.bound_names.add(chain.split(".", 1)[0])
-        self.generic_visit(node)
+    def index(self) -> VerificationReferenceIndex:
+        names: dict[str, set[str | None]] = {}
+        attributes: dict[tuple[str, int], set[AttributeUse]] = {}
+        for node in self.loads:
+            alias = self.bindings.imported_alias(node)
+            if alias is None or alias not in self.imports:
+                self._unresolved_use(node)
+                continue
+            imported = self.imports[alias]
+            test = self._test(node)
+            if isinstance(node, ast.Name):
+                names.setdefault(imported, set()).add(test)
+            elif pair := self._attribute(node, alias, imported):
+                target, suffix = pair
+                attributes.setdefault((target, node.lineno), set()).add(
+                    AttributeUse(imported, suffix, test)
+                )
+        return VerificationReferenceIndex(
+            self.guards,
+            self.uncertain_imports,
+            names,
+            attributes,
+            self.flat_tests,
+            self.used_typing_guard,
+            tuple(
+                (name, start, end)
+                for name, (start, end) in self.keyword_arguments.items()
+            ),
+        )
 
 
 @lru_cache(maxsize=4096)
@@ -165,32 +250,14 @@ def verification_reference_index(
     absolute_path: str,
     identity: tuple[int, int, int, int, int],
     tree: ast.Module,
+    source: str,
+    typing_guards: bool = True,
 ) -> VerificationReferenceIndex:
-    """Project one already freshness-bound AST snapshot into reference evidence.
-
-    ``tree`` is part of the process-local cache key so a new snapshot can never
-    reuse a projection from an older source identity.  The caller obtains the
-    snapshot through ``read_python_ast``; do not re-read the same file here.
-    """
-    visitor = _VerificationReferenceIndexVisitor()
+    """Project the existing source snapshot without rereading or reparsing the member."""
+    visitor = _VerificationReferenceIndexVisitor(
+        PythonBindings(tree, source.encode("utf-8")),
+        typing_guards,
+        deferred_annotations=annotations_are_deferred(tree),
+    )
     visitor.visit(tree)
-    imported_targets: dict[str, set[str]] = {}
-    for imported, bound, guard in visitor.module_bindings:
-        if guard is None:
-            imported_targets.setdefault(bound, set()).add(imported)
-    visitor.bound_names.update(
-        bound for bound, targets in imported_targets.items() if len(targets) > 1
-    )
-    return VerificationReferenceIndex(
-        bindings=tuple(visitor.bindings),
-        module_bindings=tuple(visitor.module_bindings),
-        reachable_names=frozenset(visitor.reachable_names),
-        reachable_attributes=frozenset(visitor.reachable_attributes),
-        reachable_attribute_chains=frozenset(visitor.reachable_attribute_chains),
-        bound_names=frozenset(visitor.bound_names),
-        star_import=visitor.star_import,
-        keyword_arguments=tuple(
-            (name, start, end)
-            for name, (start, end) in visitor.keyword_arguments.items()
-        ),
-    )
+    return visitor.index()

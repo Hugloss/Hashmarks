@@ -7,6 +7,7 @@ from contract_assertions import assert_records, assert_text
 
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.providers import TreeSitterRangeProvider
+from hashmarks.codemap.python_ast import estimate_tokens
 
 
 def _move_after_check(
@@ -103,6 +104,56 @@ def test_source_body_uses_physical_lines_and_preserves_unicode_contents(
     assert body["lines"] == [2, 3]
     assert body["content"] == "def owner():\n    return 'body\u0085tail'"
     assert (tmp_path / "owner.py").read_bytes() == source.encode("utf-8")
+
+
+@pytest.mark.parametrize("newline", ["\n", "\r\n", "\r"])
+def test_python_outline_uses_ast_lines_for_binding_signatures_and_cost(
+    tmp_path: Path, newline: str
+) -> None:
+    marker = "marker = 'before\u2028middle\fafter'"
+    binding = "retry_interval = 9"
+    (tmp_path / "settings.py").write_bytes(newline.join((marker, binding)).encode())
+    with CodeMap(tmp_path, state_dir=tmp_path / ".state") as codemap:
+        codemap.index.sync()
+        symbols = assert_records(codemap.source.outline("settings.py")["symbols"])
+        body = codemap.source.read("settings.py::retry_interval")
+        packet = codemap.tasks.evidence("Inspect retry_interval in settings.py")
+    assert [row["signature"] for row in symbols] == [marker, binding]
+    assert [row["body_tokens"] for row in symbols] == list(
+        map(estimate_tokens, (marker, binding))
+    )
+    assert body["signature"] == body["content"] == binding
+    source = packet["ownership"]["source_evidence"]
+    assert source is not None and f"{binding}  [2-2]" in source["content"]
+
+
+def test_bare_cr_task_source_range_uses_python_symbol_coordinates(
+    tmp_path: Path,
+) -> None:
+    declaration = "def normalize_timeout(value):\n    return value"
+    (tmp_path / "retry.py").write_bytes(
+        ("marker = 1\n" + declaration + "\n").replace("\n", "\r").encode()
+    )
+    (tmp_path / "test_retry.py").write_text(
+        "from retry import normalize_timeout\n"
+        "def test_normalize_timeout():\n    assert normalize_timeout(1) == 1\n"
+    )
+    with CodeMap(tmp_path) as codemap:
+        codemap.index.sync()
+        source = codemap.tasks.evidence("Fix normalize_timeout")["ownership"][
+            "source_evidence"
+        ]
+        raw = codemap.source.observe("retry.py", lines=[1, 2])
+    assert source is not None
+    assert (source["representation"], source.get("lines"), source["content"]) == (
+        "source-range",
+        [2, 3],
+        declaration,
+    )
+    assert [anchor["state"] for anchor in assert_records(raw["line_anchors"])] == [
+        "observed",
+        "unknown",
+    ]
 
 
 @pytest.mark.parametrize(

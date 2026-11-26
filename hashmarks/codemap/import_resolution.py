@@ -291,12 +291,39 @@ class RepositoryImports:
     ) -> tuple[list[tuple[str, str]], bool]:
         """Expose exact declaration leaves from the existing bounded import walk."""
         paths = self._resolve_import_paths(source_path, target)
-        walk = _OwnerWalk(self)
-        if len(paths) > 1 or self._python_import_identity_ambiguous(
+        unresolved = len(paths) > 1 or self._python_import_identity_ambiguous(
             source_path, target
-        ):
-            walk.unresolved = True
+        )
         name = target.lstrip(".").rsplit(".", 1)[-1]
+        return self._python_member_symbol_evidence(paths, name, unresolved=unresolved)
+
+    def _python_module_call_evidence(
+        self, binding: PythonExportBinding, target: str
+    ) -> tuple[list[tuple[str, str]], bool]:
+        """Qualify one member of a module named by an explicit Python import."""
+        alias = binding.module_import
+        if alias is None:
+            return [], True
+        receiver, _, member = target.rpartition(".")
+        if alias.asname:
+            if receiver != alias.asname:
+                return [], False
+            module = alias.name
+        else:
+            # 'import pkg.sub' binds pkg and loads pkg.sub. 'import pkg' alone
+            # supplies no evidence that an arbitrary pkg.sub was loaded.
+            if receiver != alias.name and not alias.name.startswith(receiver + "."):
+                return [], False
+            module = receiver
+        paths = self.reads.module_paths(module)
+        if len(paths) != 1:
+            return [], bool(paths)
+        return self._python_member_symbol_evidence(paths, member)
+
+    def _python_member_symbol_evidence(
+        self, paths: list[str], name: str, *, unresolved: bool = False
+    ) -> tuple[list[tuple[str, str]], bool]:
+        walk = _OwnerWalk(self, unresolved=unresolved)
         for path in paths[:20]:
             walk.visit(path, name, 0)
         return sorted(walk.symbol_leaves), (
@@ -326,7 +353,7 @@ class RepositoryImports:
         return python_reexport_targets(tree, exported_name)
 
     def _python_export_binding(
-        self, facade_path: str, exported_name: str
+        self, facade_path: str, exported_name: str, *, before_line: int | None = None
     ) -> tuple[str, list[str]]:
         """Return conservative top-level binding authority for one exported name.
 
@@ -337,11 +364,13 @@ class RepositoryImports:
         """
         if not facade_path.endswith(".py") or not exported_name:
             return "unknown", []
-        observed = self._python_export_observation(facade_path, exported_name)
+        observed = self._python_export_observation(
+            facade_path, exported_name, before_line=before_line
+        )
         return observed.kind, list(observed.targets)
 
     def _python_export_observation(
-        self, facade_path: str, exported_name: str
+        self, facade_path: str, exported_name: str, *, before_line: int | None = None
     ) -> PythonExportBinding:
         """Project binding and declaration facts from one stable AST snapshot."""
         if not exported_name:
@@ -355,7 +384,7 @@ class RepositoryImports:
             os.path.abspath(os.fspath(self.workspace / facade_path)),
             snapshot.identity,
             snapshot.tree,
-        ).binding(exported_name)
+        ).binding(exported_name, before_line=before_line)
 
     def _python_star_export_authority(
         self, facade_path: str, target: str, exported_name: str

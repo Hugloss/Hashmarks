@@ -180,6 +180,78 @@ def test_field_group_bound_preserves_explicit_omissions_and_unknown_absence(
     )
 
 
+def test_task_matches_field_before_limiting_classes(tmp_path: Path) -> None:
+    (tmp_path / "settings.py").write_text(
+        "class Red:\n    red: int = 1\n"
+        "class Blue:\n    blue: int = 2\n"
+        "class Green:\n    green: int = 3\n"
+        "class Timeouts:\n    retry_interval: int = 9\n"
+    )
+    task = "Inspect retry_interval in settings.py"
+    with CodeMap(tmp_path) as repository:
+        repository.index.sync()
+        full = _context(repository.tasks.evidence(task))
+        initial = _context(repository.tasks.evidence(task, result_mode="initial"))
+    for context in (full, initial):
+        assert (context["observed"], context["returned"], context["omitted"]) == (
+            4,
+            3,
+            1,
+        )
+        assert context["coverage"] == "incomplete"
+        assert context["negative_evidence_admissible"] is False
+    fields = [
+        assert_records(assert_object(group["value"])["fields"])
+        for group in assert_records(full["groups"])
+    ]
+    assert [[field["name"] for field in group] for group in fields] == [
+        ["red"],
+        ["blue"],
+        ["retry_interval"],
+    ]
+    displayed = assert_records(initial["groups"])
+    assert len(displayed) == 1
+    assert assert_object(displayed[0]["value"])["fields"] == fields[2]
+    assert assert_object(initial["initial_field_projection"])[
+        "source_field_indexes"
+    ] == [[2, 0]]
+
+
+def test_literal_field_survives_competing_partial_class_and_field_matches(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "settings.py").write_text(
+        "class Count:\n    retry_count: int\n    retry_window: int\n"
+        "class Policy:\n    retry_policy: str\n"
+        "class Delay:\n    retry_delay: int\n"
+        "class Timeouts:\n    interval_seconds: int\n    retry_interval: int\n"
+    )
+    with CodeMap(tmp_path) as repository:
+        repository.index.sync()
+        context = _context(
+            repository.tasks.evidence(
+                "Inspect retry_interval in settings.py", result_mode="initial"
+            )
+        )
+    assert (context["observed"], context["returned"], context["omitted"]) == (4, 3, 1)
+    assert assert_object(context["initial_field_selection"])["matched"] == 6
+    assert [
+        [
+            field["name"]
+            for field in assert_records(assert_object(group["value"])["fields"])
+        ]
+        for group in assert_records(context["groups"])
+    ] == [["retry_count", "retry_window"], ["retry_interval"]]
+    projection = assert_object(context["initial_field_projection"])
+    assert projection["source_group_indexes"] == [0, 2]
+    assert projection["source_field_indexes"] == [[0, 0], [0, 1], [2, 1]]
+    assert (
+        projection["observed_fields"],
+        projection["returned_fields"],
+        projection["omitted_fields"],
+    ) == (5, 3, 2)
+
+
 def test_provider_bound_failure_is_incomplete_disclosure_not_absent_fields(
     tmp_path: Path,
 ) -> None:

@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Any, Literal
 from hashmarks.digest import hash_bytes
 from hashmarks.operation_contract import operation_schema, validate_operation_response
 
+from .signature_preview import signature_disclosure
 from .task_evidence_contract import read_initial_projection
 
 if TYPE_CHECKING:
@@ -347,6 +348,22 @@ def _locator(value: object) -> object:
     return {key: item for key, item in value.items() if key not in omitted}
 
 
+def _project_ambiguity(ambiguity: dict[str, Any], omitted_sections: list[str]) -> None:
+    ambiguity["alternatives"] = [_locator(row) for row in ambiguity["alternatives"]]
+    for key in ("candidates", "task_local_verification_origins"):
+        rows = list(ambiguity[key])
+        for index, row in enumerate(rows):
+            signature = row.get("signature")
+            if isinstance(signature, str):
+                disclosure = signature_disclosure(row["path"], signature)
+                if disclosure.get("signature_truncated"):
+                    rows[index] = {**row, **disclosure}
+                    omitted_sections.append(
+                        f"/ownership/ambiguity/{key}/{index}/signature"
+                    )
+        ambiguity[key] = rows
+
+
 def _encode_rows(container: dict[str, Any], key: str, columns: list[str]) -> None:
     rows = container.get(key)
     if not isinstance(rows, list):
@@ -521,9 +538,7 @@ def initial_task_evidence(packet: Mapping[str, Any]) -> InitialTaskEvidenceProje
     ownership = result["ownership"]
     for key in ("owner", "candidate"):
         ownership[key] = _locator(ownership.get(key))
-    ambiguity = ownership.get("ambiguity")
-    if isinstance(ambiguity, dict) and isinstance(ambiguity.get("alternatives"), list):
-        ambiguity["alternatives"] = [_locator(row) for row in ambiguity["alternatives"]]
+    _project_ambiguity(ownership["ambiguity"], omissions["sections"])
     source = ownership.get("source_evidence")
     if isinstance(source, dict) and "content" in source:
         source.pop("content")

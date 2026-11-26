@@ -599,6 +599,30 @@ class VerificationPlanMixin:
             }
         )
 
+    def _task_selection_plan(
+        self, verify: Mapping[str, object] | None
+    ) -> TaskVerificationPlan:
+        """Project the verifier's nominated node or file into the advisory plan."""
+        if TYPE_CHECKING:
+            self = cast("RepositoryVerification", self)
+        if verify is None or not verify.get("path"):
+            return {
+                "schema": "hashmarks.verification-plan.v1",
+                "available": False,
+                "reason": "no-verification-surface",
+            }
+        path = str(verify["path"])
+        symbol = verify.get("verification_test_symbol")
+        if path.endswith(".py"):
+            return self.plan(path, symbol=symbol if isinstance(symbol, str) else None)
+        fallback = symbol if symbol is not None else verify.get("name")
+        qualname = verify.get("qualname")
+        return self.plan(
+            path,
+            symbol=str(fallback) if fallback is not None else None,
+            qualname=str(qualname) if qualname is not None else None,
+        )
+
     def plan(
         self: ReadScopeOwner,
         path: str,

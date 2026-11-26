@@ -4,8 +4,14 @@ import ast
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from enum import Enum
-from functools import lru_cache
+from functools import cached_property, lru_cache
 from types import MappingProxyType
+from typing import TYPE_CHECKING
+
+from .model import symbol_occurrence_parts
+
+if TYPE_CHECKING:
+    from hashmarks.python_ast_cache import PythonAstSnapshot
 
 
 def static_string_names(value: ast.expr | None) -> list[str] | None:
@@ -40,17 +46,61 @@ class PythonExportBinding:
     kind: str
     targets: tuple[str, ...] = ()
     declaration: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef | None = None
+    module_import: ast.alias | None = None
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class PythonExportBindings:
     """Read-only binding syntax within one already parsed file snapshot."""
 
     body: tuple[ast.stmt, ...]
     writes: Mapping[ast.stmt, frozenset[str]]
 
-    def binding(self, name: str) -> PythonExportBinding:
-        return _export_binding(self.body, name, self.writes)
+    def binding(
+        self, name: str, *, before_line: int | None = None
+    ) -> PythonExportBinding:
+        observed = _export_binding(
+            self.body, name, self.writes, before_line=before_line
+        )
+        if observed.module_import is not None and any(
+            observed.module_import.name == module
+            or observed.module_import.name.startswith(module + ".")
+            for module in self._mutated_modules
+        ):
+            # Keep the import spelling as provenance, without using this receiver
+            # to prove an exact callable after an authored attribute write.
+            return PythonExportBinding(observed.kind, observed.targets)
+        return observed
+
+    @cached_property
+    def _mutated_modules(self) -> frozenset[str]:
+        roots: set[str] = set()
+        for statement in self.body:
+            for node in ast.walk(statement):
+                if isinstance(node, ast.Attribute) and isinstance(
+                    node.ctx, (ast.Store, ast.Del)
+                ):
+                    target = node.value
+                elif (
+                    isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Name)
+                    and node.func.id in {"setattr", "delattr"}
+                    and node.args
+                ):
+                    target = node.args[0]
+                else:
+                    continue
+                while isinstance(target, ast.Attribute):
+                    target = target.value
+                if isinstance(target, ast.Name):
+                    roots.add(target.id)
+        return frozenset(
+            target
+            for root in roots
+            if (binding := _export_binding(self.body, root, self.writes)).kind
+            == "module"
+            for target in binding.targets
+        )
 
 
 @lru_cache(maxsize=256)
@@ -81,6 +131,8 @@ def _export_binding(
     body: Sequence[ast.stmt],
     name: str,
     writes: Mapping[ast.stmt, frozenset[str]] | None = None,
+    *,
+    before_line: int | None = None,
 ) -> PythonExportBinding:
     bindings: list[PythonExportBinding] = []
     for node in body:
@@ -88,6 +140,13 @@ def _export_binding(
             node, name, None if writes is None else writes.get(node)
         )
         if binding is not None:
+            # Module code and definition headers can run before the module's
+            # final binding exists. The call index has line precision only.
+            if (
+                before_line is not None
+                and (node.end_lineno or node.lineno) >= before_line
+            ):
+                return PythonExportBinding("ambiguous", binding.targets)
             bindings.append(binding)
     reexports = [row for row in bindings if row.kind in {"reexport", "star", "module"}]
     if len(reexports) > 1:
@@ -281,14 +340,35 @@ def _expression_bound_call(
 
 
 def python_expression_call_binds(
-    body: Sequence[ast.stmt], name: str, line: int
+    snapshot: PythonAstSnapshot, source: str, name: str, line: int
 ) -> bool:
     """Observe call-site shadowing without leaking expression locals into their parent.
 
     The compact call index has line coordinates only. A same-line collision
     therefore preserves uncertainty for every call with that receiver spelling.
     """
+    body = snapshot.tree.body
+    if source:
+        functions = python_source_functions(
+            snapshot.function_definitions_by_qualname, source
+        )
+        if len(functions) != 1:
+            return True
+        body = functions[0].body
     return any(_expression_bound_call(statement, name, line) for statement in body)
+
+
+def python_source_functions(
+    definitions: Mapping[str, tuple[ast.FunctionDef | ast.AsyncFunctionDef, ...]],
+    source: str,
+) -> tuple[ast.FunctionDef | ast.AsyncFunctionDef, ...]:
+    """Match a lexical source occurrence only; a bare callee keeps its ambiguity."""
+    qualname, line = symbol_occurrence_parts(source)
+    functions = definitions.get(qualname, ())
+    if line is not None:
+        # A Python def cannot share a physical start line with another def.
+        return tuple(function for function in functions if str(function.lineno) == line)
+    return functions
 
 
 def python_function_scope_binds(
@@ -303,7 +383,7 @@ def python_function_scope_binds(
     """
     parts = qualname.split(".")
     for depth in range(1, len(parts) + 1):
-        functions = definitions.get(".".join(parts[:depth]), ())
+        functions = python_source_functions(definitions, ".".join(parts[:depth]))
         if not functions and depth < len(parts):
             continue
         if len(functions) != 1:
@@ -314,6 +394,20 @@ def python_function_scope_binds(
         ):
             return True
     return False
+
+
+def _module_import_binding(node: ast.Import, name: str) -> PythonExportBinding | None:
+    aliases = [
+        alias
+        for alias in node.names
+        if (alias.asname or alias.name.split(".")[0]) == name
+    ]
+    if not aliases:
+        return None
+    targets = tuple(alias.name if alias.asname else name for alias in aliases)
+    return PythonExportBinding(
+        "module", targets, module_import=aliases[0] if len(aliases) == 1 else None
+    )
 
 
 def _statement_export_binding(
@@ -328,12 +422,7 @@ def _statement_export_binding(
         kind, targets = _import_from_binding(node, name)
         return PythonExportBinding(kind, tuple(targets)) if targets else None
     if isinstance(node, ast.Import):
-        targets = tuple(
-            alias.name if alias.asname else alias.name.split(".")[0]
-            for alias in node.names
-            if (alias.asname or alias.name.split(".")[0]) == name
-        )
-        return PythonExportBinding("module", targets) if targets else None
+        return _module_import_binding(node, name)
     if not (
         _writes_name(node, name, annotation_targets_bind=False)
         if writes is None
@@ -345,14 +434,19 @@ def _statement_export_binding(
     return PythonExportBinding("ambiguous")
 
 
-def _assignment_target_binds(target: ast.AST, name: str) -> bool:
+def assignment_name_targets(target: ast.AST) -> Iterator[ast.Name]:
+    """Yield lexical names actually assigned, in Python target order."""
     if isinstance(target, ast.Name):
-        return target.id == name
-    if isinstance(target, ast.Starred):
-        return _assignment_target_binds(target.value, name)
-    if isinstance(target, (ast.Tuple, ast.List)):
-        return any(_assignment_target_binds(child, name) for child in target.elts)
-    return False
+        yield target
+    elif isinstance(target, ast.Starred):
+        yield from assignment_name_targets(target.value)
+    elif isinstance(target, (ast.Tuple, ast.List)):
+        for child in target.elts:
+            yield from assignment_name_targets(child)
+
+
+def _assignment_target_binds(target: ast.AST, name: str) -> bool:
+    return any(item.id == name for item in assignment_name_targets(target))
 
 
 def _assignment_binds(node: ast.stmt, name: str) -> bool:
@@ -368,7 +462,9 @@ def _assignment_binds(node: ast.stmt, name: str) -> bool:
     return False
 
 
-def _class_export_binding(node: ast.ClassDef, name: str) -> PythonExportBinding:
+def python_class_export_binding(
+    node: ast.ClassDef, name: str, *, before_line: int | None = None
+) -> PythonExportBinding:
     if name in _class_global_names(node):
         return PythonExportBinding("ambiguous")
     writes = {
@@ -379,7 +475,7 @@ def _class_export_binding(node: ast.ClassDef, name: str) -> PythonExportBinding:
         )
         for statement in node.body
     }
-    return _export_binding(node.body, name, writes)
+    return _export_binding(node.body, name, writes, before_line=before_line)
 
 
 def python_class_node(tree: ast.Module, qualname: str) -> ast.ClassDef | None:
@@ -389,7 +485,7 @@ def python_class_node(tree: ast.Module, qualname: str) -> ast.ClassDef | None:
         binding = (
             _export_binding(tree.body, part)
             if selected is None
-            else _class_export_binding(selected, part)
+            else python_class_export_binding(selected, part)
         )
         if not isinstance(binding.declaration, ast.ClassDef):
             return None
@@ -401,7 +497,7 @@ def python_class_member_binding(
     node: ast.ClassDef, name: str
 ) -> tuple[str, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef | None]:
     """Expose the same ordered binding rule inside one declared class scope."""
-    binding = _class_export_binding(node, name)
+    binding = python_class_export_binding(node, name)
     return binding.kind, binding.declaration
 
 

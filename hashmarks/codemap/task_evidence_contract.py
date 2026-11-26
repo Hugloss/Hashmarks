@@ -133,15 +133,29 @@ def _hops(value: object, path: str) -> None:
         _fields(hop, path, str, ("from", "to", "relation"))
 
 
+def _locator_signature(row: dict[str, object], path: str) -> None:
+    if "signature" in row:
+        _nullable(row, "signature", str, path)
+    if "signature_preview" in row or "signature_truncated" in row:
+        _field(row, "signature_preview", str, path)
+        if (
+            row.get("signature_truncated") is not True
+            or row.get("signature") is not None
+        ):
+            raise RuntimeError(
+                f"invalid {path}.signature_truncated: inconsistent signature preview"
+            )
+
+
 def _locator(value: object, path: str) -> None:
     row = _record(value, path, TaskCandidate)
     _field(row, "path", str, path)
+    _locator_signature(row, path)
     # Indexed candidate metadata is owned by the index. Validate nullable identity
     # fields without treating missing display metadata as missing evidence.
     for key in (
         "name",
         "qualname",
-        "signature",
         "verification_test_symbol",
         "test_symbol",
         "start_line",

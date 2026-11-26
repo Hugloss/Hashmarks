@@ -6,7 +6,7 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, cast
 
 from .model import EvidenceVisibility
-from .query_primitives import _TASK_STOPWORDS, _query_terms
+from .query_primitives import _TASK_STOPWORDS, _WORD_RE, _query_terms
 from .repository_declaration_provider import RepositoryDeclarationProviderError
 from .static_python_backend_declarations import StaticPythonBackendDeclarations
 
@@ -43,12 +43,14 @@ def _field_groups(discovery: Mapping[str, object]) -> list[dict[str, object]]:
     )
 
 
-def _initial_field_selection(
+def _select_field_groups(
     groups: list[dict[str, object]], task: str
-) -> dict[str, object]:
+) -> tuple[list[dict[str, object]], dict[str, object]]:
+    """Spend group and field slots on observed matches before source-order fallback."""
     terms = set(_query_terms(task)) - _TASK_STOPWORDS
+    literal_names = set(_WORD_RE.findall(task)) - _TASK_STOPWORDS
     fields = [
-        (group_index, field_index, field)
+        (group_index, field_index, str(field["name"]))
         for group_index, group in enumerate(groups)
         for field_index, field in enumerate(
             cast(
@@ -57,18 +59,29 @@ def _initial_field_selection(
             )
         )
     ]
-    matches = [
-        [group, index]
-        for group, index, field in fields
-        if terms.intersection(_query_terms(str(field["name"])))
-    ]
-    selected = matches if matches else [[group, index] for group, index, _ in fields]
-    return {
-        "basis": "field-name-terms-else-source-order",
+    exact: list[tuple[int, int]] = []
+    partial: list[tuple[int, int]] = []
+    for group, index, name in fields:
+        if name in literal_names:
+            exact.append((group, index))
+        elif terms.intersection(_query_terms(name)):
+            partial.append((group, index))
+    matches = exact + partial
+    # Keep the best match for each class, then fill any remaining class slots.
+    ordered_groups = dict.fromkeys(group for group, _ in matches)
+    ordered_groups.update(dict.fromkeys(range(len(groups))))
+    group_indexes = sorted(list(ordered_groups)[:3])
+    retained = [groups[i] for i in group_indexes]
+    projected_group = {original: index for index, original in enumerate(group_indexes)}
+    selected = matches or [(group, index) for group, index, _ in fields]
+    return retained, {
+        "basis": "literal-field-name-then-terms-else-source-order",
         "selection_authority": False,
         "bound": 3,
         "matched": len(matches),
-        "fields": selected[:3],
+        "fields": [
+            [projected_group[group], index] for group, index in sorted(selected[:3])
+        ],
     }
 
 
@@ -107,6 +120,8 @@ class TaskEvidenceFieldsMixin:
         groups = _field_groups(discovery)
         if not groups:
             return None
+        query = self._task_evidence_retrieval_query(task).replace(path, " ")
+        retained, selection = _select_field_groups(groups, query)
         return {
             **qualification,
             "state": "observed",
@@ -115,10 +130,10 @@ class TaskEvidenceFieldsMixin:
             "provider": providers[0]["provenance"],
             "discovery_identity": discovery["observation_identity"],
             "observed": len(groups),
-            "returned": min(len(groups), 3),
-            "omitted": max(0, len(groups) - 3),
-            "groups": groups[:3],
-            "initial_field_selection": _initial_field_selection(groups[:3], task),
+            "returned": len(retained),
+            "omitted": len(groups) - len(retained),
+            "groups": retained,
+            "initial_field_selection": selection,
         }
 
     def _task_evidence_attach_field_declarations(

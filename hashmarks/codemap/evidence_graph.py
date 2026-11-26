@@ -11,6 +11,7 @@ from hashmarks.paths import normalize_relative_path
 from .decision_session import ReadScopeOwner, decision_scoped
 from .model import EvidenceVisibility
 from .repository_domains import is_test_path
+from .signature_preview import signature_disclosure
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -236,9 +237,7 @@ class RepositoryRelationships(ReadScopeOwner):
             return {rel}
         return {
             str(row["path"])
-            for row in self.store.symbol(query)
-            if EvidenceVisibility(str(row["evidence_visibility"]))
-            is not EvidenceVisibility.DENY
+            for row in self.store.visible_symbol_candidates(query, limit=50)
         }
 
     def _resolve_edge(self, edge: dict) -> dict:
@@ -250,31 +249,27 @@ class RepositoryRelationships(ReadScopeOwner):
             else []
         )
         short = target.rsplit(".", 1)[-1]
+        candidates = self.store.symbols_named(short, limit=9, visible_only=True)
         resolved_symbols = [
             {
                 "path": row["path"],
                 "qualname": row["qualname"],
-                "signature": row["signature"],
+                **signature_disclosure(row["path"], row["signature"]),
             }
-            for row in self.store.symbols_named(short, limit=8)
-            if EvidenceVisibility(str(row["evidence_visibility"]))
-            is not EvidenceVisibility.DENY
+            for row in candidates[:8]
         ]
         value["resolved_paths"] = resolved_paths
         value["resolved_symbols"] = resolved_symbols
+        if len(candidates) > 8:
+            value["resolved_symbols_truncated"] = True
         return value
 
     @decision_scoped
     def deps(self, query: str) -> dict[str, object]:
         self.reads.ready()
-        matches = self.store.symbol(query)
+        matches = self.store.visible_symbol_candidates(query, limit=51)
         if matches:
-            visible_matches = [
-                match
-                for match in matches
-                if EvidenceVisibility(str(match["evidence_visibility"]))
-                is not EvidenceVisibility.DENY
-            ]
+            visible_matches = matches[:50]
             edge_map = self.reads.edges_from_many(
                 [
                     (str(match["path"]), str(match["qualname"]))
@@ -299,19 +294,27 @@ class RepositoryRelationships(ReadScopeOwner):
             return {
                 "schema": "hashmarks.deps.v1",
                 "query": query,
+                "matches_truncated": len(matches) > len(visible_matches),
                 **self.reads.freshness_fields(),
                 "edges": [self._resolve_edge(row) for row in rows],
                 "native_edges": native_rows,
                 "native_file_edges": [
                     row
-                    for match in matches
-                    for row in self.native._fresh_native_file_edges_from(
-                        str(match["path"])
+                    for path in dict.fromkeys(
+                        str(match["path"]) for match in visible_matches
                     )
+                    for row in self.native._fresh_native_file_edges_from(path)
                 ],
             }
+        if self.store.has_symbol(query):
+            raise PermissionError(f"symbol exists but agent context is denied: {query}")
         rel = normalize_relative_path(query, allow_root=False)
         self.source.ensure_current(rel)
+        member = self.reads.file_row(rel)
+        if member and member["evidence_visibility"] == EvidenceVisibility.DENY.value:
+            raise PermissionError(
+                f"repository evidence denied by context policy: {rel}"
+            )
         return {
             "schema": "hashmarks.deps.v1",
             "query": query,
@@ -324,12 +327,7 @@ class RepositoryRelationships(ReadScopeOwner):
     @decision_scoped
     def refs(self, query: str) -> dict[str, object]:
         self.reads.ready()
-        rows = [
-            row
-            for row in self.store.refs(query)
-            if EvidenceVisibility(str(row["evidence_visibility"]))
-            is not EvidenceVisibility.DENY
-        ]
+        rows = self.store.refs(query, limit=101, visible_only=True)
         native_rows = self.native._fresh_native_refs(query)
         native_file_rows = self.reads.file_rows(str(row["path"]) for row in native_rows)
         native = [
@@ -343,7 +341,8 @@ class RepositoryRelationships(ReadScopeOwner):
             "schema": "hashmarks.refs.v1",
             "query": query,
             **self.reads.freshness_fields(),
-            "references": rows,
+            "references": rows[:100],
+            "references_truncated": len(rows) > 100,
             "native_references": native,
         }
 

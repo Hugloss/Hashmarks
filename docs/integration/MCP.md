@@ -420,6 +420,48 @@ Exact identifier queries accept Unicode names and dotted class/member names in
 their indexed spelling. This does not establish Unicode normalization equivalence
 or complete retrieval of Unicode literals that are absent from the lexical index.
 
+For Python, a natural qualified name can refer to several source declarations.
+`find` counts the returned occurrences separately. Each has its own line span
+and indexed qualname. A function whose sole statement is an ellipsis shows
+`: ...` in its signature, including overload stubs. The CLI and Python
+`source.read` result for an explicit `path::qualname` keeps the addressed
+occurrence and lists up to 20 matching spans and symbol IDs when the natural
+name repeats. `matches_truncated` describes that list. A line-qualified ID
+such as `codec.py::Codec.encode@L12` reads that occurrence directly.
+
+Python `find`, `symbol`, `deps` candidate records, and symbol source responses show at most 512 UTF-8 bytes per
+signature preview. Source also applies the caller's smaller source budget.
+For oversized signatures the result carries `signature: null`,
+`signature_truncated: true` and a UTF-8 prefix in `signature_preview`. The
+symbol's source range remains available for reading the complete declaration.
+
+The Python CLI `outline` and `CodeMap.source.outline()` use the same preview
+limit. When signatures exceed it, the textual outline points to the previews
+in the numbered `symbols` array. `outline_signature_previews` counts those
+entries. The symbol path, indexed qualname and source span locate each
+declaration. `outline_tokens` estimates the displayed outline string, while
+`full_tokens`, `signature_tokens` and `body_tokens` retain their indexed costs.
+
+The CLI `symbol` command and `CodeMap.source.symbol()` look up all indexed
+occurrences of a Python lexical name, including overload declarations. They
+return up to 50 visible records and expose the cut in `matches_truncated`.
+Symbol-based `deps` uses the same visible occurrence limit. Each static
+edge can list up to eight visible symbol candidates and carries
+`resolved_symbols_truncated: true` when more exist. In `refs`,
+`references_truncated` describes the 100-row static reference list.
+
+For Python module assignments and type aliases that share a physical line
+with other code, symbol source reads use the AST statement's exact span.
+`start_byte_column` and `end_byte_column` are zero-based UTF-8 offsets on
+the first and last Python source lines. The end offset is exclusive. For
+example, reading `LIMIT` from `BANNER = "..."; LIMIT = 3` returns
+`LIMIT = 3` and charges its own source size against the requested budget.
+Whole-line source observations continue to describe the containing lines.
+
+The statement columns change the generated workspace index shape. CodeMap
+rebuilds older workspace indexes on open under its existing schema rules.
+Consumers using previously imported native evidence need to reimport it.
+
 The MCP initialization also exposes concise server instructions for hosts that support them. For repository-localization work where the exact owner/path/symbol is not yet known, those instructions tell the coding agent to prefer one bounded `task_evidence` call before broad grep/glob or exploratory reads, then use native reads against the returned evidence. The opposite case is equally important: when a unique exact path is already known and the task is simply to inspect that file, native read is the better tool and Hashmarks should stay out of the way. This is routing guidance rather than workflow ownership: Hashmarks should win semantic reduction, not every repository access, and it does not replace editing, shell, test, or git tools.
 
 `task_evidence` uses `hashmarks.task-evidence.v5`. Retrieval remains relevance evidence only and carries no ownership authority. v3 introduced compact retrieval locators; v4 introduced a non-authoritative `ownership.next_read` for a unique, completely observed task-local structural discriminator. v5 leaves that field empty when no such discriminator exists. A named class scopes a method request but does not itself resolve the method owner; matching indexed members remain retrieval candidates until exact method identity proves ownership. `retrieval.bounds` now reports `canonical_completeness`, `canonical_truncation`, and `bound_reasons` for the executed bounded canonical query. These fields do not prove repository-wide absence. `canonical_omitted_results` still counts presentation displacement separately, and natural-language supplements remain non-authoritative.
