@@ -87,7 +87,11 @@ authored static call sites separately from this verification qualification.
 For Python `and` and `or`, both import-use and literal-read evidence stop at a
 decisive literal operand, including direct `not` negation. An unknown operand
 can still allow later evaluation. The verifier retains its source uses and the
-later possible uses without deciding runtime truth.
+later possible uses without deciding runtime truth. For a reachable conditional
+expression, the verifier observes the condition first. A scalar literal such
+as `False` or `0`, including direct `not` negation, limits import-use and
+literal-read evidence to the selected arm. Import uses also honor a source-qualified `typing.TYPE_CHECKING`
+condition. Unknown conditions preserve both arms as possible uses.
 Inside a Python function,
 a local variable's annotation supplies type syntax. The verifier observes the
 assignment target and initializer separately for reachable references.

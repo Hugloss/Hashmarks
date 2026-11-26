@@ -27,16 +27,21 @@ def _unnegated_test(test: ast.expr) -> tuple[ast.expr, bool]:
     return test, negated
 
 
+def literal_truth(test: ast.expr) -> bool | None:
+    """Identify an ordinary Python literal's truth, including explicit not."""
+    operand, negated = _unnegated_test(test)
+    if isinstance(operand, ast.Constant):
+        return bool(operand.value) != negated
+    return None
+
+
 def possible_boolean_operands(node: ast.BoolOp) -> Iterator[ast.expr]:
     """Yield possibly evaluated operands up to and including a decisive literal."""
     stop_if_true = isinstance(node.op, ast.Or)
     for operand in node.values:
         yield operand
-        test, negated = _unnegated_test(operand)
-        if isinstance(test, ast.Constant):
-            operand_truth = bool(test.value) != negated
-            if operand_truth == stop_if_true:
-                break
+        if literal_truth(operand) is stop_if_true:
+            break
 
 
 @dataclass(frozen=True)
@@ -141,23 +146,30 @@ class _VerificationReferenceIndexVisitor(PythonReferenceVisitor):
                 self.visit(value)
 
     def _guarded_branches(self, test: ast.expr) -> tuple[str | None, str | None]:
-        test, negated = _unnegated_test(test)
-        if isinstance(test, ast.Constant) and isinstance(test.value, bool):
-            reason = "statically-dead"
-            truth = test.value
-        elif self.typing_guards and self.bindings.references_import_member(
-            test, "typing", "TYPE_CHECKING"
-        ):
+        truth = literal_truth(test)
+        reason = "statically-dead"
+        if truth is None:
+            operand, negated = _unnegated_test(test)
+            if not self.typing_guards or not self.bindings.references_import_member(
+                operand, "typing", "TYPE_CHECKING"
+            ):
+                return None, None
             self.used_typing_guard = True
             reason = "type-checking-only"
-            truth = False
-        else:
-            return None, None
-        return (None, reason) if truth != negated else (reason, None)
+            truth = negated
+        return (None, reason) if truth else (reason, None)
 
     def visit_BoolOp(self, node: ast.BoolOp) -> None:
         for operand in possible_boolean_operands(node):
             self.visit(operand)
+
+    def visit_IfExp(self, node: ast.IfExp) -> None:
+        self.visit(node.test)
+        body_guard, else_guard = self._guarded_branches(node.test)
+        if body_guard is None:
+            self.visit(node.body)
+        if else_guard is None:
+            self.visit(node.orelse)
 
     def visit_If(self, node: ast.If) -> None:
         previous = self.guard

@@ -1,3 +1,7 @@
+import json
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -5,6 +9,76 @@ from contract_assertions import assert_records, assert_text
 
 from hashmarks import CodeMap
 from hashmarks.codemap.python_ast import estimate_tokens
+
+
+def _cli_bytes(root: Path, command: list[str], encoding: str) -> bytes:
+    args = [
+        sys.executable,
+        "-m",
+        "hashmarks.cli",
+        "--workspace",
+        str(root),
+        "--state-dir",
+        str(root.parent / "state"),
+        *command,
+    ]
+
+    return subprocess.run(
+        args,
+        capture_output=True,
+        check=True,
+        env={
+            **os.environ,
+            "HASHMARKS_NO_UPDATE_CHECK": "1",
+            "PYTHONIOENCODING": encoding,
+        },
+    ).stdout
+
+
+@pytest.mark.parametrize(
+    "command", [["outline", "messages.py"], ["source", "messages.py::message"]]
+)
+def test_python_cli_preserves_printable_unicode_and_escapes_controls(
+    tmp_path: Path, command: list[str]
+) -> None:
+    root = tmp_path / "repo"
+    root.mkdir()
+    (root / "messages.py").write_text(
+        "message = '连接超时，请重试。\u2028\u202e\x7f'\n", encoding="utf-8"
+    )
+    localized = _cli_bytes(root, command, "utf-8")
+    portable = _cli_bytes(root, command, "ascii")
+    assert json.loads(localized) == json.loads(portable)
+    assert "连接超时，请重试。".encode() in localized
+    assert portable.isascii()
+    for control in ("\u2028", "\u202e", "\x7f"):
+        assert control.encode() not in localized
+        assert f"\\u{ord(control):04x}".encode() in localized
+
+
+@pytest.mark.parametrize("mixed", [False, True])
+def test_unicode_ambiguous_source_only_for_all_python_matches(
+    tmp_path: Path, mixed: bool
+) -> None:
+    root = tmp_path / "repo"
+    root.mkdir()
+    for filename in ("first.py", "second.pyi"):
+        (root / filename).write_text(
+            "def message(label='连接超时'): ...\n", encoding="utf-8"
+        )
+    if mixed:
+        (root / "worker.go").write_text("package worker\nfunc message() {}\n")
+    command = ["source", "message"]
+    rendered = _cli_bytes(root, command, "utf-8")
+    portable = _cli_bytes(root, command, "ascii")
+    packet = json.loads(rendered)
+    assert packet == json.loads(portable)
+    assert packet["ambiguous"] and "path" not in packet
+    assert {row["path"] for row in packet["matches"]} == {
+        p.name for p in root.iterdir() if p.is_file()
+    }
+    assert ("连接超时".encode() in rendered) is not mixed
+    assert portable.isascii()
 
 
 def test_outline_groups_shared_binding_statement_but_preserves_each_occurrence(

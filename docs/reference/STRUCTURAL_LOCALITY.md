@@ -52,6 +52,11 @@ Repeated Python declarations retain separate outgoing calls, imports and type
 references. A later occurrence such as `Codec.encode@L6` can appear as the
 exact caller of a helper. The preceding overload stub keeps its own evidence,
 and resolving a call *to* a repeated name still requires a unique target.
+Nested declarations keep the indexed occurrence of their direct lexical parent.
+For example, if a second `Codec` starts on line 12, its methods have
+`Codec@L12` as their parent. Each method retains its own locator, and dotted-name
+lookup still lists each occurrence. Task evidence for a class or function uses that parent key
+to describe the declarations in the selected body.
 
 For a bare `helper()` inside a function that defines its own `helper`, the
 source binding at the call site can establish the nested declaration as an
@@ -500,6 +505,9 @@ copying the receiver expression into the packet. A separate inner call in
 Static `__all__` declarations define star-export membership, including explicitly
 listed leading-underscore names. Implicit exports exclude those names; dynamic
 or deleted `__all__` declarations retain unresolved export authority.
+A chained assignment can establish that membership when its other targets
+only bind names. A computed target or another binding of `__all__` inside an
+unpacking target leaves the resulting membership uncertain.
 Supported unconditional `append` and `extend` operations preserve explicit
 membership. Operations such as `clear()`, slice writes and conditional
 reassignment withdraw it while the original declaration remains readable.

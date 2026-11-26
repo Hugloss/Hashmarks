@@ -299,6 +299,19 @@ def test_annotation_only_module_target_has_no_qualified_binding(tmp_path: Path) 
     ("name", "declaration", "exported"),
     [
         ("_build", "__all__ = ['_build']\n", True),
+        ("_build", "exported = __all__ = ['_build']\n", True),
+        ("_build", "__all__ = first, *remaining = ['_build']\n", True),
+        (
+            "build",
+            "registry = {}\n__all__ = registry[__all__.pop()] = ['build']\n",
+            False,
+        ),
+        ("build", "b = u = i = l = d = 0\n__all__ = [__all__] = ['build']\n", False),
+        (
+            "build",
+            "__all__ = ['build']\nclass Setup:\n    __all__ = [__all__] = [__all__]\n    __all__.clear()\n",
+            False,
+        ),
         ("_build", "__all__ = []\n__all__.append('_build')\n", True),
         ("_build", "__all__ = []\n__all__.extend(['_build'])\n", True),
         ("build", "__all__ = ['build']\n__all__.copy()\n", True),

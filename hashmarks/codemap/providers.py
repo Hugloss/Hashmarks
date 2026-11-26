@@ -10,7 +10,7 @@ from pathlib import PurePath
 from typing import TYPE_CHECKING, Literal, Protocol, cast, runtime_checkable
 
 from .ecmascript_syntax import SyntaxObservationBound, module_declarations
-from .model import EdgeRecord, ParsedArtifact, SymbolRecord
+from .model import EdgeRecord, ParsedArtifact, SymbolRecord, allocate_symbol_occurrence
 from .python_ast import estimate_tokens
 from .source_languages import SOURCE_LANGUAGES
 
@@ -480,11 +480,24 @@ class TreeSitterRangeProvider:
         self, tree: StructuralTree, source_bytes: bytes, language: str
     ) -> list[SymbolRecord]:
         found: list[SymbolRecord] = []
+        occurrences: set[str] = set()
 
-        def visit(node: StructuralNode, parent: str | None = None) -> None:
-            current_parent = parent
+        def visit(
+            node: StructuralNode,
+            parent: str | None = None,
+            parent_occurrence: str | None = None,
+        ) -> None:
             symbol = self._symbol_from_tree_node(node, parent, source_bytes)
             if symbol is not None:
+                lexical_name = symbol.qualname
+                if language == "python":
+                    symbol = replace(
+                        symbol,
+                        parent=parent_occurrence,
+                        qualname=allocate_symbol_occurrence(
+                            occurrences, lexical_name, symbol.start_line
+                        ),
+                    )
                 found.append(symbol)
                 if symbol.kind in {
                     "class",
@@ -497,14 +510,15 @@ class TreeSitterRangeProvider:
                     "method",
                     "constructor",
                 }:
-                    current_parent = symbol.qualname
+                    parent = lexical_name
+                    parent_occurrence = symbol.qualname
             children = (
                 self._declaration_children(node, source_bytes)
                 if language in {"typescript", "tsx"}
                 else node.named_children
             )
             for child in children:
-                visit(child, current_parent)
+                visit(child, parent, parent_occurrence)
 
         visit(tree.root_node)
         return found

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import codecs
 import json
 import logging
 import sys
@@ -15,6 +16,7 @@ from .codemap.change_impact import (
 from .codemap.context_defaults import REPOSITORY_CONTEXT_DEFAULTS
 from .codemap.evidence_packet import TASK_EVIDENCE_DEFAULT_OPTIONS
 from .codemap.find_engine import FIND_DEFAULT_OPTIONS
+from .codemap.source_languages import SOURCE_LANGUAGES
 from .codemap.source_line_correspondence import validated_source_lines
 from .codemap.verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
 from .errors import RepositoryCliError
@@ -35,15 +37,55 @@ if TYPE_CHECKING:
     from .codemap.model import SyncResult
 
 
-def _print(value: object, *, compact: bool = False) -> None:
-    log_command_output(
-        logger,
-        json.dumps(
-            value,
-            indent=None if compact else 2,
-            separators=(",", ":") if compact else None,
-            sort_keys=True,
-        ),
+def _print(
+    value: object, *, compact: bool = False, printable_unicode: bool = False
+) -> None:
+    utf8 = (
+        printable_unicode
+        and codecs.lookup(sys.stdout.encoding or "ascii").name == "utf-8"
+    )
+    rendered = json.dumps(
+        value,
+        indent=None if compact else 2,
+        separators=(",", ":") if compact else None,
+        sort_keys=True,
+        ensure_ascii=not utf8,
+    )
+    if utf8 and (not rendered.isascii() or "\x7f" in rendered):
+        # JSON has already escaped newlines inside strings. Keep formatting
+        # newlines, and escape any other nonprintable characters individually.
+        escapes = {
+            ord(char): json.dumps(char)[1:-1]
+            for char in set(rendered)
+            if char != "\n" and not char.isprintable()
+        }
+        if escapes:
+            rendered = rendered.translate(escapes)
+    log_command_output(logger, rendered)
+
+
+def _python_member(path: object) -> bool:
+    return (
+        isinstance(path, str)
+        and SOURCE_LANGUAGES.get(Path(path).suffix.lower()) == "python"
+    )
+
+
+def _python_source_output(operation: str, packet: dict[str, object]) -> bool:
+    if operation not in {"outline", "source"}:
+        return False
+    if _python_member(packet.get("path")):
+        return True
+    if operation != "source" or packet.get("ambiguous") is not True:
+        return False
+    matches = packet.get("matches")
+    return (
+        isinstance(matches, list)
+        and bool(matches)
+        and all(
+            isinstance(match, dict) and _python_member(match.get("path"))
+            for match in matches
+        )
     )
 
 
@@ -58,6 +100,7 @@ def _print_operation(
     _print(
         presentation_response(operation, native, format=presentation, result_mode=mode),
         compact=presentation in {"compact", "text"},
+        printable_unicode=_python_source_output(operation, native),
     )
 
 
