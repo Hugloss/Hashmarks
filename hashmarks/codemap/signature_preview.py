@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Mapping
 
 from .model import PYTHON_SIGNATURE_PREVIEW_BYTES, SignatureDisclosure
 from .python_ast import estimate_tokens
@@ -22,6 +23,19 @@ def signature_disclosure(
         "signature_preview": encoded[:bound].decode("utf-8", errors="ignore"),
         "signature_truncated": True,
     }
+
+
+def bounded_signature_locator(
+    row: Mapping[str, object] | None,
+) -> Mapping[str, object] | None:
+    """Preserve the producer's locator and replace only oversized Python signature text."""
+    if row is not None:
+        path, signature = row.get("path"), row.get("signature")
+        if isinstance(path, str) and isinstance(signature, str):
+            disclosure = signature_disclosure(path, signature)
+            if disclosure.get("signature_truncated"):
+                return {**row, **disclosure}
+    return row
 
 
 def _signature_text(record: dict[str, object]) -> str:

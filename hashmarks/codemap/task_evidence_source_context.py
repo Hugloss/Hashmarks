@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, cast
 from hashmarks.python_ast_cache import parse_python_ast
 
 from .model import EvidenceVisibility
+from .python_exports import python_reference_line
 from .query_primitives import _TASK_STOPWORDS
 
 if TYPE_CHECKING:
@@ -30,7 +31,7 @@ def _loaded_names(tree: ast.Module) -> tuple[dict[int, set[str]], bool]:
         if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load):
             names[node.lineno].add(node.id)
         elif isinstance(node, ast.Attribute) and isinstance(node.ctx, ast.Load):
-            names[node.lineno].add(node.attr)
+            names[python_reference_line(node)].add(node.attr)
     return names, len(nodes) > _MAX_SOURCE_NODES
 
 

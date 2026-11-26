@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 from hashmarks.python_ast_cache import read_python_ast
 
 from .go_module_declaration import declared_go_module
+from .python_bindings import python_import_member_changed
 from .python_exports import (
     AllExportStatus,
     PythonExportBinding,
@@ -21,6 +22,8 @@ from .python_exports import (
 )
 
 if TYPE_CHECKING:
+    from hashmarks.python_ast_cache import PythonAstSnapshot
+
     from .repository_source import RepositorySource
 
 
@@ -302,7 +305,11 @@ class RepositoryImports:
         return self._python_member_symbol_evidence(paths, name, unresolved=unresolved)
 
     def _python_module_call_evidence(
-        self, binding: PythonExportBinding, target: str
+        self,
+        source_path: str,
+        binding: PythonExportBinding,
+        target: str,
+        snapshot: PythonAstSnapshot | None,
     ) -> tuple[list[tuple[str, str]], bool]:
         """Qualify one member of a module named by an explicit Python import."""
         alias = binding.module_import
@@ -322,6 +329,15 @@ class RepositoryImports:
         paths = self.reads.module_paths(module)
         if len(paths) != 1:
             return [], bool(paths)
+        if python_import_member_changed(
+            snapshot,
+            module,
+            member,
+            relative_package=lambda level: self._python_relative_module_candidate(
+                source_path, "." * level
+            ),
+        ):
+            return [], True
         return self._python_member_symbol_evidence(paths, member)
 
     def _python_member_symbol_evidence(

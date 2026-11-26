@@ -8,7 +8,7 @@ separate conditional observations; neither can resolve a parameter use.
 from __future__ import annotations
 
 import ast
-from collections.abc import Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass, replace
 from functools import cached_property, lru_cache
 from types import MappingProxyType
@@ -1318,9 +1318,21 @@ class PythonLocalCallBindings:
     nested_calls: Mapping[tuple[ast.AST, int, str], int]
     receiver_calls: frozenset[tuple[ast.AST, int, str]]
     class_member_writes: frozenset[tuple[ast.ClassDef, str | None]] | None
-    imported_member_writes: frozenset[_ImportKey] | None
+    imported_member_writes: frozenset[tuple[int, tuple[str, ...]]] | None
     initializer_member_writes: frozenset[tuple[ast.FunctionDef, str | None]] | None
     delegating_initializers: frozenset[ast.FunctionDef]
+
+    @cached_property
+    def relative_write_levels(self) -> frozenset[int]:
+        return frozenset(
+            level for level, _ in self.imported_member_writes or () if level
+        )
+
+    def import_write_matches(self, level: int, path: tuple[str, ...]) -> bool:
+        writes = self.imported_member_writes
+        return writes is None or any(
+            (level, path[:depth]) in writes for depth in range(1, len(path) + 1)
+        )
 
     def class_member_may_be_changed(self, owner: ast.ClassDef, member: str) -> bool:
         writes = self.class_member_writes
@@ -1389,7 +1401,10 @@ def python_local_call_bindings(snapshot: PythonAstSnapshot) -> PythonLocalCallBi
         MappingProxyType(nested_calls),
         frozenset(receiver_calls),
         bindings.class_member_writes,
-        frozenset(bindings._property_mutations),
+        frozenset(
+            (level, (*module.split("."), *properties) if module else properties)
+            for module, _, level, properties in bindings._property_mutations
+        ),
         bindings.initializer_member_writes,
         frozenset(
             owner
@@ -1400,20 +1415,33 @@ def python_local_call_bindings(snapshot: PythonAstSnapshot) -> PythonLocalCallBi
 
 
 def python_import_member_changed(
-    snapshot: PythonAstSnapshot | None, from_target: str, member: str
+    snapshot: PythonAstSnapshot | None,
+    import_target: str,
+    member: str,
+    *,
+    relative_package: Callable[[int], str] | None = None,
 ) -> bool:
-    """Match the authored from-import and member, retaining the import level."""
-    writes = (
-        python_local_call_bindings(snapshot).imported_member_writes
-        if snapshot
-        else None
-    )
-    if not writes:
-        return writes is None
-    target = from_target.lstrip(".")
-    module, _, name = target.rpartition(".")
-    key = (module, None, len(from_target) - len(target), (name, *member.split(".")))
-    return any(prefix in writes for prefix in _import_prefixes(key))
+    """Match a write to the imported member or a prefix, across import spellings."""
+    if snapshot is None:
+        return True
+    bindings = python_local_call_bindings(snapshot)
+    target = import_target.lstrip(".")
+    level = len(import_target) - len(target)
+    path = (*target.split("."), *member.split("."))
+    if bindings.import_write_matches(level, path):
+        return True
+    if relative_package is None or level:
+        return False
+    for depth in bindings.relative_write_levels:
+        package = relative_package(depth)
+        if not package:
+            return True
+        prefix = tuple(package.split("."))
+        if path[: len(prefix)] == prefix and bindings.import_write_matches(
+            depth, path[len(prefix) :]
+        ):
+            return True
+    return False
 
 
 def python_direct_method(

@@ -214,10 +214,14 @@ For a task that explicitly names a current source-visible Python file, its
 retrieval row also carries `field_declarations`. Tasks borrows the canonical
 RepositoryDeclarations owner and its built-in static Python producer; it does
 not parse fields independently. Tasks matches field names across the observed
-classes before selecting up to three classes. A field named literally in the
-task has priority over a field sharing only part of an identifier. Source
-order breaks ties and fills unused class slots. The retained classes appear
-in source order with observed/returned/omitted counts. Each value
+classes before selecting up to three classes. An explicit `Client.timeout`
+discloses matching fields of that indexed lexical class. The selector may
+include enclosing classes and the file's indexed module name. Repeated
+declarations can match at different lines. Additional bare field names still
+participate. With a qualified match, only matching groups use display slots.
+Otherwise a literal field name takes priority over partial identifier matches,
+and source order breaks ties and fills unused slots. The retained classes
+appear in source order with observed/returned/omitted counts. Each value
 retains the producer's supported annotations, initializer references, source
 lines, unknown runtime binding, incomplete semantic coverage and unresolved
 correspondence. The source revision, repository qualification, provider
@@ -230,8 +234,8 @@ Tasks applies the same literal-name and partial-term priorities to the field
 slots and uses source order when no field name matches. The explicit file
 path and output-format directive do not supply field terms. This is
 disclosure relevance only.
-Full packets retain all admitted fields; initial omissions count excluded
-fields and retain their original group/field indexes. Coverage stays incomplete
+Full packets retain every field in each selected group. Initial omissions
+count excluded fields and retain their original group/field indexes. Coverage stays incomplete
 and exclusions never establish absent declarations. Existing owner and verifier
 facts are preserved independently of this bound.
 
@@ -250,7 +254,9 @@ configuration or execution authority.
 
 Tasks can attach `source_observation` and separate `source_selection` to a
 retrieval row for an explicit current source-visible Python file. Cached AST
-identifier loads nominate positions from a bounded Source member read. Source emits
+identifier loads nominate positions from a bounded Source member read. A
+multiline attribute contributes its name at the line spelling that attribute.
+Source emits
 the unchanged native source packet. At most 4,096 AST nodes and three anchors
 are considered, with one context line per anchor and a 262,144-byte input bound.
 Selection prefers more matched normalized task-word families, then rarer

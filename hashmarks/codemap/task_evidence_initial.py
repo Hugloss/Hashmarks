@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Any, Literal
 from hashmarks.digest import hash_bytes
 from hashmarks.operation_contract import operation_schema, validate_operation_response
 
-from .signature_preview import signature_disclosure
+from .signature_preview import bounded_signature_locator
 from .task_evidence_contract import read_initial_projection
 
 if TYPE_CHECKING:
@@ -353,14 +353,10 @@ def _project_ambiguity(ambiguity: dict[str, Any], omitted_sections: list[str]) -
     for key in ("candidates", "task_local_verification_origins"):
         rows = list(ambiguity[key])
         for index, row in enumerate(rows):
-            signature = row.get("signature")
-            if isinstance(signature, str):
-                disclosure = signature_disclosure(row["path"], signature)
-                if disclosure.get("signature_truncated"):
-                    rows[index] = {**row, **disclosure}
-                    omitted_sections.append(
-                        f"/ownership/ambiguity/{key}/{index}/signature"
-                    )
+            projected = bounded_signature_locator(row)
+            if projected is not row:
+                rows[index] = projected
+                omitted_sections.append(f"/ownership/ambiguity/{key}/{index}/signature")
         ambiguity[key] = rows
 
 

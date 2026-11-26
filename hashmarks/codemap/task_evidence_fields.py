@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+import re
+import unicodedata
+from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, cast
 
-from .model import EvidenceVisibility
+from .model import EvidenceVisibility, symbol_occurrence_parts
 from .query_primitives import _TASK_STOPWORDS, _WORD_RE, _query_terms
 from .repository_declaration_provider import RepositoryDeclarationProviderError
 from .static_python_backend_declarations import StaticPythonBackendDeclarations
@@ -43,13 +45,41 @@ def _field_groups(discovery: Mapping[str, object]) -> list[dict[str, object]]:
     )
 
 
-def _select_field_groups(
-    groups: list[dict[str, object]], task: str
-) -> tuple[list[dict[str, object]], dict[str, object]]:
-    """Spend group and field slots on observed matches before source-order fallback."""
+def _qualified_field_query(task: str) -> tuple[set[str], str]:
+    """Separate whole dotted Python spellings from independently requested words."""
+    words = "".join(
+        ch if ch == "." or ("_" + ch).isidentifier() else " " for ch in task
+    ).split()
+    dotted: set[str] = set()
+    bare: list[str] = []
+    for word in words:
+        # A trailing period may end a sentence. A leading dot can instead
+        # continue a computed receiver, as in items[0].Client.timeout.
+        word = word.rstrip(".")
+        if "." in word and all(part.isidentifier() for part in word.split(".")):
+            dotted.add(unicodedata.normalize("NFKC", word))
+        else:
+            bare.append(word)
+    return dotted, " ".join(bare)
+
+
+def _lexical_field_matches(
+    fields: list[tuple[int, int, str]], task: str
+) -> list[tuple[int, int]]:
     terms = set(_query_terms(task)) - _TASK_STOPWORDS
     literal_names = set(_WORD_RE.findall(task)) - _TASK_STOPWORDS
-    fields = [
+    exact: list[tuple[int, int]] = []
+    partial: list[tuple[int, int]] = []
+    for group, index, name in fields:
+        if name in literal_names:
+            exact.append((group, index))
+        elif terms.intersection(_query_terms(name)):
+            partial.append((group, index))
+    return exact + partial
+
+
+def _field_positions(groups: list[dict[str, object]]) -> list[tuple[int, int, str]]:
+    return [
         (group_index, field_index, str(field["name"]))
         for group_index, group in enumerate(groups)
         for field_index, field in enumerate(
@@ -59,23 +89,52 @@ def _select_field_groups(
             )
         )
     ]
-    exact: list[tuple[int, int]] = []
-    partial: list[tuple[int, int]] = []
-    for group, index, name in fields:
-        if name in literal_names:
-            exact.append((group, index))
-        elif terms.intersection(_query_terms(name)):
-            partial.append((group, index))
-    matches = exact + partial
-    # Keep the best match for each class, then fill any remaining class slots.
+
+
+def _qualified_field_matches(
+    groups: list[dict[str, object]],
+    fields: list[tuple[int, int, str]],
+    symbols: Sequence[Mapping[str, object]],
+    dotted: set[str],
+) -> list[tuple[int, int]]:
+    classes = {
+        (row["name"], row["start_line"]): symbol_occurrence_parts(str(row["qualname"]))[
+            0
+        ]
+        for row in symbols
+        if row["kind"] == "class"
+    }
+    scopes = [cast("Mapping[str, object]", group["scope"]) for group in groups]
+    owners = [
+        classes.get((scope["class_name_syntax"], scope["class_line"]))
+        for scope in scopes
+    ]
+    return [
+        (group, index)
+        for group, index, name in fields
+        if owners[group] is not None and f"{owners[group]}.{name}" in dotted
+    ]
+
+
+def _select_field_groups(
+    groups: list[dict[str, object]],
+    fields: list[tuple[int, int, str]],
+    task: str,
+    qualified: list[tuple[int, int]],
+) -> tuple[list[dict[str, object]], dict[str, object]]:
+    """Match declarations before applying the group and field display limits."""
+    matches = list(dict.fromkeys([*qualified, *_lexical_field_matches(fields, task)]))
     ordered_groups = dict.fromkeys(group for group, _ in matches)
-    ordered_groups.update(dict.fromkeys(range(len(groups))))
+    if not qualified:
+        ordered_groups.update(dict.fromkeys(range(len(groups))))
     group_indexes = sorted(list(ordered_groups)[:3])
     retained = [groups[i] for i in group_indexes]
     projected_group = {original: index for index, original in enumerate(group_indexes)}
     selected = matches or [(group, index) for group, index, _ in fields]
     return retained, {
-        "basis": "literal-field-name-then-terms-else-source-order",
+        "basis": "qualified-class-field-then-literal-field-name-and-terms"
+        if qualified
+        else "literal-field-name-then-terms-else-source-order",
         "selection_authority": False,
         "bound": 3,
         "matched": len(matches),
@@ -120,8 +179,9 @@ class TaskEvidenceFieldsMixin:
         groups = _field_groups(discovery)
         if not groups:
             return None
-        query = self._task_evidence_retrieval_query(task).replace(path, " ")
-        retained, selection = _select_field_groups(groups, query)
+        retained, selection = self._task_evidence_select_fields(
+            path, task, groups, inputs[0]["member_revision"]
+        )
         return {
             **qualification,
             "state": "observed",
@@ -135,6 +195,37 @@ class TaskEvidenceFieldsMixin:
             "groups": retained,
             "initial_field_selection": selection,
         }
+
+    def _task_evidence_select_fields(
+        self, path: str, task: str, groups: list[dict[str, object]], revision: object
+    ) -> tuple[list[dict[str, object]], dict[str, object]]:
+        """Use an indexed class spelling only for the same revision as the declaration."""
+        if TYPE_CHECKING:
+            self = cast("RepositoryTasks", self)
+        query = re.sub(
+            rf"(?<![\w.]){re.escape(path)}(?!\w|\.\w)",
+            " ",
+            self._task_evidence_retrieval_query(task),
+        )
+        fields = _field_positions(groups)
+        qualified = []
+        dotted, bare = _qualified_field_query(query) if "." in query else (set(), query)
+        if dotted:
+            member = self.reads.file_row(path)
+            if member is not None and member["file_digest"] == revision:
+                if module := member["module_name"]:
+                    prefix = f"{module}."
+                    dotted |= {
+                        name.removeprefix(prefix)
+                        for name in dotted
+                        if name.startswith(prefix)
+                    }
+                qualified = _qualified_field_matches(
+                    groups, fields, self.reads.symbols_for_path(path), dotted
+                )
+        return _select_field_groups(
+            groups, fields, bare if qualified else query, qualified
+        )
 
     def _task_evidence_attach_field_declarations(
         self, packet: TaskEvidenceDraft

@@ -675,7 +675,7 @@ class RepositoryStructure(ReadScopeOwner):
         kind, targets = observed.kind, observed.targets
         if kind == "module":
             symbols, unresolved = self.imports._python_module_call_evidence(
-                observed, target
+                source_path, observed, target, self._python_snapshot(source_path)
             )
             return (
                 *self._python_imported_symbol_binding(symbols, unresolved, candidates),

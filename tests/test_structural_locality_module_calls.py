@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pytest
 from contract_assertions import assert_records
 
 from hashmarks.codemap import CodeMap
@@ -107,3 +108,106 @@ def test_ambiguous_module_paths_cannot_establish_exact_caller(tmp_path: Path) ->
         for path in ("service.py", "service/__init__.py"):
             reverse = codemap.structure.locality(f"{path}::save", max_depth=0)
             assert assert_records(reverse["nodes"])[0]["exact_callers"] == []
+
+
+@pytest.mark.parametrize(
+    ("imports", "patch_source", "receiver", "write"),
+    [
+        ("import pkg.service as svc", "svc", "svc", "patch.build = replacement"),
+        ("import pkg.service", "pkg.service", "pkg.service", "del patch.build"),
+        (
+            "import pkg.service as svc\nimport pkg.service",
+            "pkg.service",
+            "svc",
+            "setattr(patch, 'build', replacement)",
+        ),
+        (
+            "import pkg.service\nfrom pkg import service",
+            "service",
+            "pkg.service",
+            "patch.build = replacement",
+        ),
+    ],
+)
+def test_module_write_through_assignment_alias_qualifies_only_affected_call(
+    tmp_path: Path, imports: str, patch_source: str, receiver: str, write: str
+) -> None:
+    package = tmp_path / "pkg"
+    package.mkdir()
+    (package / "__init__.py").write_text("")
+    (package / "service.py").write_text("def build(): return 1\ndef keep(): return 2\n")
+    worker = tmp_path / "worker.py"
+    source = (
+        f"{imports}\ndef replacement(): return 3\npatch = {patch_source}\n"
+        f"{write}\ndef run(): return {receiver}.build(), {receiver}.keep()\n"
+    )
+    worker.write_text(source)
+    with CodeMap(tmp_path) as codemap:
+        for changed in (True, False):
+            if not changed:
+                # A parameter with the same spelling is a separate binding.
+                worker.write_text(source.replace(write, f"def other(patch): {write}"))
+            forward = codemap.structure.locality("worker.py::run")
+            assert {
+                row["target_text"]: row["resolved_symbol_id"]
+                for row in assert_records(forward["edges"])
+            } == {
+                f"{receiver}.build": None if changed else "pkg/service.py::build",
+                f"{receiver}.keep": "pkg/service.py::keep",
+            }
+            for target, callers in (
+                ("pkg/service.py::build", [] if changed else ["run"]),
+                ("pkg/service.py::keep", ["run"]),
+                ("worker.py::replacement", []),
+            ):
+                reverse = codemap.structure.locality(target, max_depth=0)
+                node = assert_records(reverse["nodes"])[0]
+                assert [
+                    row["source"] for row in assert_records(node["exact_callers"])
+                ] == callers
+
+
+@pytest.mark.parametrize(
+    ("caller", "relative_import", "affected"),
+    [
+        ("pkg/worker.py", "from . import service", True),
+        ("pkg/inner/worker.py", "from .. import service", True),
+        ("pkg/inner/__init__.py", "from .. import service", True),
+        ("other/worker.py", "from . import service", False),
+        ("pkg/inner/worker.py", "from . import service", False),
+    ],
+)
+def test_relative_alias_write_uses_its_own_indexed_package(
+    tmp_path: Path, caller: str, relative_import: str, affected: bool
+) -> None:
+    for dirname in ("pkg", "pkg/inner", "other"):
+        package = tmp_path / dirname
+        package.mkdir()
+        (package / "__init__.py").write_text("")
+        (package / "service.py").write_text(
+            "def build(): return 1\ndef keep(): return 2\n"
+        )
+    (tmp_path / caller).write_text(
+        f"import pkg.service as svc\n{relative_import} as patch\n"
+        "def replacement(): return 3\npatch.build = replacement\n"
+        "def run(): return svc.build(), svc.keep()\n"
+    )
+    with CodeMap(tmp_path) as codemap:
+        forward = codemap.structure.locality(f"{caller}::run")
+        assert {
+            row["target_text"]: row["resolved_symbol_id"]
+            for row in assert_records(forward["edges"])
+        } == {
+            "svc.build": None if affected else "pkg/service.py::build",
+            "svc.keep": "pkg/service.py::keep",
+        }
+        for target, expected in (
+            ("pkg/service.py::build", [] if affected else [caller]),
+            ("pkg/service.py::keep", [caller]),
+            ("other/service.py::build", []),
+        ):
+            packet = codemap.structure.locality(target, max_depth=0)
+            node = assert_records(packet["nodes"])[0]
+            assert [
+                row["path"] for row in assert_records(node["exact_callers"])
+            ] == expected
