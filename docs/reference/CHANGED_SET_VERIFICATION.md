@@ -95,7 +95,11 @@ generator. In these positions the verifier and call index retain creation-time
 expressions, including lambda defaults and the generator's outermost iterable.
 Assigned or passed objects may have consumers elsewhere in the source.
 In a task packet, an exact test node comes from a supported top-level test
-declaration containing a qualified reference or literal read. When several
+declaration containing a qualified reference or literal read. A qualified
+import use in an eager list, set or dictionary comprehension can identify its
+enclosing test when each loop binds a simple name from a nonempty literal
+collection of constants and has no filters. Generator bodies and callback bodies retain file scope.
+When several
 such tests exist, the existing task-term comparison can distinguish them. A
 tie, class method, or use confined to a helper retains the file target.
 Changed-set membership continues to identify whole files.

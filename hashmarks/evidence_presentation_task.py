@@ -461,21 +461,25 @@ def _initial_verification_qualifier_table(
     return columns, qualifiers, rows
 
 
+def _common_verification_qualifiers(details: list[dict[str, Any]]) -> dict[str, Any]:
+    return {
+        key: details[0][key]
+        for key in _INITIAL_VERIFICATION_QUALIFIERS
+        if key in details[0]
+        and all(
+            key in row and json.dumps(row[key]) == json.dumps(details[0][key])
+            for row in details
+        )
+    }
+
+
 def compact_initial_verification_qualifiers(groups: list[dict[str, Any]]) -> None:
     """Common qualifier values apply to each locator, never to omitted evidence."""
     for group in groups:
         if group["family"] != "verification" or len(group["findings"]) < 2:
             continue
         details = [finding["details"] for finding in group["findings"]]
-        common = {
-            key: details[0][key]
-            for key in _INITIAL_VERIFICATION_QUALIFIERS
-            if key in details[0]
-            and all(
-                key in row and json.dumps(row[key]) == json.dumps(details[0][key])
-                for row in details
-            )
-        }
+        common = _common_verification_qualifiers(details)
         if not common:
             table = _initial_verification_qualifier_table(details)
             if table is not None:
@@ -830,6 +834,37 @@ def _initial_next_read_text(ownership: Mapping[str, object]) -> list[str]:
     ]
 
 
+def _verification_candidate_lines(details: list[dict[str, Any]]) -> list[str]:
+    return [
+        f"Verification candidate: {_initial_json_record(row)} (@ /verification/relevance/candidates/{index})."
+        for index, row in enumerate(details)
+    ]
+
+
+def _initial_verification_text(rows: list[dict[str, Any]]) -> list[str]:
+    details = [_initial_verification_locator(row) for row in rows]
+    original = _verification_candidate_lines(details)
+    if len(details) <= 2:
+        return original
+    common = _common_verification_qualifiers(details)
+    if not common:
+        return original
+    individual = [
+        {key: value for key, value in row.items() if key not in common}
+        for row in details
+    ]
+    shared = [
+        "Verification qualifiers for every displayed candidate: "
+        + _initial_json_record(common),
+        *_verification_candidate_lines(individual),
+    ]
+    return (
+        shared
+        if len("\n".join(shared).encode()) < len("\n".join(original).encode())
+        else original
+    )
+
+
 def initial_evidence_text(packet: Mapping[str, object]) -> str:
     """Describe admitted initial locators; their native qualifications still govern."""
     from hashmarks.codemap.task_evidence_initial import decode_initial_collection
@@ -894,11 +929,7 @@ def initial_evidence_text(packet: Mapping[str, object]) -> str:
         rows = relevance.get("candidates", [])
         if isinstance(relevance.get("candidates_encoding"), dict):
             rows = decode_initial_collection(rows, relevance["candidates_encoding"])
-        for index, row in enumerate(rows):
-            locator = _initial_json_record(_initial_verification_locator(row))
-            lines.append(
-                f"Verification candidate: {locator} (@ /verification/relevance/candidates/{index})."
-            )
+        lines.extend(_initial_verification_text(rows))
     lines.append(
         "Qualification details remain in the native packet. Omissions: /initial_projection/omissions; omissions do not establish absence. Verification is relevance evidence; tests were not executed."
     )

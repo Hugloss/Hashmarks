@@ -510,18 +510,23 @@ class RepositoryStructure(ReadScopeOwner):
         return source_node
 
     def _python_method_receiver(
-        self, path: str, method: ast.FunctionDef | ast.AsyncFunctionDef
+        self,
+        path: str,
+        method: ast.FunctionDef | ast.AsyncFunctionDef,
+        member: str,
+        line: int,
     ) -> str | None:
+        snapshot = self._python_snapshot(path)
+        if snapshot is None:
+            return None
+        bindings = python_local_call_bindings(snapshot)
+        if (method, line, member) not in bindings.receiver_calls:
+            return None
         if not method.decorator_list:
             return "self"
         if len(method.decorator_list) != 1:
             return None
-        snapshot = self._python_snapshot(path)
-        if snapshot is None:
-            return None
-        descriptor = python_local_call_bindings(snapshot).method_descriptors.get(
-            method.decorator_list[0]
-        )
+        descriptor = bindings.method_descriptors.get(method.decorator_list[0])
         return {"classmethod": "cls", "staticmethod": "static", "property": "self"}.get(
             descriptor or ""
         )
@@ -531,6 +536,7 @@ class RepositoryStructure(ReadScopeOwner):
         *,
         source_path: str,
         source_qualname: str,
+        line: int,
         target: str,
         candidates: list[dict[str, object]],
     ) -> tuple[dict[str, object] | None, list[str], bool] | None:
@@ -546,7 +552,9 @@ class RepositoryStructure(ReadScopeOwner):
         if source_node is None:
             return None
         candidate_ids = sorted(_symbol_id(row) for row in candidates)
-        receiver = self._python_method_receiver(source_path, source_node)
+        receiver = self._python_method_receiver(
+            source_path, source_node, call_target.method, line
+        )
         if receiver != call_target.receiver:
             return (None, candidate_ids, True) if receiver is None else None
         if python_function_body_binds(source_node, call_target.receiver):
@@ -573,6 +581,7 @@ class RepositoryStructure(ReadScopeOwner):
         self_cls_binding = self._python_self_cls_call_binding(
             source_path=source_path,
             source_qualname=source_qualname,
+            line=line,
             target=target,
             candidates=candidates,
         )

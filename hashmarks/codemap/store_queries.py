@@ -111,6 +111,22 @@ class WorkspaceMapQueryMixin:
             ).fetchall()
         return [dict(row) for row in rows]
 
+    def source_symbol_ranges(
+        self, path: str, revision: str, *, require_parsed: bool
+    ) -> list[dict]:
+        """Read symbol spans from the same publication as the observed member."""
+        if TYPE_CHECKING:
+            self = cast("WorkspaceMapStore", self)
+        with self._lock:
+            rows = self._db.execute(
+                """SELECT s.name,s.qualname,s.start_line,s.end_line,s.start_byte_column,s.end_byte_column
+                FROM symbol s JOIN file_map f ON f.path=s.path
+                WHERE s.path=? AND f.file_digest=? AND f.evidence_visibility='source'
+                  AND (?=0 OR f.parse_error IS NULL)""",
+                (path, revision, require_parsed),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
     def symbols_containing_line(
         self, path: str, line: int, *, limit: int = 33
     ) -> list[dict]:

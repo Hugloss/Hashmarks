@@ -111,11 +111,7 @@ class ScopedSourceLiteralsMixin:
         except UnicodeDecodeError:
             record.update(availability="unsupported", reason="invalid-utf8")
             return record, empty, len(raw)
-        symbols = (
-            self.store.symbols_for_path(path)
-            if member.get("index_state") == "indexed"
-            else []
-        )
+        ranges = self._literal_symbol_ranges(member, text)
         token_kinds = self._python_source_token_kinds(text, path)
         counts: dict[str, int] = {}
         for literal in state.literals:
@@ -124,7 +120,7 @@ class ScopedSourceLiteralsMixin:
                 literal,
                 member=member,
                 limit=state.limit,
-                symbols=symbols,
+                ranges=ranges,
                 token_kinds=token_kinds,
             )
             self._source_evidenced_hits(

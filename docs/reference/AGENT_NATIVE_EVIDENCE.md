@@ -126,6 +126,12 @@ alongside reference strength, selection authority, edit relationship and
 negative-evidence qualification. A null test symbol stays null; a missing field
 stays missing. Structured, compact and text use the same locator projection.
 Text encodes each locator as a JSON record with its native source reference.
+For three or more displayed candidates, text can place JSON-identical
+qualifiers present on every locator in one preceding record labelled
+`Verification qualifiers for every displayed candidate`. Overlay each
+candidate on that record to recover its exact locator. Distinct or missing
+qualifiers stay local. Short lists keep their individual qualifiers, and the
+shared representation is used only when it reduces the rendered bytes.
 Shared qualifier tables preserve those values without granting test sufficiency
 or execution authority.
 
