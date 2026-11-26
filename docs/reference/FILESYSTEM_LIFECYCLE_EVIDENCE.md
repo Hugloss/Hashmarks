@@ -43,6 +43,11 @@ Operations retain API identity, source path/symbol/range/column, member revision
 operand role, a source-reference identity, descriptor-relative arguments,
 lexical context managers, and qualified call-site forwarding evidence.
 
+When a helper returns a value and a second call uses that value as its
+receiver, each call needs its own target evidence. The two expressions can
+start at the same byte. A qualified inner helper still contributes its own
+operations when the outer target is unresolved.
+
 A relationship states `same-source-reference`. Its runtime identity remains
 `unverified`. It retains conditional failure language, environmental unknowns,
 positive namespace-mutator evidence, and structurally relevant verification

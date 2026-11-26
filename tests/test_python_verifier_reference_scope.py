@@ -1138,3 +1138,65 @@ def test_literal_while_qualifies_only_proven_arms(
         changed = repository.verification.changed_set(["owner.py"])
     assert bool(changed["targets"]) is expected
     assert changed["negative_evidence_admissible"] is False
+
+
+def test_always_true_assert_message_cannot_nominate_a_decoy(tmp_path: Path) -> None:
+    with _repository(
+        tmp_path,
+        "from owner import calculate_tax\ndef test_calculate_tax():\n"
+        "    assert True, calculate_tax()\n    assert not False, calculate_tax()\n",
+    ) as repository:
+        live = "tests/test_live.py"
+        (tmp_path / live).write_text(
+            "from owner import calculate_tax\ndef test_amount():\n    value = calculate_tax()\n    assert value == 2\n"
+        )
+        repository.index.sync()
+        verify = repository.tasks.evidence("Change calculate_tax in owner.py")[
+            "verification"
+        ]
+        changed = repository.verification.changed_set(["owner.py"])
+        calls = repository.structure.locality("owner.py::calculate_tax", max_depth=0)
+    decoy = next(
+        r
+        for r in verify["relevance"]["candidates"]
+        if r["path"] == "tests/test_amounts.py"
+    )
+    assert decoy.get("reference_strength") == "reachable-import"
+    assert decoy.get("test_symbol") is None
+    assert assert_object(verify["plan"])["test_symbol"] == "test_amount"
+    assert [r["path"] for r in assert_records(changed["targets"])] == [live]
+    assert changed["negative_evidence_admissible"] is False
+    assert {
+        r["source"]
+        for r in assert_records(assert_records(calls["nodes"])[0]["exact_callers"])
+    } == {"test_calculate_tax", "test_amount"}
+
+
+@pytest.mark.parametrize(
+    ("test", "direct"),
+    [
+        ("'success'", False),
+        ("not not 1", False),
+        ("False", True),
+        ("not True", True),
+        ("flag", True),
+        ("(lambda: calculate_tax())", False),
+        ("(lambda value=calculate_tax(): value)", True),
+        ("(calculate_tax() for item in (1,))", False),
+        ("(item for item in calculate_tax())", True),
+    ],
+)
+def test_assertion_guard_inputs_and_possible_failure_messages_keep_their_evidence(
+    tmp_path: Path, test: str, direct: bool
+) -> None:
+    with _repository(
+        tmp_path,
+        "from owner import calculate_tax\ndef test_value(flag):\n    assert "
+        + test
+        + ", calculate_tax()\n",
+    ) as repository:
+        (tmp_path / "owner.py").write_text("def calculate_tax(): return (1,)\n")
+        repository.index.sync()
+        changed = repository.verification.changed_set(["owner.py"])
+    assert bool(changed["targets"]) is direct
+    assert changed["negative_evidence_admissible"] is False

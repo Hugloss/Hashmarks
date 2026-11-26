@@ -44,6 +44,10 @@ Each Python call keeps its indexed lexical source. Calls inside a nested functio
 or method belong to that declaration, and do not become direct calls of its
 enclosing function. Decorator, default and class-base expressions belong to the
 surrounding definition scope; they are not calls made by the declared body.
+For a wrapped call, the edge points to the line spelling the callee name. A
+multiline dotted call points to its final attribute. Forward edges, reverse
+callers and verifier witnesses share that location. Import edges point to the
+start of the individual imported name, including each entry in a grouped import.
 When a header calls the name its declaration will publish, the final file
 binding cannot prove that earlier call's target. Such calls remain unresolved;
 ordinary body recursion and parameter names do not change that boundary.
@@ -127,6 +131,13 @@ A source-visible write or deletion on the named class also makes that member
 uncertain, including lookup through an inherited base. The same rule applies
 when the caller's source writes to a qualified imported class through an alias.
 The declaration remains readable and the observer does not select a replacement.
+For an instance call, a write to the member on the first parameter of a
+qualified, undecorated `__init__` can shadow the class method on the instance.
+This includes inherited initializer candidates. Competing initializers retain
+the observed write without choosing a runtime method order. A directly
+qualified `super().__init__()` also keeps base initializer writes in scope.
+Calls through the
+class name or a qualified `cls` retain their separate class-member evidence.
 
 For the target member, ordinary methods and qualified static or class methods
 can identify a direct callable declaration. With `self.prop()`, the call uses

@@ -295,3 +295,34 @@ def test_zero_iteration_while_retains_only_possible_literal_read(
         changed = repository.verification.changed_set(["docs/guide.md"])
     assert bool(changed["targets"]) is observed
     assert changed["negative_evidence_admissible"] is False
+
+
+@pytest.mark.parametrize(
+    ("condition", "observed"),
+    [
+        ("not False", False),
+        ("(lambda: READ)", False),
+        ("(lambda value=READ: value)", True),
+        ("(READ for item in (1,))", False),
+        ("(item for item in READ)", True),
+        ("False", True),
+        ("flag", True),
+    ],
+)
+def test_assertion_reads_preserve_eager_inputs_and_skip_impossible_messages(
+    tmp_path: Path, condition: str, observed: bool
+) -> None:
+    read = "(ROOT / 'docs/guide.md').read_text()"
+    _fixture(
+        tmp_path,
+        "    flag = (ROOT / 'enabled').exists()\n    assert "
+        + condition.replace("READ", read)
+        + ", "
+        + read
+        + "\n",
+    )
+    with CodeMap(tmp_path) as repository:
+        repository.index.sync()
+        changed = repository.verification.changed_set(["docs/guide.md"])
+    assert bool(changed["targets"]) is observed
+    assert changed["negative_evidence_admissible"] is False

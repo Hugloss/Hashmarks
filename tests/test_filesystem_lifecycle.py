@@ -377,6 +377,29 @@ def test_call_budget_covers_repeated_helper_contexts(tmp_path: Path) -> None:
     assert packet["coverage"]["negative_evidence_admissible"] is False
 
 
+@pytest.mark.parametrize(
+    "inner", ["inspect(first)", "(\n        inspect\n    )(first)"]
+)
+def test_call_on_a_helper_result_cannot_reuse_the_inner_callee(
+    tmp_path: Path, inner: str
+) -> None:
+    packet = _observe(
+        tmp_path,
+        "import os\nclass Sink:\n    def accept(self, path): return 17\n"
+        "def inspect(path):\n    os.stat(path)\n    os.rmdir(path)\n    return Sink()\n"
+        f"def cleanup(first, second):\n    {inner}.accept(second)\n",
+    )["resource_lifecycle"]
+    assert {row["use"]["reference"] for row in packet["observations"]} == {
+        "cleanup.py::inspect:path",
+        "cleanup.py::cleanup:first",
+    }
+    assert any(
+        row["symbol"] == "cleanup"
+        and row["reason"] == "call-target-unresolved-or-external"
+        for row in packet["unresolved"]
+    )
+
+
 def test_distinct_factory_invocations_do_not_share_resource_identity(
     tmp_path: Path,
 ) -> None:

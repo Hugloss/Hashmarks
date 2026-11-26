@@ -157,6 +157,13 @@ Search owner. Context uses `CodeMap.context.build()`, `.orient()`, `.task()`,
 root methods and query/context cache fields are removed. Normalized find routes
 travel with their evidence; presentation does not classify the query again.
 
+In `CodeMap.context.work(action)`, an oversized Python signature contributes
+at most 512 UTF-8 bytes of signature text to its role anchor. The anchor labels
+the prefix `signature preview` and carries `signature_truncated: true`. A
+supplied shorter preview retains that qualification. The path, symbol, role
+and rank still come from the supplied action, and the budget counts the
+displayed anchor content.
+
 Ownership uses `CodeMap.ownership.findings()`, `.repository_graph()`, `.relations()`,
 `.import_findings()`, `.cache_findings()`, `.cache_invalidation_graph()` and
 `.concurrency_findings()`. Task views use `CodeMap.tasks.action_map()`,
