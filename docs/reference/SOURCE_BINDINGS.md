@@ -451,6 +451,12 @@ Eviction can cause another parse through the same owner without changing
 evidence. Syntax reuse creates no durable observation, generation or freshness
 authority, and consumers treat shared trees as immutable.
 
+The native Python parser accepts a leading UTF-8 byte-order mark and checks
+the member's coding cookie against it. The marker stays in the original
+member revision and the exact-source cache key. First-line byte offsets
+include its three bytes, so a binding range slices the same original bytes
+as its source read.
+
 ## Observer ownership
 
 - **Observed repository fact/evidence:** source-local declarations, references, authored imports, bounded aliases and string values, and explicitly conditional default/argument relationships.

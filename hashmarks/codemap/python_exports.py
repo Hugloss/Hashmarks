@@ -50,11 +50,8 @@ class PythonExportBinding:
     replaces_assignment: bool = False
 
     @property
-    def unwrapped_function(self) -> bool:
-        return (
-            isinstance(self.declaration, (ast.FunctionDef, ast.AsyncFunctionDef))
-            and not self.declaration.decorator_list
-        )
+    def unwrapped_declaration(self) -> bool:
+        return self.declaration is not None and not self.declaration.decorator_list
 
     def declaration_rows(
         self, name: str, rows: Sequence[dict[str, object]]
@@ -511,8 +508,10 @@ def python_class_export_binding(
     return _export_binding(node.body, name, writes, before_line=before_line)
 
 
-def python_class_node(tree: ast.Module, qualname: str) -> ast.ClassDef | None:
-    """Qualify every class component with the same ordered binding analysis."""
+def python_class_node(
+    tree: ast.Module, qualname: str, *, require_unwrapped: bool = False
+) -> ast.ClassDef | None:
+    """Locate a declaration; a call through its published path must qualify every component."""
     selected: ast.ClassDef | None = None
     for part in qualname.split("."):
         binding = (
@@ -520,7 +519,9 @@ def python_class_node(tree: ast.Module, qualname: str) -> ast.ClassDef | None:
             if selected is None
             else python_class_export_binding(selected, part)
         )
-        if not isinstance(binding.declaration, ast.ClassDef):
+        if not isinstance(binding.declaration, ast.ClassDef) or (
+            require_unwrapped and not binding.unwrapped_declaration
+        ):
             return None
         selected = binding.declaration
     return selected

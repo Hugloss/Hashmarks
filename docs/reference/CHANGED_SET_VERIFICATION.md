@@ -77,7 +77,13 @@ A qualified absolute import of `typing.TYPE_CHECKING` identifies the type-only
 branch, including an alias or the `else` branch of a negated guard. A local
 flag, rebound import, or repository-owned `typing` module retains ordinary
 conditional source evidence. These relationships describe source uses. Native
-execution of a conditional branch remains unobserved. Inside a Python function,
+execution of a conditional branch remains unobserved. The verifier treats
+statements following a direct `return` or `raise` in the same suite as
+unreachable. Operands of the exit, sibling branches, handlers and `finally`
+suites retain their own source evidence. An exit inside a compound statement
+does not establish that the enclosing suite exits. The call index retains the
+authored static call sites separately from this verification qualification.
+Inside a Python function,
 a local variable's annotation supplies type syntax. The verifier observes the
 assignment target and initializer separately for reachable references.
 With an authored `from __future__ import annotations` or the native Python

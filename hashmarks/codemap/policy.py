@@ -59,8 +59,12 @@ class ContextPolicy:
     @classmethod
     def load(cls, workspace: Path, path: Path | None = None) -> ContextPolicy:
         config = workspace / ".hashmarks-context.toml" if path is None else path
-        if not config.exists():
+        try:
+            config.lstat()
+        except (FileNotFoundError, NotADirectoryError):
             return cls()
+        # A configured link is a policy entry even if its target disappears.
+        # Only a missing entry selects defaults; read errors remain unavailable.
         data = tomllib.loads(config.read_text(encoding="utf-8"))
         raw_rules = data.get("rule", [])
         if not isinstance(raw_rules, list):

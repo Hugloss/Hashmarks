@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import os
 import sys
+from codecs import BOM_UTF8
 from collections import OrderedDict
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
@@ -59,7 +60,23 @@ _source_trees: ContextVar[_SourceTrees | None] = ContextVar(
 def python_ast_signature() -> str:
     """Identify the canonical Python grammar and source parsing implementation."""
     version = ".".join(str(part) for part in sys.version_info[:3])
-    return f"hashmarks.python-source.v1:{sys.implementation.name}:{version}"
+    return f"hashmarks.python-source.v2:{sys.implementation.name}:{version}"
+
+
+def _bom_tree(raw: bytes, filename: str) -> ast.Module:
+    # CPython checks any coding cookie against the BOM, then reports columns
+    # relative to the source after the BOM. Bind first-line positions back to
+    # the actual bytes before the immutable tree reaches any consumer.
+    tree = ast.parse(raw, filename=filename)
+    for node in ast.walk(tree):
+        for line, column in (
+            ("lineno", "col_offset"),
+            ("end_lineno", "end_col_offset"),
+        ):
+            offset = getattr(node, column, None)
+            if getattr(node, line, None) == 1 and isinstance(offset, int):
+                setattr(node, column, offset + len(BOM_UTF8))
+    return tree
 
 
 def parse_python_ast(source: str | bytes, *, filename: str = "<unknown>") -> ast.Module:
@@ -75,7 +92,11 @@ def parse_python_ast(source: str | bytes, *, filename: str = "<unknown>") -> ast
     cached = trees.get(key) if trees is not None else None
     if cached is not None:
         return cached
-    tree = ast.parse(text, filename=filename)
+    if text.startswith("\ufeff"):
+        raw = source if isinstance(source, bytes) else text.encode("utf-8")
+        tree = _bom_tree(raw, filename)
+    else:
+        tree = ast.parse(text, filename=filename)
     if trees is not None:
         trees.retain(key, tree)
     return tree
@@ -173,9 +194,14 @@ def _cached_snapshot(
     errors: str,
 ) -> PythonAstSnapshot:
     path = Path(absolute_path)
-    source = path.read_text(encoding=encoding, errors=errors)
+    raw = path.read_bytes()
     if _metadata(path) != identity:
         raise UnstablePythonSourceError(f"Python source changed while reading: {path}")
+    # A lossy or BOM-stripping diagnostic read must not supply a different
+    # program to the parser. Preserve the existing text snapshot's newlines.
+    if raw.startswith(BOM_UTF8):
+        encoding, errors = "utf-8", "strict"
+    source = raw.decode(encoding, errors).replace("\r\n", "\n").replace("\r", "\n")
     tree = parse_python_ast(source, filename=absolute_path)
     return PythonAstSnapshot(source=source, tree=tree, identity=identity)
 

@@ -110,20 +110,18 @@ def test_python_ast_cache_retries_when_source_changes_during_read(
     clear_ast_cache()
     source = tmp_path / "sample.py"
     source.write_text("def alpha():\n    return 1\n", encoding="utf-8")
-    original_read_text = Path.read_text
+    original_read_bytes = Path.read_bytes
     calls = 0
 
-    def mutating_read_text(
-        path: Path, encoding: str | None = None, errors: str | None = None
-    ) -> str:
+    def mutating_read_bytes(path: Path) -> bytes:
         nonlocal calls
-        text = original_read_text(path, encoding=encoding, errors=errors)
+        raw = original_read_bytes(path)
         if path == source and calls == 0:
             calls += 1
             source.write_text("def bravo():\n    return 2\n", encoding="utf-8")
-        return text
+        return raw
 
-    monkeypatch.setattr(Path, "read_text", mutating_read_text)
+    monkeypatch.setattr(Path, "read_bytes", mutating_read_bytes)
     snapshot = read_python_ast(source)
 
     assert calls == 1

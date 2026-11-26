@@ -89,9 +89,7 @@ class _CodeMapPaths:
             if artifact_db is None
             else canonical_host_path(artifact_db)
         )
-        policy = (
-            None if policy_path is None else canonical_host_path(root / policy_path)
-        )
+        policy = None if policy_path is None else root / policy_path
         return cls(root, state, artifacts, policy, internal)
 
 

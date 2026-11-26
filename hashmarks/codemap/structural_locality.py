@@ -331,8 +331,7 @@ class RepositoryStructure(ReadScopeOwner):
                 local,
                 candidates,
                 unresolved=True,
-                direct_callable=isinstance(observed.declaration, ast.ClassDef)
-                or observed.unwrapped_function,
+                direct_callable=observed.unwrapped_declaration,
             )
         if kind == "reexport" and len(targets) == 1:
             symbols, unresolved = self.imports._resolve_import_symbol_evidence(
@@ -356,12 +355,12 @@ class RepositoryStructure(ReadScopeOwner):
             if row.get("qualname") == qualname
         ]
         direct_callable = True
-        if len(owned) == 1 and owned[0].get("kind") == "function":
+        if len(owned) == 1 and owned[0].get("kind") in {"function", "class"}:
             row = owned[0]
             observed = self.imports._python_export_observation(
                 str(row["path"]), str(row["name"])
             )
-            direct_callable = observed.unwrapped_function
+            direct_callable = observed.unwrapped_declaration
         return _binding_result(
             owned, candidates, unresolved=bool(symbols), direct_callable=direct_callable
         )
@@ -370,7 +369,11 @@ class RepositoryStructure(ReadScopeOwner):
         if not path.endswith(".py") or not qualname:
             return None
         snapshot = self._python_snapshot(path)
-        return python_class_node(snapshot.tree, qualname) if snapshot else None
+        return (
+            python_class_node(snapshot.tree, qualname, require_unwrapped=True)
+            if snapshot
+            else None
+        )
 
     def _python_class_bases(
         self, path: str, qualname: str
@@ -409,7 +412,10 @@ class RepositoryStructure(ReadScopeOwner):
                 path, base.id, before_line=base.lineno
             )
             local_name = base.id
-        if isinstance(observed.declaration, ast.ClassDef):
+        if (
+            isinstance(observed.declaration, ast.ClassDef)
+            and observed.unwrapped_declaration
+        ):
             return path, local_name
         if observed.kind != "reexport" or len(observed.targets) != 1:
             return None
@@ -433,7 +439,7 @@ class RepositoryStructure(ReadScopeOwner):
         if key in seen:
             return None, True
         direct, unresolved = self._python_direct_method_owners(
-            path, class_qualname, method, self._qualified_path_symbols(path)
+            path, class_qualname, method
         )
         if unresolved:
             return None, True
@@ -465,7 +471,6 @@ class RepositoryStructure(ReadScopeOwner):
         path: str,
         class_qualname: str,
         method: str,
-        candidates: Sequence[dict[str, object]],
     ) -> tuple[list[dict[str, object]], bool]:
         class_node = self._python_class_node(path, class_qualname)
         if class_node is None:
@@ -473,10 +478,9 @@ class RepositoryStructure(ReadScopeOwner):
         kind, declaration = python_class_member_binding(class_node, method)
         if declaration is None:
             return [], kind != "unknown"
-        if (
-            isinstance(declaration, (ast.FunctionDef, ast.AsyncFunctionDef))
-            and declaration.decorator_list
-        ):
+        if declaration.decorator_list:
+            if isinstance(declaration, ast.ClassDef):
+                return [], True
             snapshot = self._python_snapshot(path)
             if snapshot is None or python_local_call_bindings(
                 snapshot
@@ -484,7 +488,7 @@ class RepositoryStructure(ReadScopeOwner):
                 return [], True
         owners = [
             row
-            for row in candidates
+            for row in self._qualified_path_symbols(path)
             if str(row.get("path") or "") == path
             and str(row.get("qualname") or "") == f"{class_qualname}.{method}"
             and locality_coordinate(row["start_line"])
@@ -544,9 +548,14 @@ class RepositoryStructure(ReadScopeOwner):
         candidates: list[dict[str, object]],
     ) -> tuple[dict[str, object] | None, list[str], bool] | None:
         call_target = self._python_self_cls_target(source_qualname, target)
-        if call_target is None:
+        if (
+            call_target is None
+            or not source_path.endswith(".py")
+            or (snapshot := self._python_snapshot(source_path)) is None
+        ):
             return None
-        class_node = self._python_class_node(source_path, call_target.class_qualname)
+        # The source method remains authored even if decoration replaced its class.
+        class_node = python_class_node(snapshot.tree, call_target.class_qualname)
         source_node = (
             self._python_receiver_method(class_node, call_target)
             if class_node
@@ -555,13 +564,8 @@ class RepositoryStructure(ReadScopeOwner):
         if source_node is None:
             return None
         candidate_ids = sorted(_symbol_id(row) for row in candidates)
-        snapshot = self._python_snapshot(source_path)
-        receiver = (
-            python_local_call_bindings(snapshot).method_receiver(
-                source_node, call_target.method, line
-            )
-            if snapshot
-            else None
+        receiver = python_local_call_bindings(snapshot).method_receiver(
+            source_node, call_target.method, line
         )
         if receiver != call_target.receiver:
             return (None, candidate_ids, True) if receiver is None else None
@@ -608,18 +612,12 @@ class RepositoryStructure(ReadScopeOwner):
         self,
         source_path: str,
         target: str,
-        root: str,
         candidates: list[dict[str, object]],
     ) -> tuple[dict[str, object] | None, list[str], bool, bool]:
-        candidate_ids = sorted(_symbol_id(row) for row in candidates)
-        if self._python_class_node(source_path, root) is None:
-            return None, candidate_ids, True, True
         class_name, method = target.rsplit(".", 1)
         qualified, _unresolved = self._python_direct_method_owners(
-            source_path, class_name, method, self._qualified_path_symbols(source_path)
+            source_path, class_name, method
         )
-        if len(qualified) == 1:
-            return qualified[0], [_symbol_id(qualified[0])], False, True
         resolved, ids, unresolved = _binding_result(
             qualified, candidates, unresolved=True
         )
@@ -642,13 +640,11 @@ class RepositoryStructure(ReadScopeOwner):
             )
             return None, candidate_ids, not data_binding, data_binding
         path, class_name = symbols[0]
-        if self._python_class_node(path, class_name) is None:
-            return None, candidate_ids, True, True
         member = target.split(".", 1)[1]
         qualified_name = f"{class_name}.{member}"
         class_qualname, method = qualified_name.rsplit(".", 1)
         qualified, _unresolved = self._python_direct_method_owners(
-            path, class_qualname, method, self._qualified_path_symbols(path)
+            path, class_qualname, method
         )
         resolved, ids, unresolved = _binding_result(
             qualified, candidates, unresolved=True
@@ -698,7 +694,7 @@ class RepositoryStructure(ReadScopeOwner):
             )
         if kind == "local" and observed.declaration is not None:
             return self._python_local_qualified_call_binding(
-                source_path, target, root, candidates
+                source_path, target, candidates
             )
         if kind == "reexport" and len(targets) == 1:
             return self._python_reexport_qualified_call_binding(

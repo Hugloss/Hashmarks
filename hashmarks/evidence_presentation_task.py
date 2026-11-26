@@ -335,6 +335,17 @@ def _factor_source_records(
     container[qualifier_key] = common
 
 
+def _share_source_qualifiers(details: dict[str, Any]) -> None:
+    anchors = details.get("line_anchors")
+    if isinstance(anchors, list):
+        for anchor in anchors:
+            if isinstance(anchor, dict):
+                _factor_source_records(
+                    anchor, "context_excerpt", "context_excerpt_qualifiers"
+                )
+        _factor_source_records(details, "line_anchors", "line_anchor_qualifiers")
+
+
 def compact_initial_source_qualifiers(groups: list[dict[str, Any]]) -> None:
     """Shared qualifiers apply to each displayed source record, never missing rows."""
     for group in groups:
@@ -342,17 +353,8 @@ def compact_initial_source_qualifiers(groups: list[dict[str, Any]]) -> None:
             continue
         for finding in group["findings"]:
             details = finding.get("details")
-            if not isinstance(details, dict):
-                continue
-            anchors = details.get("line_anchors")
-            if not isinstance(anchors, list):
-                continue
-            for anchor in anchors:
-                if isinstance(anchor, dict):
-                    _factor_source_records(
-                        anchor, "context_excerpt", "context_excerpt_qualifiers"
-                    )
-            _factor_source_records(details, "line_anchors", "line_anchor_qualifiers")
+            if isinstance(details, dict):
+                _share_source_qualifiers(details)
 
 
 def _compact_initial_field_declarations(groups: list[dict[str, Any]]) -> None:
@@ -727,12 +729,14 @@ def _initial_source_text_record(observation: Mapping[str, object], ref: str) -> 
         if first != pointer and len(text.encode("utf-8")) > len(pointer) + len(first):
             references[pointer] = first
             del row["text"]
-    original = _initial_json_record(view)
+    projected = {**view, "line_anchors": anchors}
+    _share_source_qualifiers(projected)
     if not references:
-        return original
-    shared = _initial_json_record(
-        {**view, "line_anchors": anchors, "excerpt_text_refs": references}
-    )
+        return _initial_json_record(projected)
+    original_view = deepcopy(view)
+    _share_source_qualifiers(original_view)
+    original = _initial_json_record(original_view)
+    shared = _initial_json_record({**projected, "excerpt_text_refs": references})
     return (
         shared
         if len(shared.encode("utf-8")) < len(original.encode("utf-8"))

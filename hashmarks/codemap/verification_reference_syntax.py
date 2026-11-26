@@ -98,6 +98,27 @@ class _VerificationReferenceIndexVisitor(PythonReferenceVisitor):
             )
         }
 
+    def _visit_suite(self, statements: list[ast.stmt]) -> None:
+        """Keep direct exits local to this suite, including their evaluated operands."""
+        previous = self.guard
+        for statement in statements:
+            self.visit(statement)
+            if isinstance(statement, (ast.Return, ast.Raise)):
+                self.guard = self.guard or "statically-dead"
+        self.guard = previous
+
+    def generic_visit(self, node: ast.AST) -> None:
+        for field, value in ast.iter_fields(node):
+            if isinstance(value, list):
+                if field in {"body", "orelse", "finalbody"}:
+                    self._visit_suite(value)
+                else:
+                    for child in value:
+                        if isinstance(child, ast.AST):
+                            self.visit(child)
+            elif isinstance(value, ast.AST):
+                self.visit(value)
+
     def _guarded_branches(self, test: ast.expr) -> tuple[str | None, str | None]:
         negated = False
         while isinstance(test, ast.UnaryOp) and isinstance(test.op, ast.Not):
@@ -121,11 +142,9 @@ class _VerificationReferenceIndexVisitor(PythonReferenceVisitor):
         self.visit(node.test)
         body, otherwise = self._guarded_branches(node.test)
         self.guard = previous or body
-        for child in node.body:
-            self.visit(child)
+        self._visit_suite(node.body)
         self.guard = previous or otherwise
-        for child in node.orelse:
-            self.visit(child)
+        self._visit_suite(node.orelse)
         self.guard = previous
 
     def _import(self, node: ast.Import | ast.ImportFrom, prefix: str) -> None:
@@ -156,8 +175,7 @@ class _VerificationReferenceIndexVisitor(PythonReferenceVisitor):
             node, deferred=self.deferred_annotations
         ):
             self.visit(expression)
-        for statement in node.body:
-            self.visit(statement)
+        self._visit_suite(node.body)
 
     visit_FunctionDef = _visit_definition
     visit_AsyncFunctionDef = _visit_definition

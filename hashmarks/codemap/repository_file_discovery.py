@@ -63,11 +63,12 @@ class RepositoryFiles:
     ) -> None:
         self._workspace = canonical_host_path(workspace)
         self._internal_state_path = internal_state_path
-        self._policy_path = (
-            None
-            if policy_path is None
-            else canonical_host_path(self._workspace / policy_path)
-        )
+        self._policy_path = None
+        if policy_path is not None:
+            # Bind the parent once while observing the configured policy entry
+            # itself on each refresh, including replacement of a live link.
+            entry = self._workspace / policy_path
+            self._policy_path = canonical_host_path(entry.parent) / entry.name
         self._policy = ContextPolicy.load(self._workspace, self._policy_path)
 
     @property

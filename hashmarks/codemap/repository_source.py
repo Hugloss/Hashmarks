@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import stat
 import sys
 from collections.abc import Iterator, Mapping, Sequence
 from copy import deepcopy
@@ -262,28 +263,15 @@ class RepositorySource(
                 "state": "unsupported",
                 "reason": "repository-evidence-denied",
             }
-        if not self.files.is_admitted(rel):
-            return {
-                "path": rel,
-                "state": "unsupported",
-                "reason": "repository-evidence-not-admitted",
-            }
         path = self.workspace / rel
-        cursor = self.workspace
-        for part in rel.split("/"):
-            cursor = cursor / part
-            if cursor.is_symlink():
-                return {
-                    "path": rel,
-                    "state": "unsupported",
-                    "reason": "symlink-evidence-not-observed",
-                }
-        if not path.is_file():
-            return {
-                "path": rel,
-                "state": "known-absent",
-                "reason": "member-not-present",
-            }
+        try:
+            problem = self._member_path_problem(rel, path)
+        except OSError:
+            # Admission probes and metadata reads can both be inaccessible.
+            problem = ("unknown", "member-read-unstable-or-unavailable")
+        if problem is not None:
+            state, reason = problem
+            return {"path": rel, "state": state, "reason": reason}
         row = self.reads.file_row(rel)
         visibility = (
             str(row.get("evidence_visibility") or decision.evidence_visibility.value)
@@ -299,6 +287,22 @@ class RepositorySource(
             visibility=visibility,
             indexed_revision=indexed_revision,
         )
+
+    def _member_path_problem(self, rel: str, path: Path) -> tuple[str, str] | None:
+        if not self.files.is_admitted(rel):
+            return "unsupported", "repository-evidence-not-admitted"
+        cursor = self.workspace
+        try:
+            for part in rel.split("/"):
+                cursor = cursor / part
+                mode = cursor.lstat().st_mode
+                if stat.S_ISLNK(mode):
+                    return "unsupported", "symlink-evidence-not-observed"
+                if cursor == path and not stat.S_ISREG(mode):
+                    return "unsupported", "member-not-regular-file"
+        except (FileNotFoundError, NotADirectoryError):
+            return "known-absent", "member-not-present"
+        return None
 
     def _read_repository_member_source(
         self,
@@ -354,6 +358,17 @@ class RepositorySource(
             }
         return _RepositoryMemberRead(raw, digest)
 
+    def _member_policy_available(self) -> bool:
+        # Scoped reads established admission on entry. Standalone metadata
+        # and byte reads must qualify the policy at observation time.
+        if self.reads.depth:
+            return True
+        try:
+            self.files.refresh_policy()
+        except OSError:
+            return False
+        return True
+
     def member(
         self,
         relpath: str,
@@ -364,6 +379,12 @@ class RepositorySource(
         """Observe one repository member through canonical policy/revision authority."""
         if max_bytes is not None and (type(max_bytes) is not int or max_bytes < 0):
             raise ValueError("max_bytes must be a non-negative integer or None")
+        if not self._member_policy_available():
+            return {
+                "path": normalize_relative_path(relpath, allow_root=False),
+                "state": "unknown",
+                "reason": "repository-evidence-policy-unavailable",
+            }, None
         source = self._repository_member_source(relpath)
         if isinstance(source, dict):
             return source, None
@@ -596,10 +617,6 @@ class RepositorySource(
         self, relpath: str, max_bytes: int
     ) -> tuple[dict[str, object], bytes | None]:
         """Enforce the source budget while reusing canonical member authority."""
-        # Standalone retained-evidence reads do not enter an indexing read scope.
-        # Observe current admission without publishing a replacement generation.
-        if self.reads.depth == 0:
-            self.files.refresh_policy()
         return self.member(relpath, include_bytes=True, max_bytes=max_bytes)
 
     def _source_evidenced_hits(

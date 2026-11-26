@@ -118,9 +118,12 @@ can identify a direct callable declaration. With `self.prop()`, the call uses
 the value returned by the property. That call stays unresolved, as does a call
 through a custom or stacked method decorator.
 
-A decorator on a module-level function can also replace the published callable.
+A decorator on a module-level function or class can also replace the published callable.
 Local calls, import aliases and module-qualified calls retain the authored
 declaration as a candidate. Its source and import evidence remain available.
+Member calls through a class name or inherited base require each class on the
+lookup path to have an unwrapped declaration. Methods authored inside a
+decorated class still retain their source-local calls to independent functions.
 
 ## Forwarding-only syntax
 

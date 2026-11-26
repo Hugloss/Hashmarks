@@ -277,8 +277,9 @@ each evidence record occupies one physical output line.
 When neighboring anchors display the same long excerpt from the same source
 line, initial text can print the literal once. Its `excerpt_text_refs` maps
 each omitted `text` field's JSON pointer to the first displayed literal's
-pointer in the same source view. Copy those strings into their referenced
-fields before overlaying the view on `metadata_ref`. Every occurrence retains
+pointer in the same source view. Expand any shared anchor and excerpt
+qualifiers first, then copy those strings into their referenced fields before
+overlaying the view on `metadata_ref`. Every occurrence retains
 its own line, role, column bounds and truncation. This encoding is used only
 when it shortens the rendered record.
 
@@ -624,7 +625,8 @@ so choosing `compact` is not proof of total payload/token reduction.
 No projection-only model transport is enabled without separate measured
 admission and an independently sufficient omission/identity contract.
 
-Initial compact source excerpts may carry `line_anchor_qualifiers` beside
+Initial compact source excerpts and initial text with multiple source anchors
+may carry `line_anchor_qualifiers` beside
 `line_anchors`. Overlay each anchor on that mapping to recover its exact fields.
 An anchor may similarly carry `context_excerpt_qualifiers`; overlay each context
 row on that mapping. Shared fields are present and JSON-identical in every
