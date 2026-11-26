@@ -1407,9 +1407,16 @@ class RepositorySource(
                 f"source observation unavailable for {path}: {observation['state']}"
             )
         if qualname is not None and row["language"] == "python":
-            return python_symbol_bytes(
-                python_source_byte_lines(raw), start, end, columns
-            ).decode("utf-8", errors="replace")
+            # CPython counts bare CR as a newline. The advisory range provider
+            # counts LF rows, so keep embedded CR bytes in that coordinate space.
+            lines = (
+                python_source_byte_lines(raw)
+                if row["parse_error"] is None
+                else raw.replace(b"\r\n", b"\n").split(b"\n")
+            )
+            return python_symbol_bytes(lines, start, end, columns).decode(
+                "utf-8", errors="replace"
+            )
         return "\n".join(
             line.decode("utf-8", errors="replace").removesuffix("\n").removesuffix("\r")
             for line in self._physical_lines(raw)[start - 1 : end]

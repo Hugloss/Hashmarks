@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
-from collections import Counter
+from collections import defaultdict
 
-from .model import PYTHON_SIGNATURE_PREVIEW_BYTES
+from .model import PYTHON_SIGNATURE_PREVIEW_BYTES, SignatureDisclosure
 from .python_ast import estimate_tokens
 
 
 def signature_disclosure(
     path: str, signature: str | None, *, max_bytes: int = PYTHON_SIGNATURE_PREVIEW_BYTES
-) -> dict[str, object]:
+) -> SignatureDisclosure:
     if signature is None or not path.lower().endswith((".py", ".pyi")):
         return {"signature": signature}
     encoded = signature.encode("utf-8")
@@ -58,23 +58,29 @@ def share_source_signature_budget(
     _fit_signature(selected, budget_bytes - choices_used)
 
 
-def _distinct_whole_binding_lines(
-    outline: str, symbols: list[dict[str, object]]
-) -> str:
-    """Display one whole-line assignment once even when it declares several names."""
-    bindings = Counter(
-        (row["signature"], row["start_line"])
-        for row in symbols
-        if row["kind"] == "binding"
-        and isinstance(row["signature"], str)
-        and row["start_line"] == row["end_line"]
-        and row.get("start_byte_column") is None
-        and row.get("end_byte_column") is None
-    )
+def _distinct_binding_lines(outline: str, symbols: list[dict[str, object]]) -> str:
+    """Collapse matching binding entries only when one source range accounts for them all."""
+    bindings: dict[tuple[str, object], list[tuple[object, object]]] = defaultdict(list)
+    for row in symbols:
+        signature = row["signature"]
+        line = row["start_line"]
+        if (
+            row["kind"] == "binding"
+            and isinstance(signature, str)
+            and line == row["end_line"]
+        ):
+            bindings[signature, line].append(
+                (row.get("start_byte_column"), row.get("end_byte_column"))
+            )
+    # Identical syntax can appear in distinct statements on one physical
+    # line. A display line alone does not establish that their bindings share
+    # a statement; retain every occurrence when the recorded ranges differ.
     shared = {
         f"{signature}  [{line}-{line}]"
-        for (signature, line), count in bindings.items()
-        if count > 1
+        for (signature, line), ranges in bindings.items()
+        if len(ranges) > 1
+        and len(set(ranges)) == 1
+        and (ranges[0] == (None, None) or None not in ranges[0])
     }
     if not shared:
         return outline
@@ -115,7 +121,7 @@ def outline_disclosure(
             )
         outline = "\n".join(lines)
     if path.lower().endswith((".py", ".pyi")):
-        outline = _distinct_whole_binding_lines(outline, symbols)
+        outline = _distinct_binding_lines(outline, symbols)
     return {
         "outline": outline,
         "outline_tokens": estimate_tokens(outline),

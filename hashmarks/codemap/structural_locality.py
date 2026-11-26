@@ -30,6 +30,7 @@ from .python_exports import (
     python_function_scope_binds,
 )
 from .repository_domains import is_test_path
+from .signature_preview import signature_disclosure
 from .structural_locality_model import (
     LOCALITY_SCHEMA,
     LocalityNode,
@@ -845,7 +846,7 @@ class RepositoryStructure(ReadScopeOwner):
             "qualname": str(row["qualname"]),
             "name": str(row["name"]),
             "kind": str(row["kind"]),
-            "signature": str(row["signature"]),
+            **signature_disclosure(path, str(row["signature"])),
             "lines": [start, end],
             "navigation_depth": navigation_depth,
             "file_digest": digest,

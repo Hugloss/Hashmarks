@@ -299,7 +299,88 @@ def test_annotation_only_module_target_has_no_qualified_binding(tmp_path: Path) 
     ("name", "declaration", "exported"),
     [
         ("_build", "__all__ = ['_build']\n", True),
+        (
+            "build",
+            "__all__ = ['build']\npublic = []\nclass Setup:\n    global public\n    public = __all__\npublic.clear()\n",
+            False,
+        ),
+        (
+            "build",
+            "__all__ = ['build']\npublic = []\nclass Setup:\n    shared = __all__\n    global public\n    if True: public = shared\npublic.clear()\n",
+            False,
+        ),
+        (
+            "_build",
+            "__all__ = ['_build']\npublic = []\nclass Setup:\n    public = __all__\npublic.clear()\n",
+            True,
+        ),
+        (
+            "_build",
+            "__all__ = ['_build']\npublic = []\nclass Setup:\n    global public\n    __all__ = []\n    public = __all__\npublic.clear()\n",
+            True,
+        ),
+        (
+            "_build",
+            "__all__ = ['_build']\npublic = []\nclass Setup:\n    global public\n    public = __all__\n",
+            True,
+        ),
         ("_build", "exported = __all__ = ['_build']\n", True),
+        ("build", "__all__ = ['build']\npublic = __all__\npublic.clear()\n", False),
+        (
+            "build",
+            "public = __all__ = ['build']\nsecondary: list = public\ndel secondary[:]\n",
+            False,
+        ),
+        (
+            "_build",
+            "__all__ = ['_build']\npublic = __all__\npublic = []\npublic.clear()\n",
+            True,
+        ),
+        (
+            "_build",
+            "public = __all__ = ['old']\n__all__ = ['_build']\npublic.clear()\n",
+            True,
+        ),
+        (
+            "_build",
+            "__all__ = ('_build',)\npublic = __all__\npublic += ('other',)\n",
+            True,
+        ),
+        (
+            "build",
+            "__all__ = ['build']\nif True:\n    public = __all__\npublic.clear()\n",
+            False,
+        ),
+        (
+            "build",
+            "__all__ = ['build']\nif True:\n    public = __all__\n    public.clear()\n",
+            False,
+        ),
+        (
+            "_build",
+            "__all__ = ['_build']\nif True:\n    public = __all__\n    other = []\nother.clear()\n",
+            True,
+        ),
+        (
+            "build",
+            "__all__ = ['build']\npublic = __all__\nif False: public = []\npublic.clear()\n",
+            False,
+        ),
+        (
+            "build",
+            "__all__ = ['build']\nclass Setup:\n    public = []\n    if True: public = __all__\n    public.clear()\n",
+            False,
+        ),
+        (
+            "_build",
+            "__all__ = ['_build']\nclass Setup:\n    public = __all__\n    public = []\n    public.clear()\n",
+            True,
+        ),
+        (
+            "_build",
+            "public = __all__ = ['_build']\nclass Setup:\n    public = []\n    public.clear()\n",
+            True,
+        ),
         ("_build", "__all__ = first, *remaining = ['_build']\n", True),
         (
             "build",

@@ -434,8 +434,9 @@ Python declaration signatures include class keyword unpacking such as
 The symbol locator keeps the declaration name, so a generic class `Bucket[T]`
 is still addressable as `api.py::Bucket`.
 
-Python `find`, `symbol`, `deps` candidate records, and symbol source responses show at most 512 UTF-8 bytes per
-signature preview. Source also applies the caller's smaller source budget.
+Python `find`, `symbol`, `deps` candidate records, structural-locality nodes
+and symbol source responses show at most 512 UTF-8 bytes per signature preview.
+Source also applies the caller's smaller source budget.
 When a qualified Python source read lists repeated occurrences, the selected
 signature and every displayed match signature share an aggregate allowance of
 four UTF-8 bytes per requested token. Complete signatures and previews both
@@ -458,9 +459,11 @@ entries. The symbol path, indexed qualname and source span locate each
 declaration. `outline_tokens` estimates the displayed outline string, while
 `full_tokens`, `signature_tokens` and `body_tokens` retain their indexed costs.
 When several Python module names share an untruncated, single-line assignment,
-the outline text displays that statement once. Each bound name keeps
-its own indexed qualname, span and signature in `symbols`. Statements with
-distinct line or byte-column ranges retain their separate occurrences.
+the outline text displays the statement once, including on semicolon-separated
+lines where the binding records share the same byte-column range. Each bound
+name keeps its own indexed qualname, span and signature in `symbols`. If
+identical text on one line comes from different byte ranges, the outline
+retains the occurrences separately.
 
 On UTF-8 standard output, the CLI writes printable Unicode directly in a
 Python `outline` or `source` response, including ambiguous source lookups

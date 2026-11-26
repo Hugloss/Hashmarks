@@ -97,6 +97,12 @@ sections retain their existing bounds. Native traversal bounds, source qualifier
 and unresolved identity continue to define the observation scope. An empty
 observed collection does not establish repository-wide or runtime absence.
 
+Each Python node discloses up to 512 UTF-8 bytes of its indexed signature. A
+longer signature has `signature: null`, a UTF-8 prefix in `signature_preview`,
+and `signature_truncated: true`. Its `symbol_id` and line span locate the
+declaration for an explicit source read. The node's identities still bind
+the member revision, including changes beyond the displayed prefix.
+
 For Python class methods, `self.member(...)` and `cls.member(...)` may be promoted to an exact call only when the containing method/class is statically known and the member has one unambiguous owner through the local/import-resolved class inheritance graph. Competing inherited owners, unsupported/dynamic bases, or receiver shapes other than proven `self`/`cls` remain unresolved or external evidence rather than being guessed.
 
 A named base must qualify at the class header. A nested header looks in its
@@ -508,6 +514,11 @@ or deleted `__all__` declarations retain unresolved export authority.
 A chained assignment can establish that membership when its other targets
 only bind names. A computed target or another binding of `__all__` inside an
 unpacking target leaves the resulting membership uncertain.
+Plain name aliases to the current mutable export list can also change its
+membership. An explicit `global` declaration can publish such an alias from a
+class suite into the module. A possible alias from a conditional assignment
+keeps a later mutation uncertain. A definite fresh literal assignment separates that name
+from the old list.
 Supported unconditional `append` and `extend` operations preserve explicit
 membership. Operations such as `clear()`, slice writes and conditional
 reassignment withdraw it while the original declaration remains readable.

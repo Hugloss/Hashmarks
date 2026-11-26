@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any
+from typing import Any, NotRequired, TypedDict
 
 from hashmarks.operation_contract import operation_response, operation_schema
 
@@ -10,6 +10,12 @@ CODEMAP_SCHEMA = "hashmarks.codemap.v1"
 PYTHON_SIGNATURE_PREVIEW_BYTES = 512
 PYTHON_PARSER = "hashmarks.python-ast.v22"
 _OCCURRENCE_MARKER = "@L"
+
+
+class SignatureDisclosure(TypedDict):
+    signature: str | None
+    signature_preview: NotRequired[str]
+    signature_truncated: NotRequired[bool]
 
 
 def symbol_occurrence_parts(key: str) -> tuple[str, str | None]:

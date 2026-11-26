@@ -81,7 +81,11 @@ execution of a conditional branch remains unobserved. The verifier treats
 statements following a direct `return`, `raise`, `break` or `continue` in the
 same suite as unreachable. Exit operands, loop headers, sibling branches, loop
 `else` clauses, handlers and `finally` suites retain their own source evidence.
-An exit inside a compound statement does not establish that the enclosing
+A synchronous `for` over an explicitly empty tuple, list, dictionary,
+string or bytes literal skips the target assignment and body. Its `else` suite
+retains qualified import uses and literal reads. A direct `return` or `raise`
+in that guaranteed `else` also rules out later statements in the surrounding
+suite. An exit inside a conditional arm does not establish that its enclosing
 suite exits. The call index retains the
 authored static call sites separately from this verification qualification.
 For Python `and` and `or`, both import-use and literal-read evidence stop at a

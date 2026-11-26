@@ -608,50 +608,122 @@ def static_all_exports(tree: ast.Module) -> list[str] | AllExportStatus:
     This parser reads syntax only; the caller owns repository identity/freshness.
     """
     exports: list[str] | AllExportStatus = AllExportStatus.ABSENT
+    receivers: set[str] | None = None
     for node in tree.body:
-        exports = _all_statement_exports(node, exports)
-        if exports is AllExportStatus.UNKNOWN:
-            break
+        assigned = _all_assignment(node)
+        if assigned is not None:
+            names = static_string_names(assigned)
+            if names is None:
+                return AllExportStatus.UNKNOWN
+            exports = names
+            # Only mutable literal collections can change through another name.
+            receivers = (
+                _direct_store_names(node)
+                if isinstance(assigned, (ast.List, ast.Set))
+                else None
+            )
+        else:
+            if receivers is not None:
+                _add_possible_aliases(node, receivers)
+            exports = _all_statement_exports(node, exports, receivers)
+            if exports is AllExportStatus.UNKNOWN:
+                return exports
+            if receivers is not None:
+                _discard_fresh_bindings(node, receivers)
     return exports
 
 
-def _targets_all(targets: list[ast.expr]) -> bool:
-    return any(isinstance(item, ast.Name) and item.id == "__all__" for item in targets)
-
-
-def _other_name_target(target: ast.expr) -> bool:
-    """A plain sibling store may unpack names, but must not rebind __all__."""
+def _other_name_target(target: ast.expr, name: str) -> bool:
+    """A plain sibling store may unpack names, but must not rebind the selected name."""
     if isinstance(target, ast.Name):
-        return target.id != "__all__"
+        return target.id != name
     if isinstance(target, ast.Starred):
-        return _other_name_target(target.value)
+        return _other_name_target(target.value, name)
     return isinstance(target, (ast.Tuple, ast.List)) and all(
-        _other_name_target(item) for item in target.elts
+        _other_name_target(item, name) for item in target.elts
     )
 
 
-def _all_assignment(node: ast.stmt) -> ast.expr | None:
+def _all_assignment(node: ast.stmt, name: str = "__all__") -> ast.expr | None:
     match node:
-        case ast.Assign(targets=targets, value=value) if _targets_all(targets):
+        case ast.Assign(targets=targets, value=value) if any(
+            isinstance(t, ast.Name) and t.id == name for t in targets
+        ):
             # Each target receives the same value, in order. A computed store
             # can mutate that value and nested unpacking can replace __all__.
             if all(
-                isinstance(target, ast.Name) or _other_name_target(target)
+                isinstance(target, ast.Name) or _other_name_target(target, name)
                 for target in targets
             ):
                 return value
-        case ast.AnnAssign(target=ast.Name(id="__all__"), value=value):
+        case ast.AnnAssign(target=ast.Name(id=identifier), value=value) if (
+            identifier == name
+        ):
             return value
     return None
 
 
+def _direct_store_names(node: ast.AST) -> set[str]:
+    if isinstance(node, ast.Assign):
+        return {target.id for target in node.targets if isinstance(target, ast.Name)}
+    if (
+        isinstance(node, ast.AnnAssign)
+        and isinstance(node.target, ast.Name)
+        and node.value is not None
+    ):
+        return {node.target.id}
+    return set()
+
+
+def _add_possible_aliases(statement: ast.stmt, receivers: set[str]) -> None:
+    """A possible name transfer can weaken membership, never establish it."""
+    if isinstance(statement, (ast.Assign, ast.AnnAssign)):
+        if isinstance(statement.value, ast.Name) and statement.value.id in receivers:
+            receivers.update(_direct_store_names(statement))
+        return
+    compounds = (
+        ast.If,
+        ast.For,
+        ast.AsyncFor,
+        ast.While,
+        ast.With,
+        ast.AsyncWith,
+        ast.Try,
+        ast.TryStar,
+        ast.Match,
+    )
+    if not isinstance(statement, compounds):
+        return
+    # Union possible transfers inside the compound without choosing branches
+    # or assuming a loop ran just once. Nested declaration bodies stay local.
+    transfers: dict[str, set[str]] = {}
+    for child in _binding_nodes(statement):
+        if isinstance(child, (ast.Assign, ast.AnnAssign)) and isinstance(
+            child.value, ast.Name
+        ):
+            transfers.setdefault(child.value.id, set()).update(
+                _direct_store_names(child)
+            )
+    pending = list(transfers.keys() & receivers)
+    while pending:
+        new = transfers.pop(pending.pop(), set()) - receivers
+        receivers.update(new)
+        pending.extend(new & transfers.keys())
+
+
+def _discard_fresh_bindings(statement: ast.stmt, receivers: set[str]) -> None:
+    # Conditional stores cannot detach an alias on every path.
+    if isinstance(statement, (ast.Assign, ast.AnnAssign)) and isinstance(
+        statement.value, (ast.List, ast.Dict, ast.Set, ast.Tuple, ast.Constant)
+    ):
+        for name in _direct_store_names(statement) & receivers:
+            if _all_assignment(statement, name) is not None:
+                receivers.remove(name)
+
+
 def _all_statement_exports(
-    node: ast.stmt, exports: list[str] | AllExportStatus
+    node: ast.stmt, exports: list[str] | AllExportStatus, receivers: set[str] | None
 ) -> list[str] | AllExportStatus:
-    assigned = _all_assignment(node)
-    if assigned is not None:
-        names = static_string_names(assigned)
-        return AllExportStatus.UNKNOWN if names is None else names
     match node:
         case ast.AugAssign(target=ast.Name(id="__all__"), op=op, value=value):
             if not isinstance(op, ast.Add):
@@ -665,22 +737,22 @@ def _all_statement_exports(
             return _call_all_exports(exports, call, method)
     if _writes_name(
         node, "__all__", annotation_targets_bind=False
-    ) or _mutates_module_all(node):
+    ) or _mutates_module_all(node, receivers):
         return AllExportStatus.UNKNOWN
     return exports
 
 
-def _may_mutate_all(node: ast.AST) -> bool:
+def _export_mutation_receiver(node: ast.AST) -> str | None:
     match node:
-        case ast.AugAssign(target=ast.Name(id="__all__")):
-            return True
-        case ast.Subscript(value=ast.Name(id="__all__"), ctx=ast.Store() | ast.Del()):
-            return True
-        case ast.Call(func=ast.Attribute(value=ast.Name(id="__all__"), attr=method)):
+        case ast.AugAssign(target=ast.Name(id=name)):
+            return name
+        case ast.Subscript(value=ast.Name(id=name), ctx=ast.Store() | ast.Del()):
+            return name
+        case ast.Call(func=ast.Attribute(value=ast.Name(id=name), attr=method)):
             # The supported unconditional append/extend cases have already
             # been consumed. Do not execute other methods to derive membership.
-            return method not in {"copy", "count", "index"}
-    return False
+            return name if method not in {"copy", "count", "index"} else None
+    return None
 
 
 def _all_value_children(node: ast.AST) -> Iterator[ast.AST]:
@@ -698,45 +770,67 @@ def _all_value_children(node: ast.AST) -> Iterator[ast.AST]:
         yield child
 
 
-def _mutates_module_all(node: ast.AST, *, class_local: bool = False) -> bool:
-    if not class_local and _may_mutate_all(node):
+def _mutates_module_all(
+    node: ast.AST, module_receivers: set[str] | None, visible: set[str] | None = None
+) -> bool:
+    if visible is None:
+        visible = module_receivers or {"__all__"}
+    if _export_mutation_receiver(node) in visible:
         return True
-    if isinstance(node, ast.ClassDef) and _class_mutates_module_all(node):
+    if isinstance(node, ast.ClassDef) and _class_mutates_module_all(
+        node, module_receivers
+    ):
         return True
     if isinstance(node, (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)):
         # Only the first iterable reads the enclosing class namespace.
         return (
-            _mutates_module_all(node.generators[0].iter, class_local=class_local)
-            or any(_mutates_module_all(g.target) for g in node.generators)
-            or any(_mutates_module_all(expr) for expr in _comprehension_body(node))
+            _mutates_module_all(node.generators[0].iter, module_receivers, visible)
+            or any(
+                _mutates_module_all(g.target, module_receivers) for g in node.generators
+            )
+            or any(
+                _mutates_module_all(expr, module_receivers)
+                for expr in _comprehension_body(node)
+            )
         )
     return any(
-        _mutates_module_all(child, class_local=class_local)
+        _mutates_module_all(child, module_receivers, visible)
         for child in _all_value_children(node)
     )
 
 
-def _class_mutates_module_all(node: ast.ClassDef) -> bool:
+def _class_mutates_module_all(
+    node: ast.ClassDef, module_receivers: set[str] | None
+) -> bool:
     # A fresh class-local container is independent of module membership.
-    class_local = False
+    module_names = module_receivers or {"__all__"}
+    visible = set(module_names)
+    globals_in_class = _class_global_names(node) if module_receivers is not None else ()
     for statement in node.body:
-        rebinds = _writes_name(statement, "__all__", annotation_targets_bind=False)
+        rebinds = module_names.intersection(
+            _binding_writes(statement, annotation_targets_bind=False)
+        )
         # A simple augmented assignment reads the previous class-local
         # receiver. Its right-hand expression can still affect the module.
         if (
-            class_local
-            and isinstance(statement, ast.AugAssign)
-            and _targets_all([statement.target])
+            isinstance(statement, ast.AugAssign)
+            and isinstance(statement.target, ast.Name)
+            and statement.target.id not in visible
         ):
             expression = statement.value
         else:
             expression = statement
-        if _mutates_module_all(expression, class_local=class_local and not rebinds):
-            return True
-        if rebinds:
-            class_local = isinstance(
-                _all_assignment(statement), (ast.List, ast.Dict, ast.Set, ast.Tuple)
+        visible.update(rebinds)
+        if module_receivers is not None:
+            _add_possible_aliases(statement, visible)
+            # Only explicit global bindings can publish a receiver outside
+            # this class namespace. A possible store does not prove a detach.
+            module_receivers.update(
+                name for name in globals_in_class if name in visible
             )
+        if _mutates_module_all(expression, module_receivers, visible):
+            return True
+        _discard_fresh_bindings(statement, visible)
     return False
 
 

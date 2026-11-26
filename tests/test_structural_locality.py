@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from contract_assertions import assert_array, assert_object, assert_records
+from contract_assertions import assert_array, assert_object, assert_records, assert_text
 
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.structural_locality_delta import structural_locality_delta
@@ -20,6 +20,44 @@ def _codemap(root: Path) -> CodeMap:
         state_dir=root / ".hashmarks-test-state",
         artifact_db=root / ".hashmarks-test-artifacts.sqlite3",
     )
+
+
+def test_locality_bounds_python_signatures_without_losing_occurrences_or_tail_changes(
+    tmp_path: Path,
+) -> None:
+    prefix = "界" * 300
+    template = (
+        "from typing import Literal\n"
+        "def target(key: Literal['" + prefix + "{}']): return key\n"
+        "def adapter(key): return target(key)\n"
+    )
+    _write(tmp_path, "api.py", template.format("old"))
+    with _codemap(tmp_path) as cm:
+        before = cm.structure.locality("api.py::adapter", max_depth=1)
+        rows = {row["qualname"]: row for row in assert_records(before["nodes"])}
+        assert rows["adapter"]["signature"] == "def adapter(key)"
+        assert "signature_preview" not in rows["adapter"]
+        target = rows["target"]
+        assert target["signature"] is None and target["signature_truncated"] is True
+        preview = assert_text(target["signature_preview"])
+        assert 0 < len(preview.encode("utf-8")) <= 512
+        assert ("def target(key: Literal['" + prefix + "old'])").startswith(preview)
+        source = cm.source.read(assert_text(target["symbol_id"]))
+        assert (
+            "old" in assert_text(source["content"])
+            and source["lines"] == target["lines"]
+        )
+        assert target["exact_caller_count"] == 1
+
+        _write(tmp_path, "api.py", template.format("new"))
+        after = cm.structure.locality("api.py::adapter", max_depth=1)
+        updated = next(
+            row for row in assert_records(after["nodes"]) if row["qualname"] == "target"
+        )
+        assert updated["signature_preview"] == preview
+        assert updated["symbol_source_identity"] != target["symbol_source_identity"]
+        assert updated["symbol_evidence_identity"] != target["symbol_evidence_identity"]
+        assert structural_locality_delta(before, after)["comparable"] is True
 
 
 def test_structural_locality_reports_exact_bounded_facts(tmp_path: Path) -> None:
