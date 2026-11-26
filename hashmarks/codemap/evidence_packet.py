@@ -24,6 +24,7 @@ from .evidence_decision_packet import (
 from .model import EvidenceVisibility
 from .python_ast import estimate_tokens
 from .repository_observation import packet_digest
+from .repository_source import SourceSymbolNotFound
 from .task_action_projection import TASK_ACTION_DEFAULT_OPTIONS
 from .task_evidence_discrimination import (
     STRUCTURAL_SELECTION_BASIS,
@@ -400,9 +401,11 @@ class TaskEvidencePacketMixin(
         """Rebind a selected evidence row to its unique current indexed symbol."""
         if TYPE_CHECKING:
             self = cast("RepositoryTasks", self)
-        current = self.store.symbol_at(path, qualname) if qualname else None
-        if current is not None or not name:
-            return current
+        if qualname:
+            self.source.ensure_current(path)
+            return self.store.symbol_at(path, qualname)
+        if not name:
+            return None
         matches = [
             symbol
             for symbol in self.reads.symbols_for_path(path)
@@ -463,32 +466,25 @@ class TaskEvidencePacketMixin(
         self,
         path: str,
         row: Mapping[str, object],
-    ) -> tuple[str | None, str | None, str, int | None, int | None]:
+        role: str,
+    ) -> _TaskEvidenceRange | None:
         """Rebind selected symbol/range evidence to the current repository index."""
         qualname = str(row.get("qualname") or "") or None
         name = str(row.get("name") or "") or None
-        signature = str(row.get("signature") or "").strip()
-        start_raw, end_raw = row.get("start_line"), row.get("end_line")
-        start = int(start_raw) if isinstance(start_raw, int) and start_raw > 0 else None
-        end = int(end_raw) if isinstance(end_raw, int) and end_raw > 0 else None
         current = self._task_evidence_current_symbol(path, qualname=qualname, name=name)
-        if current is None:
-            return qualname, name, signature, start, end
-        qualname = str(current.get("qualname") or qualname or "") or None
-        name = str(current.get("name") or name or "") or None
-        signature = str(current.get("signature") or signature).strip()
-        current_start, current_end = current.get("start_line"), current.get("end_line")
-        start = (
-            int(current_start)
-            if isinstance(current_start, int) and current_start > 0
-            else start
+        if qualname and current is None:
+            return None
+        selected = current if current is not None else row
+        start, end = selected.get("start_line"), selected.get("end_line")
+        return _TaskEvidenceRange(
+            path=path,
+            role=role,
+            qualname=str(selected.get("qualname") or "") or None,
+            name=str(selected.get("name") or "") or None,
+            signature=str(selected.get("signature") or "").strip(),
+            start=start if isinstance(start, int) and start > 0 else None,
+            end=end if isinstance(end, int) and end > 0 else None,
         )
-        end = (
-            int(current_end)
-            if isinstance(current_end, int) and current_end > 0
-            else end
-        )
-        return qualname, name, signature, start, end
 
     def _task_evidence_source_range(
         self,
@@ -531,28 +527,58 @@ class TaskEvidencePacketMixin(
             pending["estimated_tokens"] = body_tokens
         return None, pending
 
-    def _task_evidence_path_admission(
-        self, path: str, role: str
-    ) -> tuple[EvidenceVisibility | None, SourceReadPending | None]:
+    def _task_evidence_range_admission(
+        self, path: str, row: Mapping[str, object], role: str
+    ) -> tuple[
+        EvidenceVisibility | None, _TaskEvidenceRange | None, SourceReadPending | None
+    ]:
         visibility = self._task_evidence_visibility(path)
         if visibility is None:
-            return None, {
-                "role": role,
-                "path": path,
-                "reason": "path-no-longer-indexed",
-            }
+            return (
+                None,
+                None,
+                {
+                    "role": role,
+                    "path": path,
+                    "reason": "path-no-longer-indexed",
+                },
+            )
         if visibility is EvidenceVisibility.DENY:
-            return None, {
-                "role": role,
-                "path": path,
-                "reason": "source-evidence-denied",
-            }
-        return visibility, None
+            return (
+                None,
+                None,
+                {
+                    "role": role,
+                    "path": path,
+                    "reason": "source-evidence-denied",
+                },
+            )
+        evidence = self._task_evidence_current_range(path, row, role)
+        if evidence is None:
+            return (
+                visibility,
+                None,
+                {
+                    "role": role,
+                    "path": path,
+                    "symbol": str(row["qualname"]),
+                    "reason": "exact-source-range-unavailable",
+                },
+            )
+        return visibility, evidence, None
 
     def _task_evidence_source_or_outline(
         self, evidence: _TaskEvidenceRange, token_budget: int
     ) -> tuple[TaskSourceEvidence | None, SourceReadPending | None]:
-        item, pending = self._task_evidence_source_range(evidence, token_budget)
+        try:
+            item, pending = self._task_evidence_source_range(evidence, token_budget)
+        except SourceSymbolNotFound:
+            return None, {
+                "role": evidence.role,
+                "path": evidence.path,
+                "symbol": evidence.qualname,
+                "reason": "exact-source-range-unavailable",
+            }
         if item is not None:
             return item, None
         assert "reason" in pending
@@ -589,23 +615,12 @@ class TaskEvidencePacketMixin(
         path = str(row.get("path") or "")
         if not path:
             return None, None
-        visibility, denied = self._task_evidence_path_admission(path, role)
+        visibility, evidence, denied = self._task_evidence_range_admission(
+            path, row, role
+        )
         if denied is not None:
             return None, denied
-        assert visibility is not None
-
-        qualname, name, signature, start, end = self._task_evidence_current_range(
-            path, row
-        )
-        evidence = _TaskEvidenceRange(
-            path=path,
-            role=role,
-            qualname=qualname,
-            name=name,
-            signature=signature,
-            start=start,
-            end=end,
-        )
+        assert visibility is not None and evidence is not None
         symbol = evidence.qualname or evidence.name
         if (
             visibility is EvidenceVisibility.SOURCE
@@ -639,7 +654,7 @@ class TaskEvidencePacketMixin(
             path=path,
             role=role,
             symbol=symbol,
-            signature=signature,
+            signature=evidence.signature,
             token_budget=token_budget,
             pending=pending,
         )
@@ -992,8 +1007,9 @@ class TaskEvidencePacketMixin(
         ambiguity, candidate, selection_basis = selected
 
         path = str(candidate.get("path") or "")
-        visibility, denied = self._task_evidence_path_admission(
+        visibility, evidence, denied = self._task_evidence_range_admission(
             path,
+            candidate,
             "ownership-discrimination",
         )
         result: DiscriminationRead = {
@@ -1016,18 +1032,14 @@ class TaskEvidencePacketMixin(
                 denied.get("reason") or "source-evidence-unavailable"
             )
             return result
-        assert visibility is not None
-
-        qualname, name, _signature, start, end = self._task_evidence_current_range(
-            path, candidate
-        )
-        symbol = qualname or name
+        assert visibility is not None and evidence is not None
+        symbol = evidence.qualname or evidence.name
         if symbol:
             result["symbol"] = symbol
-        if start is not None:
-            result["start_line"] = start
-        if end is not None:
-            result["end_line"] = end
+        if evidence.start is not None:
+            result["start_line"] = evidence.start
+        if evidence.end is not None:
+            result["end_line"] = evidence.end
         result["evidence_visibility"] = visibility.value
         return result
 

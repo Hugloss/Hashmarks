@@ -2,18 +2,17 @@
 
 from __future__ import annotations
 
+from .model import PYTHON_SIGNATURE_PREVIEW_BYTES
 from .python_ast import estimate_tokens
-
-_MAX_SIGNATURE_BYTES = 512
 
 
 def signature_disclosure(
-    path: str, signature: str | None, *, max_bytes: int = _MAX_SIGNATURE_BYTES
+    path: str, signature: str | None, *, max_bytes: int = PYTHON_SIGNATURE_PREVIEW_BYTES
 ) -> dict[str, object]:
     if signature is None or not path.lower().endswith((".py", ".pyi")):
         return {"signature": signature}
     encoded = signature.encode("utf-8")
-    bound = min(_MAX_SIGNATURE_BYTES, max_bytes)
+    bound = min(PYTHON_SIGNATURE_PREVIEW_BYTES, max_bytes)
     if len(encoded) <= bound:
         return {"signature": signature}
     return {

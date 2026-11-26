@@ -3,10 +3,65 @@ import sys
 from pathlib import Path
 
 import pytest
-from contract_assertions import assert_records
+from contract_assertions import assert_records, assert_text
 
 from hashmarks import CodeMap
 from hashmarks.codemap.python_ast import estimate_tokens
+
+
+def test_long_assignment_signatures_identify_source_only_prefix_across_queries(
+    tmp_path: Path,
+) -> None:
+    opening = "setting = '"
+    header = opening + "x" * (511 - len(opening)) + "💡" + "z" * 9000 + "'"
+    (tmp_path / "settings.py").write_text(header + "; neighbor = 1\n")
+    with CodeMap(tmp_path) as repo:
+        repo.index.sync()
+        outline = repo.source.outline("settings.py")
+        symbol = assert_records(repo.source.symbol("setting")["matches"])[0]
+        find = assert_records(repo.search.packet("setting", limit=1)["results"])[0]
+        read = repo.source.read("settings.py::setting", token_budget=4000)
+        indexed = repo.store.symbol_at("settings.py", "setting")
+    outlined = next(
+        row
+        for row in assert_records(outline["symbols"])
+        if row["qualname"] == "setting"
+    )
+    for row in (symbol, find, read, outlined):
+        assert row["signature"] is None and row["signature_truncated"] is True
+        assert row["signature_preview"] == header.encode()[:512].decode(
+            "utf-8", errors="ignore"
+        )
+    assert outline["outline_signature_previews"] == 1
+    assert symbol["signature_tokens"] == estimate_tokens(header)
+    assert read["content"] == header
+    assert (read["start_byte_column"], read["end_byte_column"]) == (
+        0,
+        len(header.encode()),
+    )
+    assert indexed is not None
+    retained = assert_text(indexed["signature"])
+    assert len(retained.encode()) < 600 and "z" * 100 not in retained
+
+
+@pytest.mark.parametrize("length", [399, 400, 401, 511, 512, 513, 514, 515, 516, 517])
+def test_assignment_signature_exactness_uses_utf8_byte_boundary(
+    tmp_path: Path, length: int
+) -> None:
+    base = "setting = 1 # "
+    marker = " … [signature truncated]"
+    header = base + "x" * (length - len((base + marker).encode())) + marker
+    (tmp_path / "settings.py").write_text(header + "\n")
+    with CodeMap(tmp_path) as repo:
+        symbol = assert_records(repo.source.symbol("setting")["matches"])[0]
+    assert symbol["signature_tokens"] == estimate_tokens(header)
+    if length <= 512:
+        assert symbol["signature"] == header and "signature_truncated" not in symbol
+    else:
+        assert symbol["signature"] is None and symbol["signature_truncated"] is True
+        assert symbol["signature_preview"] == header.encode()[:512].decode(
+            "utf-8", errors="ignore"
+        )
 
 
 def test_unpacked_module_names_restore_source_choices_and_importing_test(

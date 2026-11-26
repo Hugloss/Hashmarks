@@ -472,3 +472,60 @@ def test_generic_defaults_bases_and_alias_declarations_keep_their_evidence(
     assert ("Amount", "type") in {
         (row["qualname"], row["kind"]) for row in assert_records(outline["symbols"])
     }
+
+
+@pytest.mark.parametrize(
+    ("expression", "observed"),
+    [
+        ("(calculate_tax() for _ in (1,))", False),
+        ("lambda: calculate_tax()", False),
+        ("assert (calculate_tax() for _ in (1,)), calculate_tax()", False),
+        ("assert lambda: calculate_tax()", False),
+        ("(item for item in (calculate_tax() for _ in (1,)))", False),
+        ("lambda callback=(lambda: calculate_tax()): callback", False),
+        ("(item for item in calculate_tax())", True),
+        ("lambda *, value=calculate_tax(): value", True),
+        ("(lambda: calculate_tax())()", True),
+        ("list(calculate_tax() for _ in (1,))", True),
+        ("[calculate_tax() for _ in (1,)]", True),
+        ("callback = lambda: calculate_tax()\n    assert callback() == (1, 2)", True),
+        (
+            "checks = (calculate_tax() for _ in (1,))\n    assert next(checks) == (1, 2)",
+            True,
+        ),
+    ],
+)
+def test_discarded_and_consumed_python_expressions(
+    tmp_path: Path, expression: str, observed: bool
+) -> None:
+    test_path = "tests/test_amounts.py"
+    source = (
+        "from owner import calculate_tax\ndef test_amount():\n    " + expression + "\n"
+    )
+    with _repository(tmp_path, source) as repository:
+        (tmp_path / "owner.py").write_text("def calculate_tax(): return (1, 2)\n")
+        repository.index.sync()
+        changed = repository.verification.changed_set(["owner.py"])
+        locality = repository.structure.locality("owner.py::calculate_tax", max_depth=0)
+        forward = repository.structure.locality(
+            f"{test_path}::test_amount", max_depth=1
+        )
+    relevance = assert_object(assert_records(changed["changes"])[0]["relevance"])
+    candidate = assert_records(relevance["candidates"])[0]
+    assert candidate["reference_strength"] == (
+        "reachable-symbol-use" if observed else "reachable-import"
+    )
+    assert candidate["direct_reference"] is observed
+    assert bool(changed["targets"]) is observed
+    assert changed["negative_evidence_admissible"] is False
+    callers = assert_records(assert_records(locality["nodes"])[0]["exact_callers"])
+    assert [(row["path"], row["source"]) for row in callers] == (
+        [(test_path, "test_amount")] if observed else []
+    )
+    assert (
+        any(
+            row["resolved_symbol_id"] == "owner.py::calculate_tax"
+            for row in assert_records(forward["edges"])
+        )
+        is observed
+    )

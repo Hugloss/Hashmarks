@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 
 from .python_binding_scope import (
+    PythonReferenceVisitor,
     annotated_assignment_expressions,
     annotations_are_deferred,
     definition_time_expressions,
@@ -58,7 +59,7 @@ class VerificationReferenceIndex:
         return next(iter(uses)) if len(uses) == 1 else None
 
 
-class _VerificationReferenceIndexVisitor(ast.NodeVisitor):
+class _VerificationReferenceIndexVisitor(PythonReferenceVisitor):
     def __init__(
         self,
         bindings: PythonBindings,

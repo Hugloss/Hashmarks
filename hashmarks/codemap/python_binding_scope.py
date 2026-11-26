@@ -98,6 +98,32 @@ def annotated_assignment_expressions(
         yield node.annotation
 
 
+class PythonReferenceVisitor(ast.NodeVisitor):
+    """Observe expressions that can contribute call and verifier references."""
+
+    def _discarded_value(self, value: ast.expr) -> None:
+        if isinstance(value, ast.Lambda):
+            # Defaults are evaluated while constructing this function.
+            for _parameter, default in function_defaults(value):
+                self._discarded_value(default)
+        elif isinstance(value, ast.GeneratorExp):
+            # Constructing the generator evaluates only its outermost iterable.
+            self._discarded_value(value.generators[0].iter)
+        else:
+            self.visit(value)
+
+    def visit_Expr(self, node: ast.Expr) -> None:
+        self._discarded_value(node.value)
+
+    def visit_Assert(self, node: ast.Assert) -> None:
+        if isinstance(node.test, (ast.Lambda, ast.GeneratorExp)):
+            # Both object types are truthy. Testing truth neither consumes them
+            # nor evaluates the assertion's failure message.
+            self._discarded_value(node.test)
+        else:
+            self.generic_visit(node)
+
+
 def function_parameters(node: FunctionNode) -> list[ast.arg]:
     arguments = node.args
     return [

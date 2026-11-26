@@ -1,5 +1,6 @@
 """Source consumers must not combine checked symbols with later unbound bytes."""
 
+import json
 from pathlib import Path
 
 import pytest
@@ -8,6 +9,101 @@ from contract_assertions import assert_records, assert_text
 from hashmarks.codemap import CodeMap
 from hashmarks.codemap.providers import TreeSitterRangeProvider
 from hashmarks.codemap.python_ast import estimate_tokens
+
+
+def test_context_uses_a_fresh_native_definition_at_its_reported_line(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "repo"
+    root.mkdir()
+    content = "    'WidgetSetting': 'a metadata value at the selected location',"
+    (root / "schema.py").write_text("FIELDS = {\n" + content + "\n}\n")
+    index = tmp_path / "scip.json"
+    index.write_text(
+        json.dumps(
+            {
+                "metadata": {"toolInfo": {"name": "fixture", "version": "1"}},
+                "documents": [
+                    {
+                        "relativePath": "schema.py",
+                        "occurrences": [
+                            {
+                                "range": [1, 5, 18],
+                                "symbol": "scip-python python app 1 `schema`/WidgetSetting#",
+                                "symbolRoles": 1,
+                            }
+                        ],
+                    }
+                ],
+            }
+        )
+    )
+    with CodeMap(root, state_dir=tmp_path / "state") as codemap:
+        codemap.index.sync()
+        codemap.native.import_scip(index)
+        context = codemap.context.build("WidgetSetting", disclosure="source")
+    assert [
+        (x.symbol, x.content)
+        for x in context.items
+        if x.representation == "source-range"
+    ] == [("WidgetSetting", content)]
+
+
+def test_retained_python_qualname_cannot_read_a_replacement_method(
+    tmp_path: Path,
+) -> None:
+    member = tmp_path / "owner.py"
+    member.write_text("class Old:\n    def load(self): return 1\n")
+    with CodeMap(tmp_path) as codemap:
+        (retained,) = assert_records(codemap.source.symbol("Old.load")["matches"])
+        member.write_text("class New:\n    def load(self): return 2\n")
+        with pytest.raises(KeyError, match=r"owner\.py::Old\.load"):
+            codemap.source.slice("owner.py", 2, 2, qualname="Old.load")
+        assert codemap.source.slice("owner.py", 2, 2) == "    def load(self): return 2"
+        assert (
+            codemap.source.slice("owner.py", 1, 1, qualname="New.load")
+            == "    def load(self): return 2"
+        )
+        item, pending = codemap.tasks._task_evidence_evidence_item(
+            retained, role="owner", token_budget=1000
+        )
+        assert item is None and pending == {
+            "role": "owner",
+            "path": "owner.py",
+            "symbol": "Old.load",
+            "reason": "exact-source-range-unavailable",
+        }
+
+
+def test_direct_symbol_slice_rejects_a_publication_between_lookup_and_read(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "repo"
+    root.mkdir()
+    member = root / "worker.py"
+    member.write_text("def target(): return 1\n")
+    state = tmp_path / "state"
+    with (
+        CodeMap(root, state_dir=state) as reader,
+        CodeMap(root, state_dir=state) as writer,
+    ):
+        reader.index.sync()
+        lookup = reader.store.symbol_at
+
+        def publish_after_lookup(path: str, qualname: str) -> dict[str, object] | None:
+            old = lookup(path, qualname)
+            member.write_text("def unrelated(): return 2\ndef target(): return 3\n")
+            writer.index.sync()
+            return old
+
+        with monkeypatch.context() as patch:
+            patch.setattr(reader.store, "symbol_at", publish_after_lookup)
+            with pytest.raises(RuntimeError, match="generation changed"):
+                reader.source.slice("worker.py", 1, 1, qualname="target")
+        assert (
+            reader.source.slice("worker.py", 1, 1, qualname="target")
+            == "def target(): return 3"
+        )
 
 
 def _move_after_check(

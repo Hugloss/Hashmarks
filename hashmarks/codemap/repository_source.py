@@ -42,6 +42,10 @@ if TYPE_CHECKING:
     from .indexing_lifecycle import RepositoryIndex
 
 
+class SourceSymbolNotFound(KeyError):
+    """An explicit source locator has no occurrence in the observed index."""
+
+
 def _symbol_columns(row: Mapping[str, object]) -> tuple[int, int] | None:
     start, end = row.get("start_byte_column"), row.get("end_byte_column")
     if isinstance(start, int) and isinstance(end, int):
@@ -1272,6 +1276,7 @@ class RepositorySource(
             "stale": stale,
         }
 
+    @decision_scoped
     def slice(
         self, path: str, start: int, end: int, *, qualname: str | None = None
     ) -> str:
@@ -1287,10 +1292,11 @@ class RepositorySource(
         columns = None
         if qualname is not None:
             current = self.store.symbol_at(path, qualname)
-            if current is not None:
-                start = int(current["start_line"])
-                end = int(current["end_line"])
-                columns = _symbol_columns(current)
+            if current is None:
+                raise SourceSymbolNotFound(f"symbol not found: {path}::{qualname}")
+            start = int(current["start_line"])
+            end = int(current["end_line"])
+            columns = _symbol_columns(current)
         observation, raw = self.member(path, include_bytes=True)
         if raw is None:
             if observation.get("reason") == "member-revision-mismatch":
