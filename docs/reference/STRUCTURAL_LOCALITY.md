@@ -113,6 +113,15 @@ assignment through that receiver or its alias can invalidate the member
 binding. The call remains visible in `unresolved_calls`; an exact caller
 is reported only when the class declaration and the receiver evidence agree.
 
+For the target member, ordinary methods and qualified static or class methods
+can identify a direct callable declaration. With `self.prop()`, the call uses
+the value returned by the property. That call stays unresolved, as does a call
+through a custom or stacked method decorator.
+
+A decorator on a module-level function can also replace the published callable.
+Local calls, import aliases and module-qualified calls retain the authored
+declaration as a candidate. Its source and import evidence remain available.
+
 ## Forwarding-only syntax
 
 For supported Python symbols, Hashmarks reports whether the function body is syntactically just one call/return-call after an optional docstring. This is a structural observation only.

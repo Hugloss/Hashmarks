@@ -839,18 +839,21 @@ class WorkspaceMapQueryMixin:
             ).fetchall()
         return [dict(row) for row in rows]
 
-    def lexical_candidates(self, tokens: list[str], limit: int = 500) -> list[dict]:
+    def lexical_candidates(
+        self, tokens: list[str], limit: int = 500, *, source_only: bool = False
+    ) -> list[dict]:
         if TYPE_CHECKING:
             self = cast("WorkspaceMapStore", self)
         unique = sorted({token.lower() for token in tokens if token})
         if not unique:
             return []
         placeholders = ",".join("?" for _ in unique)
+        visibility = "AND f.evidence_visibility='source'" if source_only else ""
         with self._lock:
             rows = self._db.execute(
                 f"""SELECT l.path,l.line,f.evidence_visibility,COUNT(DISTINCT l.token) matches
                 FROM lexical l JOIN file_map f ON f.path=l.path
-                WHERE l.token IN ({placeholders})
+                WHERE l.token IN ({placeholders}) {visibility}
                 GROUP BY l.path,l.line
                 HAVING matches=?
                 ORDER BY l.path,l.line

@@ -143,6 +143,12 @@ lexical candidates; they do not replace `test_symbol`, resolve tied tests, prove
 runtime reachability or change selected verification. Initial readable locators
 retain the declaration context. Identical repeated qualification copies can be
 removed when their values remain beside the same referenced record.
+When three or more candidates include declaration scopes, initial text may
+give one field mapping for those scopes. Apply the mapping inside each
+existing `test_declarations` object using that candidate's own `path` or
+`test_revision`. Only fields equal to the enclosing value in every displayed
+scope qualify for this encoding. Declarations, spans and omission counts stay
+with their original candidate.
 
 Text encodes the same selected findings, locators, qualifications, source
 identities, references, and exclusions as its structured backing. JSON escaping

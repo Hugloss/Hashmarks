@@ -187,3 +187,73 @@ def test_shared_text_qualifiers_round_trip_partial_and_distinct_candidate_eviden
             == f" (@ {finding['source_refs'][0]})."
         )
     assert displays["text"]["result"] == wire
+
+
+@pytest.mark.parametrize("different_revision", [False, True])
+def test_verification_declaration_source_refs_are_per_candidate(
+    tmp_path: Path, different_revision: bool
+) -> None:
+    (tmp_path / "backend.py").write_text("def execute(): return 1\n")
+    for index in range(5):
+        (tmp_path / f"test_lifecycle_{index}.py").write_text(
+            "from backend import execute\n"
+            + "".join(
+                f"def test_stateful_cleanup_{name}(): assert execute() == {index}\n"
+                for name in ("starts", "stops", "fails")
+            )
+        )
+    with CodeMap(tmp_path) as repository:
+        packet = decode_initial_packet(
+            repository.tasks.evidence(
+                "Inspect stateful cleanup in backend.py", result_mode="initial"
+            )
+        )
+    relevance = packet["verification"]["relevance"]
+    rows = decode_initial_collection(
+        relevance["candidates"], relevance.pop("candidates_encoding")
+    )
+    assert len(rows) == 5
+    rows[0].pop("test_declarations")
+    if different_revision:
+        cast("dict[str, Any]", rows[1]["test_declarations"]).pop("source_revision")
+        cast("dict[str, Any]", rows[2]["test_declarations"])["source_revision"] = (
+            "independent"
+        )
+    relevance["candidates"] = rows
+    packet["evidence_packet_identity"] = initial_packet_identity(packet)
+    wire = encode_initial_packet(packet)
+    response = cast(
+        "dict[str, Any]",
+        presentation_response(
+            "task_evidence", wire, result_mode="initial", format="text"
+        ),
+    )
+    lines = response["presentation"]["text"].splitlines()
+    prefix = "Within each displayed test_declarations, copy these fields from its own candidate: "
+    refs = json.loads(
+        next(line.removeprefix(prefix) for line in lines if line.startswith(prefix))
+    )
+    assert refs == (
+        {"path": "path"}
+        if different_revision
+        else {"path": "path", "source_revision": "test_revision"}
+    )
+    candidate_prefix = "Verification candidate: "
+    candidate_lines = [
+        line.removeprefix(candidate_prefix)
+        for line in lines
+        if line.startswith(candidate_prefix)
+    ]
+    for index, (line, row) in enumerate(zip(candidate_lines, rows, strict=True)):
+        locator, end = json.JSONDecoder().raw_decode(line)
+        assert line[end:] == f" (@ /verification/relevance/candidates/{index})."
+        if "test_declarations" in row:
+            scope = locator["test_declarations"]
+            assert not scope.keys() & refs.keys()
+            assert {
+                **scope,
+                **{key: locator[field] for key, field in refs.items()},
+            } == row["test_declarations"]
+        else:
+            assert "test_declarations" not in locator
+    assert response["result"] == wire

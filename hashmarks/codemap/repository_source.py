@@ -5,6 +5,8 @@ import sys
 from collections.abc import Iterator, Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass, field
+from itertools import groupby, islice
+from operator import itemgetter
 from pathlib import Path
 from typing import TYPE_CHECKING, TypedDict, Unpack, cast
 
@@ -996,45 +998,48 @@ class RepositorySource(
             )
         return self._scoped_source_result(batch)
 
-    def _grep_candidate_match(
-        self,
-        candidate: dict[str, object],
-        *,
-        lowered: str,
-        tokens: list[str],
-        context_lines: int,
-    ) -> dict[str, object] | None:
-        path = str(candidate["path"])
-        visibility = EvidenceVisibility(str(candidate["evidence_visibility"]))
-        if visibility is not EvidenceVisibility.SOURCE:
-            return None
+    def _grep_source_lines(self, path: str) -> list[str] | None:
         self.ensure_current(path)
-        _observation, raw = self.member(path, include_bytes=True)
+        member, raw = self.member(path, include_bytes=True)
         if raw is None:
+            if member.get("reason") == "member-revision-mismatch":
+                raise DecisionRefreshRequired(path)
             return None
-        lines = [
+        return [
             line.decode("utf-8", errors="replace").removesuffix("\n").removesuffix("\r")
             for line in self._physical_lines(raw)
         ]
-        line_value = candidate["line"]
-        assert isinstance(line_value, int)
-        line_no = line_value
-        if line_no < 1 or line_no > len(lines):
-            return None
-        line = lines[line_no - 1]
-        if lowered not in line.lower() and not all(
-            token in line.lower() for token in tokens
-        ):
-            return None
-        start = max(1, line_no - max(0, context_lines))
-        end = min(len(lines), line_no + max(0, context_lines))
-        return {
-            "path": path,
-            "line": line_no,
-            "range": [start, end],
-            "content": "\n".join(lines[start - 1 : end]),
-            "evidence_visibility": visibility.value,
-        }
+
+    def _grep_matches(
+        self,
+        candidates: Sequence[dict],
+        lowered: str,
+        tokens: list[str],
+        context_lines: int,
+        omissions: set[str],
+    ) -> Iterator[dict[str, object]]:
+        # The index orders candidates by path and line. Retain one qualified
+        # member at a time, including when several context windows overlap.
+        for path, rows in groupby(candidates, key=itemgetter("path")):
+            lines = self._grep_source_lines(path)
+            if lines is None:
+                omissions.add("source-unavailable")
+                continue
+            for row in rows:
+                line_no = row["line"]
+                if not 1 <= line_no <= len(lines):
+                    continue
+                line = lines[line_no - 1].lower()
+                if lowered in line or all(token in line for token in tokens):
+                    start = max(1, line_no - context_lines)
+                    end = min(len(lines), line_no + context_lines)
+                    yield {
+                        "path": path,
+                        "line": line_no,
+                        "range": [start, end],
+                        "content": "\n".join(lines[start - 1 : end]),
+                        "evidence_visibility": EvidenceVisibility.SOURCE.value,
+                    }
 
     @operation_response("grep")
     @decision_scoped
@@ -1045,22 +1050,24 @@ class RepositorySource(
         raw = query.strip()
         if not raw:
             raise ValueError("query must not be empty")
+        if type(limit) is not int or limit < 0:
+            raise ValueError("limit must be a nonnegative integer")
         tokens = [token.lower() for token in _WORD_RE.findall(raw) if len(token) >= 2]
-        candidates = self.store.lexical_candidates(tokens, limit=max(limit * 10, 100))
-        matches: list[dict[str, object]] = []
-        lowered = raw.lower()
-        for candidate in candidates:
-            match = self._grep_candidate_match(
-                dict(candidate),
-                lowered=lowered,
-                tokens=tokens,
-                context_lines=context_lines,
-            )
-            if match is None:
-                continue
-            matches.append(match)
-            if len(matches) >= limit:
-                break
+        bound = max(limit * 10, 100)
+        candidates = self.store.lexical_candidates(
+            tokens, limit=min(bound + 1, sys.maxsize), source_only=True
+        )
+        omissions: set[str] = set()
+        if not tokens:
+            omissions.add("no-indexed-query-terms")
+        if len(candidates) > bound:
+            omissions.add("lexical-candidate-limit")
+        observed = self._grep_matches(
+            candidates[:bound], raw.lower(), tokens, max(0, context_lines), omissions
+        )
+        matches = list(islice(observed, min(limit + 1, sys.maxsize)))
+        if len(matches) > limit:
+            omissions.add("result-limit")
         generation, identity_generation, stale = self.reads.generation_status()
         return {
             "schema": operation_schema("grep"),
@@ -1068,7 +1075,9 @@ class RepositorySource(
             "generation": generation,
             "identity_generation": identity_generation,
             "stale": stale,
-            "matches": matches,
+            "matches": matches[:limit],
+            "omissions": sorted(omissions),
+            "negative_evidence": "not-admissible",
         }
 
     @operation_response("symbol")

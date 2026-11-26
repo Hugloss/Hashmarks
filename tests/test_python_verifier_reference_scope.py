@@ -608,3 +608,78 @@ def test_only_a_shadowed_comprehension_name_cannot_supply_a_verifier(
     assert candidate["direct_reference"] is False
     assert changed["targets"] == []
     assert changed["negative_evidence_admissible"] is False
+
+
+@pytest.mark.parametrize(
+    ("declaration", "expected"),
+    [
+        ("def quoted(value=calculate_tax): pass", "test_charges"),
+        ("@calculate_tax\n    def quoted(): pass", "test_charges"),
+        ("class Example(calculate_tax()): pass", "test_charges"),
+        (
+            "class Example:\n        def quote(self, *, value=calculate_tax()): pass",
+            "test_charges",
+        ),
+        (
+            "class Example:\n        @calculate_tax\n        async def quote(self): pass",
+            "test_charges",
+        ),
+        ("class Example:\n        class Nested(calculate_tax()): pass", "test_charges"),
+        ("class Example:\n        def quote(self): return calculate_tax()", None),
+        (
+            "def helper():\n        class Example:\n            mark = calculate_tax()",
+            None,
+        ),
+        ("class Example(metaclass=type):\n        mark = calculate_tax()", None),
+    ],
+)
+def test_nested_definition_headers_retain_the_qualified_test_witness(
+    tmp_path: Path, declaration: str, expected: str | None
+) -> None:
+    source = (
+        "from owner import calculate_tax\n"
+        "def test_calculate_tax(): assert True\n"
+        "def test_charges():\n    " + declaration + "\n"
+    )
+    with _repository(tmp_path, source) as repository:
+        (tmp_path / "owner.py").write_text(
+            "def calculate_tax(value=None): return object if value is None else value\n"
+        )
+        repository.index.sync()
+        packet = repository.tasks.evidence("Change calculate_tax in owner.py")
+        changed = repository.verification.changed_set(["owner.py"])
+    verify = packet["verification"]
+    row = assert_object(verify["relevance"]["selected"])
+    assert row["direct_reference"] is True
+    assert row["test_symbol"] == expected
+    assert assert_object(verify["plan"])["scope"] == (
+        "test-node" if expected else "test-file"
+    )
+    assert assert_object(verify["plan"])["test_symbol"] == expected
+    change = assert_records(changed["changes"])[0]
+    candidate = assert_records(assert_object(change["relevance"])["candidates"])[0]
+    assert candidate["test_symbol"] == expected
+    assert [r["path"] for r in assert_records(changed["targets"])] == [
+        "tests/test_amounts.py"
+    ]
+
+
+def test_class_namespace_shadow_keeps_a_method_header_from_becoming_a_witness(
+    tmp_path: Path,
+) -> None:
+    with _repository(
+        tmp_path,
+        "from owner import calculate_tax\n"
+        "def test_charges():\n"
+        "    class Example:\n"
+        "        calculate_tax = lambda: 5\n"
+        "        def quote(self, value=calculate_tax()): pass\n",
+    ) as repository:
+        repository.index.sync()
+        changed = repository.verification.changed_set(["owner.py"])
+    candidate = assert_records(
+        assert_object(assert_records(changed["changes"])[0]["relevance"])["candidates"]
+    )[0]
+    assert candidate["direct_reference"] is False
+    assert changed["targets"] == []
+    assert changed["negative_evidence_admissible"] is False

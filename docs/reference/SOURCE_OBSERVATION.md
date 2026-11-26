@@ -68,6 +68,16 @@ No file is read in full if its preliminary size check already exceeds the bound;
 stable reads and the post-read bound protect against concurrent enlargement.
 No recursive dependency or repository scan is performed by this projection.
 
+The CLI `grep` command and `CodeMap.source.grep()` use the lexical index to
+locate candidate lines. Only source-visible members consume the candidate
+window. Each contributing member supplies one revision-checked byte capture
+per observation attempt, shared across its matching lines and context windows.
+The nonnegative result limit bounds the returned matches. The `omissions`
+list distinguishes `lexical-candidate-limit`, `result-limit`,
+`source-unavailable` and `no-indexed-query-terms`. Grep reports
+`negative_evidence: not-admissible` because the search covers indexed
+candidate lines.
+
 The exact member source observation is now also exposed through the existing
 read-only `source_observation` MCP tool. This is transport over the same CodeMap
 owner; it adds no independent index or execution backend.

@@ -49,6 +49,13 @@ class PythonExportBinding:
     module_import: ast.alias | None = None
     replaces_assignment: bool = False
 
+    @property
+    def unwrapped_function(self) -> bool:
+        return (
+            isinstance(self.declaration, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and not self.declaration.decorator_list
+        )
+
     def declaration_rows(
         self, name: str, rows: Sequence[dict[str, object]]
     ) -> list[dict[str, object]]:
