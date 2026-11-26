@@ -875,3 +875,75 @@ def test_boolean_operands_keep_possible_uses_in_evaluation_order(
         changed = repository.verification.changed_set(["owner.py"])
     assert bool(changed["targets"]) is direct
     assert changed["negative_evidence_admissible"] is False
+
+
+@pytest.mark.parametrize(
+    "expression", ["calculate_tax() if False else 1", "1 if True else calculate_tax()"]
+)
+def test_inactive_conditional_arm_cannot_become_a_selected_test(
+    tmp_path: Path, expression: str
+) -> None:
+    with _repository(
+        tmp_path,
+        "from owner import calculate_tax\ndef test_calculate_tax():\n    value = "
+        + expression
+        + "\n",
+    ) as repository:
+        live = "tests/test_live.py"
+        (tmp_path / live).write_text(
+            "from owner import calculate_tax\ndef test_charges(): assert calculate_tax() == 2\n"
+        )
+        repository.index.sync()
+        verify = repository.tasks.evidence("Change calculate_tax in owner.py")[
+            "verification"
+        ]
+        changed = repository.verification.changed_set(["owner.py"])
+        callers = repository.structure.locality("owner.py::calculate_tax", max_depth=0)
+    decoy = next(
+        r
+        for r in verify["relevance"]["candidates"]
+        if r["path"] == "tests/test_amounts.py"
+    )
+    assert decoy.get("reference_strength") == "reachable-import"
+    assert decoy.get("test_symbol") is None
+    assert assert_object(verify["plan"])["test_symbol"] == "test_charges"
+    assert [r["path"] for r in assert_records(changed["targets"])] == [live]
+    assert changed["negative_evidence_admissible"] is False
+    assert {
+        r["source"]
+        for r in assert_records(assert_records(callers["nodes"])[0]["exact_callers"])
+    } == {"test_charges", "test_calculate_tax"}
+
+
+@pytest.mark.parametrize(
+    ("expression", "direct"),
+    [
+        ("1 if calculate_tax() else 2", True),
+        ("calculate_tax() if flag else None", True),
+        ("None if flag else calculate_tax()", True),
+        ("calculate_tax() if not False else None", True),
+        ("calculate_tax() if None else 2", False),
+        ("None if 'present' else calculate_tax()", False),
+        ("calculate_tax() if only_types else None", False),
+        ("None if not only_types else calculate_tax()", False),
+        ("None if only_types else calculate_tax()", True),
+        ("(calculate_tax() if False else None) if flag else None", False),
+    ],
+)
+def test_conditional_expression_uses_qualified_test_and_arms(
+    tmp_path: Path, expression: str, direct: bool
+) -> None:
+    source = (
+        "from typing import TYPE_CHECKING as only_types\nfrom owner import calculate_tax\ndef test_value(flag): return "
+        + expression
+        + "\n"
+    )
+    with _repository(tmp_path, source) as repository:
+        repository.index.sync()
+        changed = repository.verification.changed_set(["owner.py"])
+    row = assert_records(
+        assert_object(assert_records(changed["changes"])[0]["relevance"])["candidates"]
+    )[0]
+    assert row["direct_reference"] is direct
+    assert bool(changed["targets"]) is direct
+    assert changed["negative_evidence_admissible"] is False

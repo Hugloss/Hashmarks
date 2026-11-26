@@ -210,3 +210,25 @@ def test_literal_read_relationship_obeys_boolean_short_circuit(
         packet = repository.verification.changed_set(["docs/guide.md"])
     assert bool(packet["targets"]) is observed
     assert packet["negative_evidence_admissible"] is False
+
+
+@pytest.mark.parametrize(
+    ("expression", "observed"),
+    [
+        ("READ if not True else 1", False),
+        ("1 if not False else READ", False),
+        ("READ if not False else 1", True),
+        ("1 if not True else READ", True),
+        ("1 if READ else 2", True),
+    ],
+)
+def test_literal_reads_follow_the_possible_conditional_arm(
+    tmp_path: Path, expression: str, observed: bool
+) -> None:
+    read = "(ROOT / 'docs/guide.md').read_text()"
+    _fixture(tmp_path, "    value = " + expression.replace("READ", read) + "\n")
+    with CodeMap(tmp_path) as repository:
+        repository.index.sync()
+        changed = repository.verification.changed_set(["docs/guide.md"])
+    assert bool(changed["targets"]) is observed
+    assert changed["negative_evidence_admissible"] is False

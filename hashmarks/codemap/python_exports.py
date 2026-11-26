@@ -619,10 +619,27 @@ def _targets_all(targets: list[ast.expr]) -> bool:
     return any(isinstance(item, ast.Name) and item.id == "__all__" for item in targets)
 
 
+def _other_name_target(target: ast.expr) -> bool:
+    """A plain sibling store may unpack names, but must not rebind __all__."""
+    if isinstance(target, ast.Name):
+        return target.id != "__all__"
+    if isinstance(target, ast.Starred):
+        return _other_name_target(target.value)
+    return isinstance(target, (ast.Tuple, ast.List)) and all(
+        _other_name_target(item) for item in target.elts
+    )
+
+
 def _all_assignment(node: ast.stmt) -> ast.expr | None:
     match node:
         case ast.Assign(targets=targets, value=value) if _targets_all(targets):
-            return value
+            # Each target receives the same value, in order. A computed store
+            # can mutate that value and nested unpacking can replace __all__.
+            if all(
+                isinstance(target, ast.Name) or _other_name_target(target)
+                for target in targets
+            ):
+                return value
         case ast.AnnAssign(target=ast.Name(id="__all__"), value=value):
             return value
     return None

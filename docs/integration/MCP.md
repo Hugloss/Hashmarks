@@ -462,6 +462,13 @@ the outline text displays that statement once. Each bound name keeps
 its own indexed qualname, span and signature in `symbols`. Statements with
 distinct line or byte-column ranges retain their separate occurrences.
 
+On UTF-8 standard output, the CLI writes printable Unicode directly in a
+Python `outline` or `source` response, including ambiguous source lookups
+when every displayed match belongs to a Python member. Nonprintable characters
+stay JSON-escaped, and other output encodings keep the ASCII-escaped
+representation. Both representations decode to the same source text and
+symbol records.
+
 The CLI `symbol` command and `CodeMap.source.symbol()` look up all indexed
 occurrences of a Python lexical name, including overload declarations. They
 return up to 50 visible records and expose the cut in `matches_truncated`.

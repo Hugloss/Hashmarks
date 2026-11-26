@@ -216,7 +216,8 @@ class WorkspaceMapQueryMixin:
                 JOIN file_map f ON f.path=s.path
                 WHERE f.evidence_visibility!='deny' {scope}
                   AND (s.qualname=:query {short_name}
-                       OR (f.language='python' AND s.name=:name AND s.parent IS :parent))
+                       OR (f.language='python' AND s.name=:name AND
+                           (s.parent IS :parent OR instr(s.qualname,:repeat_prefix)=1)))
                 ORDER BY CASE WHEN s.qualname=:query THEN 0 ELSE 1 END,
                          s.path,s.start_line,s.qualname LIMIT :bound""",
                 {
@@ -224,6 +225,7 @@ class WorkspaceMapQueryMixin:
                     "path": path,
                     "name": name,
                     "parent": parent or None,
+                    "repeat_prefix": query + "@L",
                     "bound": min(limit, 1024),
                 },
             ).fetchall()

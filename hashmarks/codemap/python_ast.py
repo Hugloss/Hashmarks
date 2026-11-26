@@ -272,7 +272,7 @@ class _Collector(PythonReferenceVisitor):
             end_line=end,
             signature_tokens=estimate_tokens(signature),
             body_tokens=estimate_tokens(body),
-            parent=self.current,
+            parent=self.source_occurrence,
         )
 
     def _function_annotation_edges(

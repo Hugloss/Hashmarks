@@ -1340,7 +1340,7 @@ def python_nested_call_site(
     start = python_local_call_bindings(snapshot).nested_calls.get(
         (callers[0], line, name)
     )
-    return (parent, start) if start is not None else None
+    return (source, start) if start is not None else None
 
 
 def python_bindings(

@@ -22,7 +22,7 @@ from hashmarks.python_ast_cache import read_python_ast
 from .model import EvidenceVisibility
 from .python_binding_scope import unfiltered_literal_comprehension
 from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
-from .verification_reference_syntax import possible_boolean_operands
+from .verification_reference_syntax import literal_truth, possible_boolean_operands
 
 if TYPE_CHECKING:
     from .evidence_verification import (
@@ -349,8 +349,9 @@ class _LiteralReadVisitor(ast.NodeVisitor):
 
     def visit_IfExp(self, node: ast.IfExp) -> None:
         self.visit(node.test)
-        if isinstance(node.test, ast.Constant):
-            self.visit(node.body if bool(node.test.value) else node.orelse)
+        truth = literal_truth(node.test)
+        if truth is not None:
+            self.visit(node.body if truth else node.orelse)
         else:
             with self._copy_guard():
                 self.visit(node.body)
