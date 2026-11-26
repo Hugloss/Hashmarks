@@ -20,7 +20,12 @@ from hashmarks.python_ast_cache import read_python_ast
 from .decision_session import ReadScopeOwner, decision_scoped
 from .model import EvidenceVisibility, symbol_occurrence_parts
 from .ownership.filesystem_lifecycle import locality_lifecycle
-from .python_bindings import python_local_call_bindings, python_nested_call_site
+from .python_bindings import (
+    python_direct_method,
+    python_import_member_changed,
+    python_local_call_bindings,
+    python_nested_call_site,
+)
 from .python_exports import (
     python_class_export_binding,
     python_class_member_binding,
@@ -377,7 +382,7 @@ class RepositoryStructure(ReadScopeOwner):
         )
 
     def _python_class_bases(
-        self, path: str, qualname: str
+        self, path: str, qualname: str, member: str
     ) -> tuple[list[tuple[str, str]], bool]:
         node = self._python_class_node(path, qualname)
         if node is None:
@@ -390,14 +395,21 @@ class RepositoryStructure(ReadScopeOwner):
         for base in node.bases:
             if not isinstance(base, ast.Name):
                 return [], True
-            owner = self._python_class_header_base(path, base, enclosing, parent)
+            owner = self._python_class_header_base(
+                path, base, enclosing, parent, member
+            )
             if owner is None:
                 return [], True
             bases.append(owner)
         return list(dict.fromkeys(bases)), False
 
     def _python_class_header_base(
-        self, path: str, base: ast.Name, enclosing: str, parent: ast.ClassDef | None
+        self,
+        path: str,
+        base: ast.Name,
+        enclosing: str,
+        parent: ast.ClassDef | None,
+        member: str,
     ) -> tuple[str, str] | None:
         # A nested class header reads its enclosing class namespace before the
         # module. In either namespace, a later binding cannot prove this base.
@@ -419,6 +431,10 @@ class RepositoryStructure(ReadScopeOwner):
         ):
             return path, local_name
         if observed.kind != "reexport" or len(observed.targets) != 1:
+            return None
+        if python_import_member_changed(
+            self._python_snapshot(path), observed.targets[0], member
+        ):
             return None
         symbols, unresolved = self.imports._resolve_import_symbol_evidence(
             path, observed.targets[0]
@@ -447,7 +463,7 @@ class RepositoryStructure(ReadScopeOwner):
         if direct:
             return (direct[0], False) if len(direct) == 1 else (None, True)
 
-        bases, unresolved = self._python_class_bases(path, class_qualname)
+        bases, unresolved = self._python_class_bases(path, class_qualname, method)
         if unresolved:
             return None, True
         owners: dict[str, dict[str, object]] = {}
@@ -473,20 +489,10 @@ class RepositoryStructure(ReadScopeOwner):
         class_qualname: str,
         method: str,
     ) -> tuple[list[dict[str, object]], bool]:
-        class_node = self._python_class_node(path, class_qualname)
-        if class_node is None:
-            return [], True
-        kind, declaration = python_class_member_binding(class_node, method)
+        snapshot = self._python_snapshot(path) if path.endswith(".py") else None
+        declaration, unresolved = python_direct_method(snapshot, class_qualname, method)
         if declaration is None:
-            return [], kind != "unknown"
-        if declaration.decorator_list:
-            if isinstance(declaration, ast.ClassDef):
-                return [], True
-            snapshot = self._python_snapshot(path)
-            if snapshot is None or python_local_call_bindings(
-                snapshot
-            ).method_descriptor(declaration) not in {"staticmethod", "classmethod"}:
-                return [], True
+            return [], unresolved
         owners = [
             row
             for row in self._qualified_path_symbols(path)
@@ -609,7 +615,7 @@ class RepositoryStructure(ReadScopeOwner):
             candidates=candidates,
         )
 
-    def _python_local_qualified_call_binding(
+    def _python_class_member_call_binding(
         self,
         source_path: str,
         target: str,
@@ -642,15 +648,13 @@ class RepositoryStructure(ReadScopeOwner):
             return None, candidate_ids, not data_binding, data_binding
         path, class_name = symbols[0]
         member = target.split(".", 1)[1]
-        qualified_name = f"{class_name}.{member}"
-        class_qualname, method = qualified_name.rsplit(".", 1)
-        qualified, _unresolved = self._python_direct_method_owners(
-            path, class_qualname, method
+        if python_import_member_changed(
+            self._python_snapshot(source_path), import_target, member
+        ):
+            return None, candidate_ids, True, True
+        return self._python_class_member_call_binding(
+            path, f"{class_name}.{member}", candidates
         )
-        resolved, ids, unresolved = _binding_result(
-            qualified, candidates, unresolved=True
-        )
-        return resolved, ids, unresolved, True
 
     def _python_imported_data_binding(self, path: str, target: str) -> bool:
         """Keep admitted imported data in the existing external/unindexed category."""
@@ -694,7 +698,7 @@ class RepositoryStructure(ReadScopeOwner):
                 True,
             )
         if kind == "local" and observed.declaration is not None:
-            return self._python_local_qualified_call_binding(
+            return self._python_class_member_call_binding(
                 source_path, target, candidates
             )
         if kind == "reexport" and len(targets) == 1:

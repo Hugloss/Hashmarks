@@ -93,10 +93,22 @@ class WorkspaceMapQueryMixin:
             result.append(value)
         return result
 
-    def outline(self, path: str) -> dict | None:
+    def outline(
+        self, path: str, *, signature_token_limit: int | None = None
+    ) -> dict | None:
         if TYPE_CHECKING:
             self = cast("WorkspaceMapStore", self)
-        row = self.file_row(path)
+        if signature_token_limit is None:
+            row = self.file_row(path)
+        else:
+            self._count_read("file_row")
+            with self._lock:
+                row = self._db.execute(
+                    """SELECT f.*, EXISTS (
+                         SELECT 1 FROM symbol s WHERE s.path=f.path AND s.signature_tokens>?
+                       ) AS has_oversized_signature FROM file_map f WHERE f.path=?""",
+                    (signature_token_limit, path),
+                ).fetchone()
         if row is None:
             return None
         return dict(row)

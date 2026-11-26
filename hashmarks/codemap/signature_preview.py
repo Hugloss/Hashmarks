@@ -95,8 +95,25 @@ def _distinct_binding_lines(outline: str, symbols: list[dict[str, object]]) -> s
     return "\n".join(rendered)
 
 
+def _outline_line(index: int, symbol: dict[str, object], inline_previews: bool) -> str:
+    qualname = str(symbol["qualname"])
+    if not symbol.get("signature_truncated"):
+        display = symbol["signature"]
+    elif inline_previews:
+        display = f"{qualname} [signature preview] {symbol['signature_preview']}…"
+    else:
+        display = (
+            f"{qualname} [signature preview at /symbols/{index}/signature_preview]"
+        )
+    return f"{'  ' * qualname.count('.')}{display}  [{symbol['start_line']}-{symbol['end_line']}]"
+
+
 def outline_disclosure(
-    path: str, outline: str, symbols: list[dict[str, object]]
+    path: str,
+    outline: str,
+    symbols: list[dict[str, object]],
+    *,
+    inline_previews: bool = False,
 ) -> dict[str, object]:
     """Render detached index rows, keeping long Python prefixes in one place."""
     previews = 0
@@ -108,18 +125,10 @@ def outline_disclosure(
                 symbol.update(disclosure)
                 previews += 1
     if previews:
-        lines = []
-        for index, symbol in enumerate(symbols):
-            qualname = str(symbol["qualname"])
-            display = (
-                f"{qualname} [signature preview at /symbols/{index}/signature_preview]"
-                if symbol.get("signature_truncated")
-                else symbol["signature"]
-            )
-            lines.append(
-                f"{'  ' * qualname.count('.')}{display}  [{symbol['start_line']}-{symbol['end_line']}]"
-            )
-        outline = "\n".join(lines)
+        outline = "\n".join(
+            _outline_line(index, symbol, inline_previews)
+            for index, symbol in enumerate(symbols)
+        )
     if path.lower().endswith((".py", ".pyi")):
         outline = _distinct_binding_lines(outline, symbols)
     return {

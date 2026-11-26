@@ -23,7 +23,7 @@ from .model import EvidenceVisibility
 from .python_binding_scope import unfiltered_literal_comprehension
 from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
 from .verification_reference_syntax import (
-    empty_literal_iterable,
+    empty_literal_loop,
     empty_loop_else_exits,
     literal_truth,
     possible_boolean_operands,
@@ -402,16 +402,20 @@ class _LiteralReadVisitor(ast.NodeVisitor):
             with self._copy_guard():
                 self.visit(node.msg)
 
+    def _visit_empty_loop_else(self, node: ast.For | ast.While) -> None:
+        # A direct exit closes its statement list; handlers and finally suites
+        # have independent qualifications at their existing owner.
+        previous = self.terminated
+        self._visit_suite(node.orelse, stop_if_terminated=True)
+        self.terminated = previous
+
     def visit_While(self, node: ast.While) -> None:
-        return
+        if empty_literal_loop(node):
+            self._visit_empty_loop_else(node)
 
     def visit_For(self, node: ast.For) -> None:
-        if empty_literal_iterable(node.iter):
-            # An exit stops the else suite, but an enclosing handler or
-            # finally suite may still observe an input.
-            previous = self.terminated
-            self._visit_suite(node.orelse, stop_if_terminated=True)
-            self.terminated = previous
+        if empty_literal_loop(node):
+            self._visit_empty_loop_else(node)
             return
         paths = self._finite_paths(node.iter)
         if (

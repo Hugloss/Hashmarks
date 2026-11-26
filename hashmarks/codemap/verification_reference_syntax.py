@@ -35,9 +35,11 @@ def literal_truth(test: ast.expr) -> bool | None:
     return None
 
 
-def empty_literal_iterable(node: ast.expr) -> bool:
-    """Only literal iterables whose syntax guarantees zero members."""
-    match node:
+def empty_literal_loop(node: ast.For | ast.While) -> bool:
+    """Only literal inputs whose syntax guarantees zero iterations."""
+    if isinstance(node, ast.While):
+        return literal_truth(node.test) is False
+    match node.iter:
         case ast.List(elts=[]) | ast.Tuple(elts=[]) | ast.Dict(keys=[]):
             return True
         case ast.Constant(value="" | b""):
@@ -48,8 +50,8 @@ def empty_literal_iterable(node: ast.expr) -> bool:
 def empty_loop_else_exits(statement: ast.stmt) -> bool:
     """Only the sole reachable suite of an explicitly empty loop can prove this exit."""
     return (
-        isinstance(statement, ast.For)
-        and empty_literal_iterable(statement.iter)
+        isinstance(statement, (ast.For, ast.While))
+        and empty_literal_loop(statement)
         and any(
             isinstance(child, (ast.Return, ast.Raise)) for child in statement.orelse
         )
@@ -177,13 +179,19 @@ class _VerificationReferenceIndexVisitor(PythonReferenceVisitor):
     def generic_visit(self, node: ast.AST) -> None:
         visit_suite_fields(node, self.visit, self._visit_suite)
 
-    def _guarded_branches(self, test: ast.expr) -> tuple[str | None, str | None]:
+    def _guarded_branches(
+        self, test: ast.expr, *, allow_typing_guard: bool = True
+    ) -> tuple[str | None, str | None]:
         truth = literal_truth(test)
         reason = "statically-dead"
         if truth is None:
             operand, negated = _unnegated_test(test)
-            if not self.typing_guards or not self.bindings.references_import_member(
-                operand, "typing", "TYPE_CHECKING"
+            if (
+                not allow_typing_guard
+                or not self.typing_guards
+                or not self.bindings.references_import_member(
+                    operand, "typing", "TYPE_CHECKING"
+                )
             ):
                 return None, None
             self.used_typing_guard = True
@@ -198,7 +206,7 @@ class _VerificationReferenceIndexVisitor(PythonReferenceVisitor):
     def visit_For(self, node: ast.For) -> None:
         self.visit(node.iter)
         previous = self.guard
-        if empty_literal_iterable(node.iter):
+        if empty_literal_loop(node):
             self.guard = previous or "statically-dead"
         self.visit(node.target)
         self._visit_suite(node.body)
@@ -213,15 +221,21 @@ class _VerificationReferenceIndexVisitor(PythonReferenceVisitor):
         if else_guard is None:
             self.visit(node.orelse)
 
-    def visit_If(self, node: ast.If) -> None:
+    def _visit_guarded_suites(self, node: ast.If | ast.While) -> None:
         previous = self.guard
         self.visit(node.test)
-        body, otherwise = self._guarded_branches(node.test)
+        # Only a literal has fixed truth across every loop-condition check.
+        body, otherwise = self._guarded_branches(
+            node.test, allow_typing_guard=isinstance(node, ast.If)
+        )
         self.guard = previous or body
         self._visit_suite(node.body)
         self.guard = previous or otherwise
         self._visit_suite(node.orelse)
         self.guard = previous
+
+    visit_If = _visit_guarded_suites
+    visit_While = _visit_guarded_suites
 
     def _import(self, node: ast.Import | ast.ImportFrom, prefix: str) -> None:
         syntax = self.bindings.syntax

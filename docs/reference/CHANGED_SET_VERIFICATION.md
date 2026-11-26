@@ -82,9 +82,12 @@ statements following a direct `return`, `raise`, `break` or `continue` in the
 same suite as unreachable. Exit operands, loop headers, sibling branches, loop
 `else` clauses, handlers and `finally` suites retain their own source evidence.
 A synchronous `for` over an explicitly empty tuple, list, dictionary,
-string or bytes literal skips the target assignment and body. Its `else` suite
-retains qualified import uses and literal reads. A direct `return` or `raise`
-in that guaranteed `else` also rules out later statements in the surrounding
+string or bytes literal skips the target assignment and body. A `while` with a
+false scalar literal condition, including direct `not` negation, also runs zero
+iterations. Their `else` suites retain qualified import uses and literal reads.
+A true scalar literal `while` condition excludes its `else` from verifier
+references. Other loop conditions can change between checks. A direct `return`
+or `raise` in a guaranteed `else` also rules out later statements in the surrounding
 suite. An exit inside a conditional arm does not establish that its enclosing
 suite exits. The call index retains the
 authored static call sites separately from this verification qualification.

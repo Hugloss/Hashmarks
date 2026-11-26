@@ -8,7 +8,7 @@ separate conditional observations; neither can resolve a parameter use.
 from __future__ import annotations
 
 import ast
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, replace
 from functools import cached_property, lru_cache
 from types import MappingProxyType
@@ -23,7 +23,11 @@ from .python_binding_scope import (
     function_defaults,
     function_parameters,
 )
-from .python_exports import python_source_functions
+from .python_exports import (
+    python_class_member_binding,
+    python_class_node,
+    python_source_functions,
+)
 from .source_binding_contract import (
     MAX_ALIAS_DEPTH,
     MAX_BINDING_DETAILS,
@@ -147,6 +151,10 @@ def _import_key(target: dict[str, object] | None) -> _ImportKey | None:
             *cast(list[str], target["properties"]),
         ),
     )
+
+
+def _import_prefixes(key: _ImportKey) -> Iterator[_ImportKey]:
+    return ((*key[:3], key[3][:depth]) for depth in range(len(key[3]) + 1))
 
 
 class PythonBindings:
@@ -321,8 +329,8 @@ class PythonBindings:
         return value
 
     def _imported_property_mutation(self, key: _ImportKey) -> ast.AST | None:
-        for depth in range(len(key[3]) + 1):
-            mutation = self._property_mutations.get((*key[:3], key[3][:depth]))
+        for prefix in _import_prefixes(key):
+            mutation = self._property_mutations.get(prefix)
             if mutation is not None:
                 return mutation
         return None
@@ -554,15 +562,24 @@ class PythonBindings:
     def _observe_property_writes(self) -> None:
         mutations: dict[_ImportKey, ast.AST] = {}
         symbolic: dict[_SymbolicKey, ast.AST] = {}
+        class_members: set[tuple[ast.ClassDef, str | None]] = set()
         for node in self.syntax.nodes:
-            key = self._property_write(node)
-            if key is not None:
-                mutations[key] = node
+            write = self._property_write(node)
+            if write is not None:
+                base, name = write
+                key = _import_key(base.target)
+                if key is not None:
+                    mutations[key if name is None else (*key[:3], (*key[3], name))] = (
+                        node
+                    )
+                elif isinstance(base.declaration, ast.ClassDef):
+                    class_members.add((base.declaration, name))
             source_key = self._symbolic_property_write(node)
             if source_key is not None:
                 symbolic[source_key] = node
         self._property_mutations = mutations
         self._symbolic_mutations = symbolic
+        self.class_member_writes = frozenset(class_members)
 
     def _symbolic_mutation_base(
         self, node: ast.AST, scope: PythonScope, depth: int = 0
@@ -650,33 +667,23 @@ class PythonBindings:
             return self._symbolic_mutation_base(node.func.value, scope)
         return None
 
-    def _property_write(self, node: ast.AST) -> _ImportKey | None:
+    def _property_write(self, node: ast.AST) -> tuple[_Value, str | None] | None:
         if isinstance(node, ast.Attribute) and isinstance(
             node.ctx, (ast.Store, ast.Del)
         ):
-            base, name = node.value, node.attr
-        elif isinstance(node, ast.Call):
-            return self._setattr_write(node)
-        else:
-            return None
-        value = self.resolve(base, self.syntax.owners[node])
-        key = _import_key(value.target)
-        return None if key is None else (*key[:3], (*key[3], name))
-
-    def _setattr_write(self, node: ast.Call) -> _ImportKey | None:
+            return self.resolve(node.value, self.syntax.owners[node]), node.attr
         if not (
-            isinstance(node.func, ast.Name)
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
             and node.func.id in {"setattr", "delattr"}
             and self.syntax.lookup(node.func.id, self.syntax.owners[node]) is None
             and len(node.args) >= 2
         ):
             return None
         scope = self.syntax.owners[node]
-        key = _import_key(self.resolve(node.args[0], scope).target)
-        if key is None:
-            return None
-        name = self.resolve(node.args[1], scope).literal
-        return key if name is None else (*key[:3], (*key[3], name))
+        return self.resolve(node.args[0], scope), self.resolve(
+            node.args[1], scope
+        ).literal
 
     def row(
         self, kind: str, node: ast.AST, value: _Value, name: str | None = None
@@ -1268,6 +1275,12 @@ class PythonLocalCallBindings:
     method_descriptors: Mapping[ast.expr, str]
     nested_calls: Mapping[tuple[ast.AST, int, str], int]
     receiver_calls: frozenset[tuple[ast.AST, int, str]]
+    class_member_writes: frozenset[tuple[ast.ClassDef, str | None]] | None
+    imported_member_writes: frozenset[_ImportKey] | None
+
+    def class_member_may_be_changed(self, owner: ast.ClassDef, member: str) -> bool:
+        writes = self.class_member_writes
+        return writes is None or (owner, member) in writes or (owner, None) in writes
 
     def method_descriptor(
         self, declaration: ast.FunctionDef | ast.AsyncFunctionDef
@@ -1295,7 +1308,7 @@ def python_local_call_bindings(snapshot: PythonAstSnapshot) -> PythonLocalCallBi
         bindings = PythonBindings(snapshot.tree, snapshot.source.encode("utf-8"))
     except BindingObservationBound:
         return PythonLocalCallBindings(
-            MappingProxyType({}), MappingProxyType({}), frozenset()
+            MappingProxyType({}), MappingProxyType({}), frozenset(), None, None
         )
     descriptors: dict[ast.expr, str] = {}
     nested_calls: dict[tuple[ast.AST, int, str], int] = {}
@@ -1323,7 +1336,52 @@ def python_local_call_bindings(snapshot: PythonAstSnapshot) -> PythonLocalCallBi
         MappingProxyType(descriptors),
         MappingProxyType(nested_calls),
         frozenset(receiver_calls),
+        bindings.class_member_writes,
+        frozenset(bindings._property_mutations),
     )
+
+
+def python_import_member_changed(
+    snapshot: PythonAstSnapshot | None, from_target: str, member: str
+) -> bool:
+    """Match the authored from-import and member, retaining the import level."""
+    writes = (
+        python_local_call_bindings(snapshot).imported_member_writes
+        if snapshot
+        else None
+    )
+    if not writes:
+        return writes is None
+    target = from_target.lstrip(".")
+    module, _, name = target.rpartition(".")
+    key = (module, None, len(from_target) - len(target), (name, *member.split(".")))
+    return any(prefix in writes for prefix in _import_prefixes(key))
+
+
+def python_direct_method(
+    snapshot: PythonAstSnapshot | None, class_name: str, member: str
+) -> tuple[ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef | None, bool]:
+    """Qualify a declared member or report uncertainty before inheriting it."""
+    owner = (
+        python_class_node(snapshot.tree, class_name, require_unwrapped=True)
+        if snapshot
+        else None
+    )
+    if snapshot is None or owner is None:
+        return None, True
+    bindings = python_local_call_bindings(snapshot)
+    if bindings.class_member_may_be_changed(owner, member):
+        return None, True
+    kind, declaration = python_class_member_binding(owner, member)
+    if declaration is None:
+        return None, kind != "unknown"
+    if declaration.decorator_list and (
+        isinstance(declaration, ast.ClassDef)
+        or bindings.method_descriptor(declaration)
+        not in {"staticmethod", "classmethod"}
+    ):
+        return None, True
+    return declaration, False
 
 
 def python_nested_call_site(

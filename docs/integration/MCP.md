@@ -434,6 +434,14 @@ Python declaration signatures include class keyword unpacking such as
 The symbol locator keeps the declaration name, so a generic class `Bucket[T]`
 is still addressable as `api.py::Bucket`.
 
+In Python `deps` and `refs`, a named base such as `Envelope[Payload]` supplies
+one `inherits` edge to `Envelope`. The type argument remains visible in the
+class signature. Computed bases and annotation factories cannot establish a
+named result from their operands. A named annotation factory still appears
+as an authored annotation reference. Parameter, return and attribute type edges
+locate the first written reference to each type in that annotation. A decoded
+forward reference uses the source line of its containing string.
+
 Python `find`, `symbol`, `deps` candidate records, structural-locality nodes
 and symbol source responses show at most 512 UTF-8 bytes per signature preview.
 Source also applies the caller's smaller source budget.
@@ -464,6 +472,13 @@ lines where the binding records share the same byte-column range. Each bound
 name keeps its own indexed qualname, span and signature in `symbols`. If
 identical text on one line comes from different byte ranges, the outline
 retains the occurrences separately.
+
+The `context` CLI and `CodeMap.context.build()` also bound Python signatures
+used for orientation or dependency evidence. Oversized symbol items use the
+`signature-preview` representation and carry the indexed path and qualname.
+File outline items embed the prefix beside its qualname and line range.
+The context budget counts the displayed content. A source-level query can
+still return the complete qualified source range when it fits.
 
 On UTF-8 standard output, the CLI writes printable Unicode directly in a
 Python `outline` or `source` response, including ambiguous source lookups

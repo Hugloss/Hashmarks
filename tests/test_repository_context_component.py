@@ -13,6 +13,7 @@ from hashmarks.codemap.context_cache import ContextCache
 from hashmarks.codemap.find_engine import RepositorySearch
 from hashmarks.codemap.indexing_lifecycle import RepositoryIndex
 from hashmarks.codemap.model import ContextDisclosure
+from hashmarks.codemap.python_ast import estimate_tokens
 from hashmarks.codemap.repository_context import RepositoryContext
 
 
@@ -25,6 +26,94 @@ def context(index: RepositoryIndex) -> Iterator[RepositoryContext]:
         yield RepositoryContext(relationships.source, search, relationships, cache)
     finally:
         cache.close()
+
+
+def test_context_limits_python_orientation_and_keeps_full_explicit_source(
+    context: RepositoryContext,
+) -> None:
+    opening = "def encode_record(value='"
+    default = "A" * (511 - len(opening)) + "界" * 800
+    definition = f"{opening}{default}'):\n    return value"
+    (context.workspace / "codec.py").write_text(
+        definition + "\n\ndef decode_record(value): return value\n", encoding="utf-8"
+    )
+    (context.workspace / "worker.py").write_text(
+        "from codec import encode_record\ndef dispatch(value): return encode_record(value)\n"
+    )
+    context.source.index.sync()
+    bounded = context.build(
+        "encode_record", token_budget=128, disclosure=ContextDisclosure.OUTLINE
+    )
+    item = next(item for item in bounded.items if item.symbol == "encode_record")
+    assert item.path == "codec.py" and item.representation == "signature-preview"
+    assert item.content == definition.encode()[:512].decode("utf-8", errors="ignore")
+    assert item.estimated_tokens == estimate_tokens(item.content)
+    assert (
+        bounded.estimated_tokens
+        == sum(i.estimated_tokens for i in bounded.items)
+        <= 128
+    )
+    warm = context.build(
+        "encode_record", token_budget=128, disclosure=ContextDisclosure.OUTLINE
+    )
+    assert warm.cache_hit and warm.items == bounded.items
+    evidence = context.build("dispatch", disclosure=ContextDisclosure.EVIDENCE)
+    dependency = next(i for i in evidence.items if i.symbol == "encode_record")
+    assert (dependency.path, dependency.representation, dependency.content) == (
+        item.path,
+        item.representation,
+        item.content,
+    )
+    assert (
+        next(i for i in evidence.items if i.symbol == "dispatch").representation
+        == "signature"
+    )
+    file_pack = context.build("codec.py")
+    outline = next(
+        i
+        for i in file_pack.items
+        if i.path == "codec.py" and i.representation == "outline"
+    )
+    assert (
+        f"encode_record [signature preview] {item.content}…  [1-2]" in outline.content
+    )
+    assert (
+        "def decode_record(value)" in outline.content
+        and "/symbols/" not in outline.content
+    )
+    assert outline.estimated_tokens == estimate_tokens(outline.content)
+    full = context.build("encode_record", disclosure=ContextDisclosure.SOURCE)
+    source = next(i for i in full.items if i.symbol == "encode_record")
+    assert source.representation == "source-range" and source.content == definition
+
+
+@pytest.mark.parametrize("source_bytes", [480, 511])
+def test_source_replaces_preview_when_normalized_signature_costs_as_much_as_body(
+    context: RepositoryContext, source_bytes: int
+) -> None:
+    # ast.unparse inserts spaces after argument commas, unlike the authored definition.
+    arguments = ",".join(f"a{i}" for i in range(108))
+    definition = f"def format_record({arguments}): return a0 #".ljust(source_bytes, "x")
+    (context.workspace / "codec.py").write_text(definition + "\n")
+    outline = context.build(
+        "format_record", disclosure=ContextDisclosure.OUTLINE, token_budget=128
+    )
+    preview = next(item for item in outline.items if item.symbol == "format_record")
+    assert (
+        preview.representation == "signature-preview"
+        and preview.estimated_tokens == 128
+    )
+    packet = context.build(
+        "format_record", disclosure=ContextDisclosure.SOURCE, token_budget=128
+    )
+    item = next(item for item in packet.items if item.symbol == "format_record")
+    assert item.representation == "source-range" and item.content == definition
+    assert (
+        packet.estimated_tokens
+        == item.estimated_tokens
+        == estimate_tokens(definition)
+        <= 128
+    )
 
 
 def test_standalone_context_preserves_unknown_identity_and_reobserves_source(
