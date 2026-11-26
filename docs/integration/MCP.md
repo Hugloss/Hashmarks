@@ -435,6 +435,12 @@ For oversized signatures the result carries `signature: null`,
 `signature_truncated: true` and a UTF-8 prefix in `signature_preview`. The
 symbol's source range remains available for reading the complete declaration.
 
+For direct Python module assignments, `signature_tokens` estimates the
+complete first-line header of the selected statement. A large header retains
+bounded index text with a visible truncation marker. Public signature previews
+contain only original header text and uphold the same UTF-8 byte limit. An
+explicit source read with sufficient budget returns the full statement.
+
 The Python CLI `outline` and `CodeMap.source.outline()` use the same preview
 limit. When signatures exceed it, the textual outline points to the previews
 in the numbered `symbols` array. `outline_signature_previews` counts those
@@ -457,6 +463,16 @@ the first and last Python source lines. The end offset is exclusive. For
 example, reading `LIMIT` from `BANNER = "..."; LIMIT = 3` returns
 `LIMIT = 3` and charges its own source size against the requested budget.
 Whole-line source observations continue to describe the containing lines.
+
+An explicit `qualname` in `CodeMap.source.slice()` selects that indexed
+occurrence. It follows the occurrence when it moves and raises `KeyError` when
+the member is indexed but the occurrence is missing. Omit `qualname` to read
+physical lines directly. Symbol lookup and byte disclosure share one index
+observation. Task evidence reports an unavailable source range if a selected
+qualified name disappears. It never redirects that selection to a sibling.
+
+When CPython parses a member successfully, its native AST supplies the
+declaration ranges, including for mixed Python newline forms.
 
 The statement columns change the generated workspace index shape. CodeMap
 rebuilds older workspace indexes on open under its existing schema rules.

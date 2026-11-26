@@ -13,6 +13,7 @@ from hashmarks import python_ast_cache
 from .model import (
     CODEMAP_SCHEMA,
     PYTHON_PARSER,
+    PYTHON_SIGNATURE_PREVIEW_BYTES,
     EdgeRecord,
     LexicalRecord,
     ParsedArtifact,
@@ -20,6 +21,7 @@ from .model import (
     allocate_symbol_occurrence,
 )
 from .python_binding_scope import (
+    PythonReferenceVisitor,
     annotated_assignment_expressions,
     annotations_are_deferred,
     definition_time_expressions,
@@ -55,6 +57,20 @@ def python_symbol_bytes(
         selected[0] = selected[0][left:]
         selected[-1] = selected[-1][:right]
     return b"\n".join(selected)
+
+
+def _binding_header(first_line: bytes) -> tuple[str, int]:
+    header = first_line.decode("utf-8").strip()
+    encoded = header.encode("utf-8")
+    cost = estimate_tokens(encoded)
+    # Four extra bytes retain at least one complete code point beyond the
+    # public prefix. The disclosure owner can prove truncation from byte
+    # length alone, and every displayed preview byte comes from source.
+    retained = PYTHON_SIGNATURE_PREVIEW_BYTES + 4
+    marker = " … [signature truncated]"
+    if len(encoded) <= retained + len(marker.encode("utf-8")):
+        return header, cost
+    return encoded[:retained].decode("utf-8", errors="ignore") + marker, cost
 
 
 def _function_signature(node: ast.FunctionDef | ast.AsyncFunctionDef) -> str:
@@ -212,7 +228,7 @@ class _AnnotationTargets:
 
 
 @dataclass
-class _Collector(ast.NodeVisitor):
+class _Collector(PythonReferenceVisitor):
     lines: list[bytes]
     annotations: _AnnotationTargets
 
@@ -360,7 +376,7 @@ class _Collector(ast.NodeVisitor):
         suffix = _NON_INDENT_BYTE.search(self.lines[end - 1], right)
         columns = (left, right) if prefix or (suffix and suffix[0] == b";") else None
         body = python_symbol_bytes(self.lines, start, end, columns)
-        header = body.partition(b"\n")[0].decode("utf-8").strip()[:400]
+        header, header_tokens = _binding_header(body.partition(b"\n")[0])
         body_tokens = estimate_tokens(body)
         for item, direct in named:
             # Each unpacked name is observable; its individual value is not.
@@ -382,7 +398,9 @@ class _Collector(ast.NodeVisitor):
                     signature=signature,
                     start_line=start,
                     end_line=end,
-                    signature_tokens=estimate_tokens(signature),
+                    signature_tokens=header_tokens
+                    if direct
+                    else estimate_tokens(signature),
                     body_tokens=body_tokens,
                     start_byte_column=columns[0] if columns else None,
                     end_byte_column=columns[1] if columns else None,

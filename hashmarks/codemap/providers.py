@@ -590,11 +590,16 @@ class TreeSitterRangeProvider:
         signature = self.signature(language)
         if signature is None:
             return self._unavailable(artifact, "native-syntax-unavailable")
+        parser = f"{artifact.parser}+{signature}"
+        if language == "python" and artifact.parse_error is None:
+            # CPython supplies complete declaration spans in universal-newline
+            # coordinates. A second parser's nearest name cannot qualify them.
+            return replace(artifact, parser=parser)
         try:
             raw = source.encode("utf-8") if isinstance(source, str) else source
             tree = self.syntax_tree(raw, language)
             if tree is None:
-                return self._unavailable(artifact, "native-syntax-unavailable")
+                raise SourceSyntaxError("native-syntax-unavailable")
             edges = (
                 self._module_edges(tree, raw)
                 if language in ECMASCRIPT_GRAMMARS
@@ -614,7 +619,6 @@ class TreeSitterRangeProvider:
             return self._unavailable(artifact, reason)
         if self.signature(language) != signature:
             return self._unavailable(artifact, "native-syntax-provider-changed")
-        parser = f"{artifact.parser}+{signature}"
         # JS/TS native declarations include lexical scope and binding syntax.
         # Mixing the flat advisory names back in creates false global symbols.
         symbols = (

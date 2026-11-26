@@ -89,6 +89,11 @@ A type-alias value, generic bound or constraint, and Python 3.13+ type-parameter
 default evaluate on access. Their declaration alone supplies no immediate
 call or verifier relationship. Later introspection remains outside this source
 observation.
+A standalone lambda or generator expression is discarded. A direct assertion
+of either object tests its truth without calling the lambda or iterating the
+generator. In these positions the verifier and call index retain creation-time
+expressions, including lambda defaults and the generator's outermost iterable.
+Assigned or passed objects may have consumers elsewhere in the source.
 In a task packet, an exact test node comes from a supported top-level test
 declaration containing a qualified reference or literal read. When several
 such tests exist, the existing task-term comparison can distinguish them. A

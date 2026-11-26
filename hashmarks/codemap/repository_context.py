@@ -20,6 +20,7 @@ from .python_ast import estimate_tokens
 from .query_primitives import _TASK_EVIDENCE_FAMILIES, _TASK_GOVERNANCE_CUES, _WORD_RE
 from .query_router import route_query
 from .repository_domains import is_test_path
+from .repository_source import SourceSymbolNotFound
 from .singleflight import SingleFlight
 from .work_context import WorkContextProjection
 
@@ -568,8 +569,11 @@ class RepositoryContext(WorkContextProjection, ReadScopeOwner):
                 continue
             current = items[index]
             try:
-                body = self.source.slice(hit.path, start, end, qualname=hit.qualname)
-            except (OSError, PermissionError):
+                # A fresh native definition supplies its own source coordinates.
+                # Its display name is not an indexed lexical occurrence key.
+                locator = None if hit.kind == "native-definition" else hit.qualname
+                body = self.source.slice(hit.path, start, end, qualname=locator)
+            except (OSError, SourceSymbolNotFound):
                 continue
             body_tokens = estimate_tokens(body)
             delta = body_tokens - current.estimated_tokens
