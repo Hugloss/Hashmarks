@@ -160,8 +160,9 @@ def _binding_result(
     fallback: Sequence[dict[str, object]],
     *,
     unresolved: bool,
+    direct_callable: bool = True,
 ) -> tuple[dict[str, object] | None, list[str], bool]:
-    if len(rows) == 1:
+    if len(rows) == 1 and direct_callable:
         return rows[0], [_symbol_id(rows[0])], False
     return None, sorted(_symbol_id(row) for row in rows or fallback), unresolved
 
@@ -326,7 +327,13 @@ class RepositoryStructure(ReadScopeOwner):
                 if visible
                 else []
             )
-            return _binding_result(local, candidates, unresolved=len(local) != 1)
+            return _binding_result(
+                local,
+                candidates,
+                unresolved=True,
+                direct_callable=isinstance(observed.declaration, ast.ClassDef)
+                or observed.unwrapped_function,
+            )
         if kind == "reexport" and len(targets) == 1:
             symbols, unresolved = self.imports._resolve_import_symbol_evidence(
                 source_path, targets[0]
@@ -348,7 +355,16 @@ class RepositoryStructure(ReadScopeOwner):
             for row in self._qualified_path_symbols(path)
             if row.get("qualname") == qualname
         ]
-        return _binding_result(owned, candidates, unresolved=bool(symbols))
+        direct_callable = True
+        if len(owned) == 1 and owned[0].get("kind") == "function":
+            row = owned[0]
+            observed = self.imports._python_export_observation(
+                str(row["path"]), str(row["name"])
+            )
+            direct_callable = observed.unwrapped_function
+        return _binding_result(
+            owned, candidates, unresolved=bool(symbols), direct_callable=direct_callable
+        )
 
     def _python_class_node(self, path: str, qualname: str) -> ast.ClassDef | None:
         if not path.endswith(".py") or not qualname:
@@ -457,6 +473,15 @@ class RepositoryStructure(ReadScopeOwner):
         kind, declaration = python_class_member_binding(class_node, method)
         if declaration is None:
             return [], kind != "unknown"
+        if (
+            isinstance(declaration, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and declaration.decorator_list
+        ):
+            snapshot = self._python_snapshot(path)
+            if snapshot is None or python_local_call_bindings(
+                snapshot
+            ).method_descriptor(declaration) not in {"staticmethod", "classmethod"}:
+                return [], True
         owners = [
             row
             for row in candidates
@@ -509,28 +534,6 @@ class RepositoryStructure(ReadScopeOwner):
             return None
         return source_node
 
-    def _python_method_receiver(
-        self,
-        path: str,
-        method: ast.FunctionDef | ast.AsyncFunctionDef,
-        member: str,
-        line: int,
-    ) -> str | None:
-        snapshot = self._python_snapshot(path)
-        if snapshot is None:
-            return None
-        bindings = python_local_call_bindings(snapshot)
-        if (method, line, member) not in bindings.receiver_calls:
-            return None
-        if not method.decorator_list:
-            return "self"
-        if len(method.decorator_list) != 1:
-            return None
-        descriptor = bindings.method_descriptors.get(method.decorator_list[0])
-        return {"classmethod": "cls", "staticmethod": "static", "property": "self"}.get(
-            descriptor or ""
-        )
-
     def _python_self_cls_call_binding(
         self,
         *,
@@ -552,8 +555,13 @@ class RepositoryStructure(ReadScopeOwner):
         if source_node is None:
             return None
         candidate_ids = sorted(_symbol_id(row) for row in candidates)
-        receiver = self._python_method_receiver(
-            source_path, source_node, call_target.method, line
+        snapshot = self._python_snapshot(source_path)
+        receiver = (
+            python_local_call_bindings(snapshot).method_receiver(
+                source_node, call_target.method, line
+            )
+            if snapshot
+            else None
         )
         if receiver != call_target.receiver:
             return (None, candidate_ids, True) if receiver is None else None

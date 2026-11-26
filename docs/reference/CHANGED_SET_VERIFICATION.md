@@ -98,7 +98,11 @@ In a task packet, an exact test node comes from a supported top-level test
 declaration containing a qualified reference or literal read. A qualified
 import use in an eager list, set or dictionary comprehension can identify its
 enclosing test when each loop binds a simple name from a nonempty literal
-collection of constants and has no filters. Generator bodies and callback bodies retain file scope.
+collection of constants and has no filters. Qualified uses in the suite of a
+plain local class can also identify the enclosing test, including method
+defaults and decorators. An explicit class base or metaclass can introduce a
+different class namespace. Method bodies, generator bodies and callback bodies
+retain file scope.
 When several
 such tests exist, the existing task-term comparison can distinguish them. A
 tie, class method, or use confined to a helper retains the file target.

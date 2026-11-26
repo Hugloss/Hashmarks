@@ -87,10 +87,15 @@ class _VerificationReferenceIndexVisitor(PythonReferenceVisitor):
             and isinstance(binding.node, (ast.FunctionDef, ast.AsyncFunctionDef))
         }
 
-        self.eager_comprehensions = {
+        self.eager_test_scopes = {
             scope
             for scope in bindings.syntax.scopes
             if unfiltered_literal_comprehension(scope.node, simple_targets=True)
+            or (
+                isinstance(scope.node, ast.ClassDef)
+                and not scope.node.bases
+                and not scope.node.keywords
+            )
         }
 
     def _guarded_branches(self, test: ast.expr) -> tuple[str | None, str | None]:
@@ -191,12 +196,10 @@ class _VerificationReferenceIndexVisitor(PythonReferenceVisitor):
 
     def _test(self, node: ast.AST, *, qualified_use: bool = False) -> str | None:
         scope = self.bindings.syntax.owners.get(node)
-        # Only an already qualified import use can carry its test identity
-        # through these eager expression scopes. A shadowed loop variable
-        # remains local to its comprehension.
-        while (
-            qualified_use and scope is not None and scope in self.eager_comprehensions
-        ):
+        # A qualified import use can carry its test identity through an eager
+        # comprehension or plain class suite, including method headers.
+        # Crossing a function body would lose that witness.
+        while qualified_use and scope is not None and scope in self.eager_test_scopes:
             scope = scope.defining
         if (
             scope is not None

@@ -841,9 +841,58 @@ def _verification_candidate_lines(details: list[dict[str, Any]]) -> list[str]:
     ]
 
 
+def _shorter_text_lines(original: list[str], shared: list[str]) -> list[str]:
+    return (
+        shared
+        if len("\n".join(shared).encode()) < len("\n".join(original).encode())
+        else original
+    )
+
+
+def _verification_declaration_source_lines(details: list[dict[str, Any]]) -> list[str]:
+    original = _verification_candidate_lines(details)
+    scoped = [
+        row for row in details if isinstance(row.get("test_declarations"), Mapping)
+    ]
+    if len(scoped) <= 2:
+        return original
+    refs = {
+        field: enclosing
+        for field, enclosing in (("path", "path"), ("source_revision", "test_revision"))
+        if all(
+            isinstance(row.get(enclosing), str)
+            and row["test_declarations"].get(field) == row[enclosing]
+            for row in scoped
+        )
+    }
+    if not refs:
+        return original
+    # Keep each scope attached to its own candidate. Rows without a declaration
+    # scope acquire no field or implicit source binding from the heading.
+    projected = [
+        {
+            **row,
+            "test_declarations": {
+                key: value
+                for key, value in row["test_declarations"].items()
+                if key not in refs
+            },
+        }
+        if isinstance(row.get("test_declarations"), Mapping)
+        else row
+        for row in details
+    ]
+    shared = [
+        "Within each displayed test_declarations, copy these fields from its own candidate: "
+        + _initial_json_record(refs),
+        *_verification_candidate_lines(projected),
+    ]
+    return _shorter_text_lines(original, shared)
+
+
 def _initial_verification_text(rows: list[dict[str, Any]]) -> list[str]:
     details = [_initial_verification_locator(row) for row in rows]
-    original = _verification_candidate_lines(details)
+    original = _verification_declaration_source_lines(details)
     if len(details) <= 2:
         return original
     common = _common_verification_qualifiers(details)
@@ -856,13 +905,9 @@ def _initial_verification_text(rows: list[dict[str, Any]]) -> list[str]:
     shared = [
         "Verification qualifiers for every displayed candidate: "
         + _initial_json_record(common),
-        *_verification_candidate_lines(individual),
+        *_verification_declaration_source_lines(individual),
     ]
-    return (
-        shared
-        if len("\n".join(shared).encode()) < len("\n".join(original).encode())
-        else original
-    )
+    return _shorter_text_lines(original, shared)
 
 
 def initial_evidence_text(packet: Mapping[str, object]) -> str:

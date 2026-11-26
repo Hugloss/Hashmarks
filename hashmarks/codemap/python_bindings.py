@@ -1269,6 +1269,24 @@ class PythonLocalCallBindings:
     nested_calls: Mapping[tuple[ast.AST, int, str], int]
     receiver_calls: frozenset[tuple[ast.AST, int, str]]
 
+    def method_descriptor(
+        self, declaration: ast.FunctionDef | ast.AsyncFunctionDef
+    ) -> str | None:
+        if len(declaration.decorator_list) != 1:
+            return None
+        return self.method_descriptors.get(declaration.decorator_list[0])
+
+    def method_receiver(
+        self, method: ast.FunctionDef | ast.AsyncFunctionDef, member: str, line: int
+    ) -> str | None:
+        if (method, line, member) not in self.receiver_calls:
+            return None
+        if not method.decorator_list:
+            return "self"
+        return {"classmethod": "cls", "staticmethod": "static", "property": "self"}.get(
+            self.method_descriptor(method) or ""
+        )
+
 
 @lru_cache(maxsize=32)
 def python_local_call_bindings(snapshot: PythonAstSnapshot) -> PythonLocalCallBindings:
