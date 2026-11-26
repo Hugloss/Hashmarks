@@ -306,6 +306,13 @@ def _arguments_bind(arguments: ast.arguments, name: str) -> bool:
     return any(argument.arg == name for argument in positional)
 
 
+def python_reference_line(node: ast.expr) -> int:
+    """Locate the referenced name, including the final component of a dotted access."""
+    if isinstance(node, ast.Attribute) and node.end_lineno is not None:
+        return node.end_lineno
+    return node.lineno
+
+
 def _call_uses_name(node: ast.Call, name: str) -> bool:
     target = node.func
     while isinstance(target, ast.Attribute):
@@ -346,7 +353,7 @@ def _expression_bound_call(
     if (
         isinstance(node, ast.Call)
         and bound
-        and node.lineno == line
+        and python_reference_line(node.func) == line
         and _call_uses_name(node, name)
     ):
         return True

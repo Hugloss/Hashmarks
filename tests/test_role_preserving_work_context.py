@@ -1,5 +1,15 @@
-from contract_assertions import assert_number, assert_object, assert_records
+from copy import deepcopy
+from pathlib import Path
 
+from contract_assertions import (
+    assert_number,
+    assert_object,
+    assert_records,
+    assert_text,
+)
+
+from hashmarks import CodeMap
+from hashmarks.codemap.python_ast import estimate_tokens
 from hashmarks.codemap.work_context import WorkContextProjection
 
 
@@ -25,6 +35,54 @@ def _action() -> dict[str, object]:
         ],
         "inspect": [_row("README.md", 6, "inspect")],
     }
+
+
+def test_observed_python_action_keeps_edit_and_verifier_with_a_large_default(
+    tmp_path: Path,
+) -> None:
+    head = "def encode_record(value='"
+    default = "a" * (511 - len(head)) + "界" * 400
+    (tmp_path / "codec.py").write_text(
+        f"{head}{default}'):\n    return value\n", encoding="utf-8"
+    )
+    (tmp_path / "test_codec.py").write_text(
+        "from codec import encode_record\ndef test_encode_record(): assert encode_record('x') == 'x'\n"
+    )
+    with CodeMap(tmp_path) as repository:
+        repository.index.sync()
+        action = repository.tasks.action_map("Fix encode_record in codec.py")
+        original = deepcopy(action)
+        packet = repository.context.work(action, token_budget=256)
+    assert action == original
+    anchors = {row["role"]: row for row in assert_records(packet["items"])}
+    edit, verify = anchors["edit"], anchors["verify"]
+    selected = assert_object(action["edit"])
+    exact = assert_text(selected["signature"])
+    shown = assert_text(edit["content"]).split("\nsignature preview: ", 1)[1]
+    assert shown == exact.encode()[:512].decode("utf-8", errors="ignore")
+    assert edit["signature_truncated"] is True
+    assert (edit["path"], edit["symbol"], edit["canonical_rank"]) == (
+        selected["path"],
+        selected["qualname"],
+        selected["canonical_rank"],
+    )
+    assert "\nsignature: def test_encode_record()" in assert_text(verify["content"])
+    assert "signature_truncated" not in verify
+    assert packet["role_coverage"] == {"edit": True, "verify": True, "contract": False}
+    assert packet["estimated_tokens"] == sum(
+        estimate_tokens(assert_text(row["content"])) for row in anchors.values()
+    )
+
+
+def test_supplied_short_preview_stays_explicitly_partial() -> None:
+    edit = _row("pkg/engine.py", 1, "edit")
+    edit.update(
+        signature=None, signature_preview="def target( ", signature_truncated=True
+    )
+    result = WorkContextProjection().work({"edit": edit})
+    (anchor,) = assert_records(result["items"])
+    assert anchor["signature_truncated"] is True
+    assert assert_text(anchor["content"]).endswith("\nsignature preview: def target( ")
 
 
 def test_work_context_preserves_mandatory_roles_monotonically() -> None:

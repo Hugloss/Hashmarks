@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, cast
 
 from .python_ast import estimate_tokens
+from .signature_preview import signature_disclosure
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -15,11 +16,29 @@ class WorkContextProjection:
     def _work_context_anchor(row: dict[str, object], *, role: str) -> dict[str, object]:
         path = str(row.get("path") or "")
         symbol = str(row.get("qualname") or row.get("name") or "")
-        signature = str(row.get("signature") or "").strip()
+        raw = row.get("signature")
+        supplied_preview = (
+            row.get("signature_preview")
+            if (
+                raw is None
+                and row.get("signature_truncated") is True
+                and path.lower().endswith((".py", ".pyi"))
+            )
+            else None
+        )
+        signature = (
+            supplied_preview
+            if isinstance(supplied_preview, str)
+            else str(raw or "").strip()
+        )
+        disclosure = signature_disclosure(path, signature)
+        preview = disclosure.get("signature_preview", supplied_preview)
         content_parts = [f"path: {path}", f"role: {role}"]
         if symbol:
             content_parts.append(f"symbol: {symbol}")
-        if signature:
+        if isinstance(preview, str):
+            content_parts.append(f"signature preview: {preview}")
+        elif signature:
             content_parts.append(f"signature: {signature}")
         content = "\n".join(content_parts)
         return {
@@ -32,6 +51,7 @@ class WorkContextProjection:
             "canonical_rank": int(cast("int", row.get("canonical_rank") or 0)),
             "reason": f"{role}-anchor",
             "mandatory": role in {"edit", "verify", "contract"},
+            **({"signature_truncated": True} if isinstance(preview, str) else {}),
         }
 
     def _mandatory_work_context_items(

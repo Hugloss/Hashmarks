@@ -18,17 +18,18 @@ from hashmarks.producer_identity import native_producer_implementation_identity
 from hashmarks.python_ast_cache import read_python_ast
 
 from .decision_session import ReadScopeOwner, decision_scoped
-from .model import EvidenceVisibility, symbol_occurrence_parts
+from .model import EvidenceVisibility
 from .ownership.filesystem_lifecycle import locality_lifecycle
 from .python_bindings import (
+    PythonMethodCall,
     python_direct_method,
     python_import_member_changed,
+    python_initializer_effect,
     python_local_call_bindings,
     python_nested_call_site,
 )
 from .python_exports import (
     python_class_export_binding,
-    python_class_member_binding,
     python_class_node,
     python_expression_call_binds,
     python_function_body_binds,
@@ -56,14 +57,6 @@ if TYPE_CHECKING:
 
 STRUCTURAL_LOCALITY_SCHEMA = LOCALITY_SCHEMA
 _LOCALITY_SYMBOL_CANDIDATE_LIMIT = 64
-
-
-@dataclass(frozen=True)
-class _SelfClsCallTarget:
-    receiver: str
-    method: str
-    class_qualname: str
-    source_method: str
 
 
 @dataclass(frozen=True)
@@ -392,16 +385,19 @@ class RepositoryStructure(ReadScopeOwner):
         if enclosing and parent is None:
             return [], True
         bases: list[tuple[str, str]] = []
+        incomplete = False
         for base in node.bases:
             if not isinstance(base, ast.Name):
-                return [], True
+                incomplete = True
+                continue
             owner = self._python_class_header_base(
                 path, base, enclosing, parent, member
             )
             if owner is None:
-                return [], True
-            bases.append(owner)
-        return list(dict.fromkeys(bases)), False
+                incomplete = True
+            else:
+                bases.append(owner)
+        return list(dict.fromkeys(bases)), incomplete
 
     def _python_class_header_base(
         self,
@@ -504,46 +500,28 @@ class RepositoryStructure(ReadScopeOwner):
         ]
         return owners, not owners
 
-    @staticmethod
-    def _python_self_cls_target(
-        source_qualname: str, target: str
-    ) -> _SelfClsCallTarget | None:
-        parts = target.split(".")
-        if (
-            len(parts) != 2
-            or parts[0] not in {"self", "cls"}
-            or "." not in source_qualname
-        ):
-            return None
-        class_qualname, source_method = source_qualname.rsplit(".", 1)
-        return _SelfClsCallTarget(
-            receiver=parts[0],
-            method=parts[1],
-            class_qualname=class_qualname,
-            source_method=source_method,
+    def _python_initializer_may_shadow(
+        self,
+        path: str,
+        class_name: str,
+        member: str,
+        seen: frozenset[tuple[str, str]] = frozenset(),
+    ) -> bool:
+        key = (path, class_name)
+        if key in seen:
+            return False
+        write, inherits = python_initializer_effect(
+            self._python_snapshot(path), class_name, member
         )
-
-    @staticmethod
-    def _python_receiver_method(
-        class_node: ast.ClassDef, target: _SelfClsCallTarget
-    ) -> ast.FunctionDef | ast.AsyncFunctionDef | None:
-        name, line = symbol_occurrence_parts(target.source_method)
-        methods = [
-            node
-            for node in class_node.body
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-            and node.name == name
-            and (line is None or str(node.lineno) == line)
-        ]
-        if len(methods) != 1:
-            return None
-        source_node = methods[0]
-        if python_class_member_binding(class_node, name)[1] is not source_node:
-            return None
-        positional = [*source_node.args.posonlyargs, *source_node.args.args]
-        if not positional or positional[0].arg != target.receiver:
-            return None
-        return source_node
+        if write or not inherits:
+            return write
+        bases, _ = self._python_class_bases(path, class_name, "__init__")
+        return any(
+            self._python_initializer_may_shadow(
+                base_path, base_name, member, seen | {key}
+            )
+            for base_path, base_name in bases
+        )
 
     def _python_self_cls_call_binding(
         self,
@@ -554,7 +532,7 @@ class RepositoryStructure(ReadScopeOwner):
         target: str,
         candidates: list[dict[str, object]],
     ) -> tuple[dict[str, object] | None, list[str], bool] | None:
-        call_target = self._python_self_cls_target(source_qualname, target)
+        call_target = PythonMethodCall.from_source(source_qualname, target)
         if (
             call_target is None
             or not source_path.endswith(".py")
@@ -563,17 +541,12 @@ class RepositoryStructure(ReadScopeOwner):
             return None
         # The source method remains authored even if decoration replaced its class.
         class_node = python_class_node(snapshot.tree, call_target.class_qualname)
-        source_node = (
-            self._python_receiver_method(class_node, call_target)
-            if class_node
-            else None
-        )
-        if source_node is None:
+        source_node = call_target.receiver_method(class_node) if class_node else None
+        if source_node is None or class_node is None:
             return None
         candidate_ids = sorted(_symbol_id(row) for row in candidates)
-        receiver = python_local_call_bindings(snapshot).method_receiver(
-            source_node, call_target.method, line
-        )
+        bindings = python_local_call_bindings(snapshot)
+        receiver = bindings.method_receiver(source_node, call_target.method, line)
         if receiver != call_target.receiver:
             return (None, candidate_ids, True) if receiver is None else None
         if python_function_body_binds(source_node, call_target.receiver):
@@ -584,6 +557,17 @@ class RepositoryStructure(ReadScopeOwner):
             class_qualname=call_target.class_qualname,
             method=call_target.method,
         )
+        inspect_initializer = receiver == "self" and bool(
+            class_node.bases or bindings.initializer_member_writes
+        )
+        if (
+            owner is not None
+            and inspect_initializer
+            and self._python_initializer_may_shadow(
+                source_path, call_target.class_qualname, call_target.method
+            )
+        ):
+            owner, unresolved = None, True
         if owner is None:
             return None, candidate_ids, unresolved
         return owner, [_symbol_id(owner)], False

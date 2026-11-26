@@ -26,6 +26,7 @@ from .python_binding_scope import (
 from .python_exports import (
     python_class_member_binding,
     python_class_node,
+    python_reference_line,
     python_source_functions,
 )
 from .source_binding_contract import (
@@ -466,11 +467,13 @@ class PythonBindings:
 
     def builtin_method_descriptor(self, node: ast.expr) -> str | None:
         """Observe one authored descriptor spelling in its defining scope."""
+        return self._builtin_name(node, {"classmethod", "staticmethod", "property"})
+
+    def _builtin_name(self, node: ast.expr, names: set[str]) -> str | None:
         if self._custom_builtins or not isinstance(node, (ast.Name, ast.Attribute)):
             return None
         value = self.resolve(node, self.syntax.owners[node])
         origin = value.qualified_absolute_import
-        names = {"classmethod", "staticmethod", "property"}
         if origin and origin[0] == "builtins" and len(origin[1]) == 1:
             name = origin[1][0]
             return name if name in names else None
@@ -489,6 +492,22 @@ class PythonBindings:
         mutation = self._imported_property_mutation(("builtins", None, 0, (name,)))
         return name if name in names and mutation is None else None
 
+    def _delegating_initializer(self, node: ast.AST) -> ast.FunctionDef | None:
+        match node:
+            case ast.Call(
+                func=ast.Attribute(
+                    attr="__init__", value=ast.Call(func=callee, args=[], keywords=[])
+                )
+            ):
+                owner = self.syntax.owners[node].node
+                if (
+                    isinstance(owner, ast.FunctionDef)
+                    and owner.name == "__init__"
+                    and not owner.decorator_list
+                ):
+                    return owner if self._builtin_name(callee, {"super"}) else None
+        return None
+
     def qualified_receiver_call(
         self, call: ast.Call
     ) -> tuple[ast.AST, int, str] | None:
@@ -506,7 +525,7 @@ class PythonBindings:
             return None
         if reference.root.kind != "parameter" or reference.root.name != callee.value.id:
             return None
-        return reference.root.scope.node, call.lineno, callee.attr
+        return reference.root.scope.node, python_reference_line(callee), callee.attr
 
     def direct_nested_declaration(
         self, callee: ast.Name
@@ -563,6 +582,7 @@ class PythonBindings:
         mutations: dict[_ImportKey, ast.AST] = {}
         symbolic: dict[_SymbolicKey, ast.AST] = {}
         class_members: set[tuple[ast.ClassDef, str | None]] = set()
+        instance_members: set[tuple[ast.FunctionDef, str | None]] = set()
         for node in self.syntax.nodes:
             write = self._property_write(node)
             if write is not None:
@@ -577,9 +597,31 @@ class PythonBindings:
             source_key = self._symbolic_property_write(node)
             if source_key is not None:
                 symbolic[source_key] = node
+                if (
+                    write_site := self._initializer_member_write(node, source_key)
+                ) is not None:
+                    instance_members.add(write_site)
         self._property_mutations = mutations
         self._symbolic_mutations = symbolic
         self.class_member_writes = frozenset(class_members)
+        self.initializer_member_writes = frozenset(instance_members)
+
+    def _initializer_member_write(
+        self, node: ast.AST, key: _SymbolicKey
+    ) -> tuple[ast.FunctionDef, str | None] | None:
+        """Keep writes bound to the instance parameter in the initializer's own body."""
+        method = self.syntax.owners[node].node
+        if (
+            not isinstance(method, ast.FunctionDef)
+            or method.name != "__init__"
+            or method.decorator_list
+        ):
+            return None
+        positional = method.args.posonlyargs or method.args.args
+        root, properties = key
+        if not positional or root is not positional[0] or len(properties) > 1:
+            return None
+        return method, properties[0] if properties else None
 
     def _symbolic_mutation_base(
         self, node: ast.AST, scope: PythonScope, depth: int = 0
@@ -1277,6 +1319,8 @@ class PythonLocalCallBindings:
     receiver_calls: frozenset[tuple[ast.AST, int, str]]
     class_member_writes: frozenset[tuple[ast.ClassDef, str | None]] | None
     imported_member_writes: frozenset[_ImportKey] | None
+    initializer_member_writes: frozenset[tuple[ast.FunctionDef, str | None]] | None
+    delegating_initializers: frozenset[ast.FunctionDef]
 
     def class_member_may_be_changed(self, owner: ast.ClassDef, member: str) -> bool:
         writes = self.class_member_writes
@@ -1308,7 +1352,13 @@ def python_local_call_bindings(snapshot: PythonAstSnapshot) -> PythonLocalCallBi
         bindings = PythonBindings(snapshot.tree, snapshot.source.encode("utf-8"))
     except BindingObservationBound:
         return PythonLocalCallBindings(
-            MappingProxyType({}), MappingProxyType({}), frozenset(), None, None
+            MappingProxyType({}),
+            MappingProxyType({}),
+            frozenset(),
+            None,
+            None,
+            None,
+            frozenset(),
         )
     descriptors: dict[ast.expr, str] = {}
     nested_calls: dict[tuple[ast.AST, int, str], int] = {}
@@ -1331,13 +1381,21 @@ def python_local_call_bindings(snapshot: PythonAstSnapshot) -> PythonLocalCallBi
             declaration = bindings.direct_nested_declaration(node.func)
             if declaration is not None:
                 scope = bindings.syntax.owners[node]
-                nested_calls[scope.node, node.lineno, node.func.id] = declaration.lineno
+                nested_calls[
+                    scope.node, python_reference_line(node.func), node.func.id
+                ] = declaration.lineno
     return PythonLocalCallBindings(
         MappingProxyType(descriptors),
         MappingProxyType(nested_calls),
         frozenset(receiver_calls),
         bindings.class_member_writes,
         frozenset(bindings._property_mutations),
+        bindings.initializer_member_writes,
+        frozenset(
+            owner
+            for node in bindings.syntax.nodes
+            if (owner := bindings._delegating_initializer(node)) is not None
+        ),
     )
 
 
@@ -1382,6 +1440,74 @@ def python_direct_method(
     ):
         return None, True
     return declaration, False
+
+
+def python_initializer_effect(
+    snapshot: PythonAstSnapshot | None, class_name: str, member: str
+) -> tuple[bool, bool]:
+    """Return an observed instance write and whether inherited initializers can contribute."""
+    if snapshot is None:
+        return True, False
+    owner = python_class_node(snapshot.tree, class_name, require_unwrapped=True)
+    if owner is None:
+        return True, False
+    kind, initializer = python_class_member_binding(owner, "__init__")
+    if initializer is None:
+        return False, kind == "unknown" and bool(owner.bases)
+    bindings = python_local_call_bindings(snapshot)
+    writes = bindings.initializer_member_writes
+    if writes is None:
+        return True, False
+    if not isinstance(initializer, ast.FunctionDef):
+        return False, False
+    return (
+        (initializer, member) in writes or (initializer, None) in writes,
+        initializer in bindings.delegating_initializers,
+    )
+
+
+@dataclass(frozen=True)
+class PythonMethodCall:
+    receiver: str
+    method: str
+    class_qualname: str
+    source_method: str
+
+    @classmethod
+    def from_source(cls, source_qualname: str, target: str) -> PythonMethodCall | None:
+        parts = target.split(".")
+        if (
+            len(parts) != 2
+            or parts[0] not in {"self", "cls"}
+            or "." not in source_qualname
+        ):
+            return None
+        class_qualname, source_method = source_qualname.rsplit(".", 1)
+        return cls(
+            receiver=parts[0],
+            method=parts[1],
+            class_qualname=class_qualname,
+            source_method=source_method,
+        )
+
+    def receiver_method(
+        self, class_node: ast.ClassDef
+    ) -> ast.FunctionDef | ast.AsyncFunctionDef | None:
+        name, line = symbol_occurrence_parts(self.source_method)
+        methods = [
+            node
+            for node in class_node.body
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and node.name == name
+            and (line is None or str(node.lineno) == line)
+        ]
+        if len(methods) != 1:
+            return None
+        method = methods[0]
+        if python_class_member_binding(class_node, name)[1] is not method:
+            return None
+        positional = method.args.posonlyargs or method.args.args
+        return method if positional and positional[0].arg == self.receiver else None
 
 
 def python_nested_call_site(

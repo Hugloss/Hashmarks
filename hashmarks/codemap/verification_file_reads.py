@@ -20,9 +20,13 @@ from hashmarks.paths import normalize_relative_path
 from hashmarks.python_ast_cache import read_python_ast
 
 from .model import EvidenceVisibility
-from .python_binding_scope import unfiltered_literal_comprehension
+from .python_binding_scope import (
+    unfiltered_literal_comprehension,
+    visit_discarded_value,
+)
 from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
 from .verification_reference_syntax import (
+    assertion_message_unreachable,
     empty_literal_loop,
     empty_loop_else_exits,
     literal_truth,
@@ -392,12 +396,14 @@ class _LiteralReadVisitor(ast.NodeVisitor):
         self.terminated = True
 
     def visit_Assert(self, node: ast.Assert) -> None:
+        if assertion_message_unreachable(node.test):
+            visit_discarded_value(node.test, self.visit)
+            return
         self.visit(node.test)
         if isinstance(node.test, ast.Constant):
-            if not bool(node.test.value):
-                if node.msg is not None:
-                    self.visit(node.msg)
-                self.terminated = True
+            if node.msg is not None:
+                self.visit(node.msg)
+            self.terminated = True
         elif node.msg is not None:
             with self._copy_guard():
                 self.visit(node.msg)

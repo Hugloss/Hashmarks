@@ -23,6 +23,7 @@ from ..filesystem_lifecycle_contract import (
     lifecycle_identity,
     validate_lifecycle_observation,
 )
+from ..python_exports import python_reference_line
 
 if TYPE_CHECKING:
     from ..evidence_graph import RepositoryRelationships
@@ -88,7 +89,7 @@ class FilesystemLifecycleAnalyzer:
         self.failures: list[dict[str, object]] = []
         self.api_cache: dict[tuple[str, str], str | None] = {}
         self.edges: dict[tuple[str, str], list[dict[str, object]]] = {}
-        self.resolutions: dict[tuple[str, str, int, int], FunctionSource | None] = {}
+        self.resolutions: dict[tuple[str, str, ast.Call], FunctionSource | None] = {}
         self.allowed_symbols: set[tuple[str, str]] | None = None
 
     def _failure(self, path: str, reason: str) -> None:
@@ -225,7 +226,8 @@ class FilesystemLifecycleAnalyzer:
         return self._api(owner, suffix, seen)
 
     def resolve(self, source: FunctionSource, call: ast.Call) -> FunctionSource | None:
-        key = (source.path, source.qualname, call.lineno, call.col_offset)
+        # An inner call and the call on its result can start at the same byte.
+        key = (source.path, source.qualname, call)
         if key not in self.resolutions:
             self.resolutions[key] = self._resolve(source, call)
         return self.resolutions[key]
@@ -241,7 +243,8 @@ class FilesystemLifecycleAnalyzer:
         matching = [
             row
             for row in self.edges[key]
-            if row.get("line") == call.lineno and row.get("target") == dotted(call.func)
+            if row.get("line") == python_reference_line(call.func)
+            and row.get("target") == dotted(call.func)
         ]
         if len(matching) != 1:
             return None

@@ -27,7 +27,11 @@ from .python_binding_scope import (
     definition_time_expressions,
 )
 from .python_bindings import PythonBindings
-from .python_exports import assignment_name_targets, python_import_target
+from .python_exports import (
+    assignment_name_targets,
+    python_import_target,
+    python_reference_line,
+)
 from .source_binding_contract import BindingObservationBound
 
 
@@ -382,9 +386,7 @@ class _Collector(PythonReferenceVisitor):
     def visit_Import(self, node: ast.Import) -> None:
         for alias in node.names:
             self.edges.append(
-                EdgeRecord(
-                    self.source_occurrence, "import", alias.name, int(node.lineno)
-                )
+                EdgeRecord(self.source_occurrence, "import", alias.name, alias.lineno)
             )
         self.generic_visit(node)
 
@@ -392,7 +394,7 @@ class _Collector(PythonReferenceVisitor):
         for alias in node.names:
             target = python_import_target(node, alias.name)
             self.edges.append(
-                EdgeRecord(self.source_occurrence, "import", target, int(node.lineno))
+                EdgeRecord(self.source_occurrence, "import", target, alias.lineno)
             )
         self.generic_visit(node)
 
@@ -490,7 +492,7 @@ class _Collector(PythonReferenceVisitor):
                     self.source_occurrence,
                     "call",
                     target,
-                    int(node.lineno),
+                    python_reference_line(node.func),
                     "static-name",
                 )
             )

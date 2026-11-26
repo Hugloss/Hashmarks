@@ -91,6 +91,10 @@ or `raise` in a guaranteed `else` also rules out later statements in the surroun
 suite. An exit inside a conditional arm does not establish that its enclosing
 suite exits. The call index retains the
 authored static call sites separately from this verification qualification.
+An assertion's failure message contributes no verifier reference or file-read
+evidence when its condition is a truthy scalar literal (including direct
+`not` negation), a lambda, or a generator expression. Eager inputs of the
+condition, such as a lambda default, retain their own evidence.
 For Python `and` and `or`, both import-use and literal-read evidence stop at a
 decisive literal operand, including direct `not` negation. An unknown operand
 can still allow later evaluation. The verifier retains its source uses and the

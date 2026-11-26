@@ -9,7 +9,7 @@ from __future__ import annotations
 import ast
 import sys
 from collections import Counter
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 
 from .python_exports import _binding_children, _binding_writes
@@ -113,28 +113,28 @@ def unfiltered_literal_comprehension(
     )
 
 
+def visit_discarded_value(value: ast.expr, visit: Callable[[ast.AST], object]) -> None:
+    """Visit construction-time inputs when a lambda or generator is discarded."""
+    if isinstance(value, ast.Lambda):
+        for _parameter, default in function_defaults(value):
+            visit_discarded_value(default, visit)
+    elif isinstance(value, ast.GeneratorExp):
+        visit_discarded_value(value.generators[0].iter, visit)
+    else:
+        visit(value)
+
+
 class PythonReferenceVisitor(ast.NodeVisitor):
     """Observe expressions that can contribute call and verifier references."""
 
-    def _discarded_value(self, value: ast.expr) -> None:
-        if isinstance(value, ast.Lambda):
-            # Defaults are evaluated while constructing this function.
-            for _parameter, default in function_defaults(value):
-                self._discarded_value(default)
-        elif isinstance(value, ast.GeneratorExp):
-            # Constructing the generator evaluates only its outermost iterable.
-            self._discarded_value(value.generators[0].iter)
-        else:
-            self.visit(value)
-
     def visit_Expr(self, node: ast.Expr) -> None:
-        self._discarded_value(node.value)
+        visit_discarded_value(node.value, self.visit)
 
     def visit_Assert(self, node: ast.Assert) -> None:
         if isinstance(node.test, (ast.Lambda, ast.GeneratorExp)):
             # Both object types are truthy. Testing truth neither consumes them
             # nor evaluates the assertion's failure message.
-            self._discarded_value(node.test)
+            visit_discarded_value(node.test, self.visit)
         else:
             self.generic_visit(node)
 

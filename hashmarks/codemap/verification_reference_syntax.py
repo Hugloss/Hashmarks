@@ -13,8 +13,10 @@ from .python_binding_scope import (
     annotations_are_deferred,
     definition_time_expressions,
     unfiltered_literal_comprehension,
+    visit_discarded_value,
 )
 from .python_bindings import PythonBindings
+from .python_exports import python_reference_line
 
 MAX_KEYWORD_IDENTIFIER_CHARS = 128
 
@@ -33,6 +35,13 @@ def literal_truth(test: ast.expr) -> bool | None:
     if isinstance(operand, ast.Constant):
         return bool(operand.value) != negated
     return None
+
+
+def assertion_message_unreachable(test: ast.expr) -> bool:
+    """Neither ordinary nor optimized execution uses the message of a true assertion."""
+    return (
+        isinstance(test, (ast.Lambda, ast.GeneratorExp)) or literal_truth(test) is True
+    )
 
 
 def empty_literal_loop(node: ast.For | ast.While) -> bool:
@@ -199,6 +208,12 @@ class _VerificationReferenceIndexVisitor(PythonReferenceVisitor):
             truth = negated
         return (None, reason) if truth else (reason, None)
 
+    def visit_Assert(self, node: ast.Assert) -> None:
+        if assertion_message_unreachable(node.test):
+            visit_discarded_value(node.test, self.visit)
+        else:
+            self.generic_visit(node)
+
     def visit_BoolOp(self, node: ast.BoolOp) -> None:
         for operand in possible_boolean_operands(node):
             self.visit(operand)
@@ -354,7 +369,7 @@ class _VerificationReferenceIndexVisitor(PythonReferenceVisitor):
                 names.setdefault(imported, set()).add(test)
             elif pair := self._attribute(node, alias, imported):
                 target, suffix = pair
-                attributes.setdefault((target, node.lineno), set()).add(
+                attributes.setdefault((target, python_reference_line(node)), set()).add(
                     AttributeUse(imported, suffix, test)
                 )
         return VerificationReferenceIndex(
