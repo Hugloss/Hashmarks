@@ -299,6 +299,31 @@ def test_annotation_only_module_target_has_no_qualified_binding(tmp_path: Path) 
     ("name", "declaration", "exported"),
     [
         ("_build", "__all__ = ['_build']\n", True),
+        (
+            "build",
+            "__all__ = ['build']\npublic = []\nclass Setup:\n    global public\n    public = __all__\npublic.clear()\n",
+            False,
+        ),
+        (
+            "build",
+            "__all__ = ['build']\npublic = []\nclass Setup:\n    shared = __all__\n    global public\n    if True: public = shared\npublic.clear()\n",
+            False,
+        ),
+        (
+            "_build",
+            "__all__ = ['_build']\npublic = []\nclass Setup:\n    public = __all__\npublic.clear()\n",
+            True,
+        ),
+        (
+            "_build",
+            "__all__ = ['_build']\npublic = []\nclass Setup:\n    global public\n    __all__ = []\n    public = __all__\npublic.clear()\n",
+            True,
+        ),
+        (
+            "_build",
+            "__all__ = ['_build']\npublic = []\nclass Setup:\n    global public\n    public = __all__\n",
+            True,
+        ),
         ("_build", "exported = __all__ = ['_build']\n", True),
         ("build", "__all__ = ['build']\npublic = __all__\npublic.clear()\n", False),
         (

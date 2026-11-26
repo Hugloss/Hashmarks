@@ -515,8 +515,9 @@ A chained assignment can establish that membership when its other targets
 only bind names. A computed target or another binding of `__all__` inside an
 unpacking target leaves the resulting membership uncertain.
 Plain name aliases to the current mutable export list can also change its
-membership. A possible alias from a conditional assignment keeps a later
-mutation uncertain. A definite fresh literal assignment separates that name
+membership. An explicit `global` declaration can publish such an alias from a
+class suite into the module. A possible alias from a conditional assignment
+keeps a later mutation uncertain. A definite fresh literal assignment separates that name
 from the old list.
 Supported unconditional `append` and `extend` operations preserve explicit
 membership. Operations such as `clear()`, slice writes and conditional

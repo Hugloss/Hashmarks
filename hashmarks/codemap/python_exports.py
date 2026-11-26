@@ -805,6 +805,7 @@ def _class_mutates_module_all(
     # A fresh class-local container is independent of module membership.
     module_names = module_receivers or {"__all__"}
     visible = set(module_names)
+    globals_in_class = _class_global_names(node) if module_receivers is not None else ()
     for statement in node.body:
         rebinds = module_names.intersection(
             _binding_writes(statement, annotation_targets_bind=False)
@@ -822,6 +823,11 @@ def _class_mutates_module_all(
         visible.update(rebinds)
         if module_receivers is not None:
             _add_possible_aliases(statement, visible)
+            # Only explicit global bindings can publish a receiver outside
+            # this class namespace. A possible store does not prove a detach.
+            module_receivers.update(
+                name for name in globals_in_class if name in visible
+            )
         if _mutates_module_all(expression, module_receivers, visible):
             return True
         _discard_fresh_bindings(statement, visible)
