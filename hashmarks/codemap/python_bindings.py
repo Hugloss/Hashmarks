@@ -481,6 +481,45 @@ class PythonBindings:
         mutation = self._imported_property_mutation(("builtins", None, 0, (name,)))
         return name if name in names and mutation is None else None
 
+    def qualified_receiver_call(
+        self, call: ast.Call
+    ) -> tuple[ast.AST, int, str] | None:
+        """Identify a direct parameter member use that retains its symbolic binding."""
+        callee = call.func
+        if not isinstance(callee, ast.Attribute) or not isinstance(
+            callee.value, ast.Name
+        ):
+            return None
+        if callee.value.id not in {"self", "cls"}:
+            return None
+        value = self.resolve(callee, self.syntax.owners[callee])
+        reference = value.symbolic
+        if reference is None or reference.reasons or value.conditions:
+            return None
+        if reference.root.kind != "parameter" or reference.root.name != callee.value.id:
+            return None
+        return reference.root.scope.node, call.lineno, callee.attr
+
+    def direct_nested_declaration(
+        self, callee: ast.Name
+    ) -> ast.FunctionDef | ast.AsyncFunctionDef | None:
+        scope = self.syntax.owners[callee]
+        candidate = scope.bindings.get(callee.id)
+        if (
+            scope.kind != "function"
+            or candidate is None
+            or candidate.kind != "declaration"
+        ):
+            return None
+        value = self.resolve(callee, scope)
+        if (
+            value.qualification == "qualified"
+            and isinstance(value.declaration, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and value.declaration is candidate.node
+        ):
+            return value.declaration
+        return None
+
     def imported_alias(self, node: ast.Name | ast.Attribute) -> ast.alias | None:
         """The exact import supplying this source use, when lexically qualified."""
         scope = self.syntax.owners.get(node)
@@ -1228,6 +1267,7 @@ def _supplied_arguments(
 class PythonLocalCallBindings:
     method_descriptors: Mapping[ast.expr, str]
     nested_calls: Mapping[tuple[ast.AST, int, str], int]
+    receiver_calls: frozenset[tuple[ast.AST, int, str]]
 
 
 @lru_cache(maxsize=32)
@@ -1236,9 +1276,12 @@ def python_local_call_bindings(snapshot: PythonAstSnapshot) -> PythonLocalCallBi
     try:
         bindings = PythonBindings(snapshot.tree, snapshot.source.encode("utf-8"))
     except BindingObservationBound:
-        return PythonLocalCallBindings(MappingProxyType({}), MappingProxyType({}))
+        return PythonLocalCallBindings(
+            MappingProxyType({}), MappingProxyType({}), frozenset()
+        )
     descriptors: dict[ast.expr, str] = {}
     nested_calls: dict[tuple[ast.AST, int, str], int] = {}
+    receiver_calls: set[tuple[ast.AST, int, str]] = set()
     for node in bindings.syntax.nodes:
         if (
             isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
@@ -1248,28 +1291,20 @@ def python_local_call_bindings(snapshot: PythonAstSnapshot) -> PythonLocalCallBi
             descriptor = bindings.builtin_method_descriptor(decorator)
             if descriptor is not None:
                 descriptors[decorator] = descriptor
+        elif (
+            isinstance(node, ast.Call)
+            and (receiver := bindings.qualified_receiver_call(node)) is not None
+        ):
+            receiver_calls.add(receiver)
         elif isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
-            scope = bindings.syntax.owners[node]
-            candidate = scope.bindings.get(node.func.id)
-            if (
-                scope.kind != "function"
-                or candidate is None
-                or candidate.kind != "declaration"
-            ):
-                continue
-            value = bindings.resolve(node.func, scope)
-            if (
-                value.qualification == "qualified"
-                and isinstance(
-                    value.declaration, (ast.FunctionDef, ast.AsyncFunctionDef)
-                )
-                and value.declaration is candidate.node
-            ):
-                nested_calls[scope.node, node.lineno, node.func.id] = (
-                    value.declaration.lineno
-                )
+            declaration = bindings.direct_nested_declaration(node.func)
+            if declaration is not None:
+                scope = bindings.syntax.owners[node]
+                nested_calls[scope.node, node.lineno, node.func.id] = declaration.lineno
     return PythonLocalCallBindings(
-        MappingProxyType(descriptors), MappingProxyType(nested_calls)
+        MappingProxyType(descriptors),
+        MappingProxyType(nested_calls),
+        frozenset(receiver_calls),
     )
 
 

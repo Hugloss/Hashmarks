@@ -13,6 +13,8 @@ from hashmarks.codemap import CodeMap
 from hashmarks.codemap.task_evidence_initial import (
     decode_initial_collection,
     decode_initial_packet,
+    encode_initial_packet,
+    initial_packet_identity,
 )
 from hashmarks.evidence_presentation import presentation_response
 
@@ -117,3 +119,71 @@ def test_initial_verification_keeps_exact_test_identity_and_qualification(
     if "test_declarations" in expected:
         assert displayed["test_declarations"] == expected["test_declarations"]
     assert response["result"] == wire == original
+
+
+def test_shared_text_qualifiers_round_trip_partial_and_distinct_candidate_evidence(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "codec.py").write_text("def encode_record(value): return value\n")
+    for index in range(5):
+        (tmp_path / f"test_codec_{index}.py").write_text(
+            f"from codec import encode_record\ndef test_encode_{index}(): assert encode_record(1) == 1\n"
+        )
+    with CodeMap(tmp_path) as repository:
+        packet = decode_initial_packet(
+            repository.tasks.evidence(
+                "Fix encode_record in codec.py", result_mode="initial"
+            )
+        )
+    relevance = packet["verification"]["relevance"]
+    rows = decode_initial_collection(
+        relevance["candidates"], relevance.pop("candidates_encoding")
+    )
+    assert len(rows) > 2
+    rows[0].pop("indirect_reference")
+    rows[1]["test_symbol"] = None
+    rows[2]["reference_strength"] = "unknown"
+    relevance["candidates"] = rows
+    packet["evidence_packet_identity"] = initial_packet_identity(packet)
+    wire = encode_initial_packet(packet)
+    displays = {
+        mode: cast(
+            "dict[str, Any]",
+            presentation_response(
+                "task_evidence", wire, result_mode="initial", format=mode
+            ),
+        )
+        for mode in ("text", "structured")
+    }
+    text = displays["text"]["presentation"]["text"]
+    prefix = "Verification qualifiers for every displayed candidate: "
+    shared = json.loads(
+        next(
+            line.removeprefix(prefix)
+            for line in text.splitlines()
+            if line.startswith(prefix)
+        )
+    )
+    assert shared["verification_selection_authority"] is False
+    assert shared["negative_evidence_admissible"] is False
+    assert "indirect_reference" not in shared and "reference_strength" not in shared
+    group = next(
+        group
+        for group in displays["structured"]["presentation"]["groups"]
+        if group["family"] == "verification"
+    )
+    candidate_lines = [
+        line
+        for line in text.splitlines()
+        if line.startswith("Verification candidate: ")
+    ]
+    for line, finding in zip(candidate_lines, group["findings"], strict=True):
+        record, end = json.JSONDecoder().raw_decode(
+            line.removeprefix("Verification candidate: ")
+        )
+        assert {**shared, **record} == finding["details"]
+        assert (
+            line.removeprefix("Verification candidate: ")[end:]
+            == f" (@ {finding['source_refs'][0]})."
+        )
+    assert displays["text"]["result"] == wire

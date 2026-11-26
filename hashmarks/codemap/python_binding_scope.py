@@ -98,6 +98,21 @@ def annotated_assignment_expressions(
         yield node.annotation
 
 
+def unfiltered_literal_comprehension(
+    node: ast.AST, *, simple_targets: bool = False
+) -> bool:
+    """An eager comprehension whose iterables contain explicit literal members."""
+    return isinstance(node, (ast.ListComp, ast.SetComp, ast.DictComp)) and all(
+        not generator.is_async
+        and not generator.ifs
+        and (not simple_targets or isinstance(generator.target, ast.Name))
+        and isinstance(generator.iter, (ast.List, ast.Tuple, ast.Set))
+        and bool(generator.iter.elts)
+        and all(isinstance(item, ast.Constant) for item in generator.iter.elts)
+        for generator in node.generators
+    )
+
+
 class PythonReferenceVisitor(ast.NodeVisitor):
     """Observe expressions that can contribute call and verifier references."""
 

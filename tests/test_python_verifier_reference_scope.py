@@ -529,3 +529,82 @@ def test_discarded_and_consumed_python_expressions(
         )
         is observed
     )
+
+
+@pytest.mark.parametrize(
+    ("expression", "expected"),
+    [
+        ("[calculate_tax() for _ in [1, 2]]", "test_charges"),
+        ("{calculate_tax() for _ in (1, 2)}", "test_charges"),
+        ("{index: calculate_tax() for index in {1, 2}}", "test_charges"),
+        ("[[calculate_tax() for _ in (1,)] for _ in (1,)]", "test_charges"),
+        ("[calculate_tax() for _ in ()]", None),
+        ("[calculate_tax() for left, right in (1,)]", None),
+        ("[calculate_tax() for _ in (1,) if visible]", None),
+        ("(calculate_tax() for _ in (1,))", None),
+        ("lambda: [calculate_tax() for _ in (1,)]", None),
+        ("([calculate_tax() for _ in (1,)] for _ in (1,))", None),
+    ],
+)
+def test_only_qualified_eager_comprehension_uses_narrow_the_test_node(
+    tmp_path: Path, expression: str, expected: str | None
+) -> None:
+    source = (
+        "from owner import calculate_tax\n"
+        "def test_calculate_tax(): assert True\n"
+        "def test_charges():\n    observed = " + expression + "\n"
+    )
+    with _repository(tmp_path, source) as repository:
+        repository.index.sync()
+        packet = repository.tasks.evidence("Change calculate_tax in owner.py")
+    verify = packet["verification"]
+    assert assert_object(verify["plan"])["test_symbol"] == expected
+    assert assert_object(verify["relevance"]["selected"])["test_symbol"] == expected
+
+
+@pytest.mark.parametrize("generator", [False, True])
+def test_outermost_iterable_retains_its_import_despite_a_shadowed_body(
+    tmp_path: Path, generator: bool
+) -> None:
+    delimiters = ("(", ")") if generator else ("[", "]")
+    source = (
+        "from owner import calculate_tax\n"
+        f"def test_charges():\n    values = {delimiters[0]}\n"
+        "        calculate_tax()\n"
+        "        for calculate_tax in calculate_tax()\n"
+        f"    {delimiters[1]}\n"
+    )
+    with _repository(tmp_path, source) as repository:
+        (tmp_path / "owner.py").write_text("def calculate_tax(): return (lambda: 1,)\n")
+        repository.index.sync()
+        changed = repository.verification.changed_set(["owner.py"])
+        forward = repository.structure.locality(
+            "tests/test_amounts.py::test_charges", max_depth=1
+        )
+    candidate = assert_records(
+        assert_object(assert_records(changed["changes"])[0]["relevance"])["candidates"]
+    )[0]
+    assert candidate["direct_reference"] is True
+    assert candidate["test_symbol"] == "test_charges"
+    assert {
+        (r["line"], r["resolved_symbol_id"]) for r in assert_records(forward["edges"])
+    } == {(4, None), (5, "owner.py::calculate_tax")}
+
+
+def test_only_a_shadowed_comprehension_name_cannot_supply_a_verifier(
+    tmp_path: Path,
+) -> None:
+    with _repository(
+        tmp_path,
+        "from owner import calculate_tax\n"
+        "def test_charges(): assert [calculate_tax for calculate_tax in (1,)] == [1]\n",
+    ) as repository:
+        repository.index.sync()
+        changed = repository.verification.changed_set(["owner.py"])
+    candidate = assert_records(
+        assert_object(assert_records(changed["changes"])[0]["relevance"])["candidates"]
+    )[0]
+    assert candidate["reference_strength"] == "reachable-import"
+    assert candidate["direct_reference"] is False
+    assert changed["targets"] == []
+    assert changed["negative_evidence_admissible"] is False

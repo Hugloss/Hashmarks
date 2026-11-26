@@ -20,6 +20,7 @@ from hashmarks.paths import normalize_relative_path
 from hashmarks.python_ast_cache import read_python_ast
 
 from .model import EvidenceVisibility
+from .python_binding_scope import unfiltered_literal_comprehension
 from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
 
 if TYPE_CHECKING:
@@ -310,14 +311,7 @@ class _LiteralReadVisitor(ast.NodeVisitor):
     def _visit_comprehension(self, node: ast.expr) -> None:
         outer_targets = self.iterated_targets
         self.iterated_targets = set()
-        if isinstance(node, (ast.ListComp, ast.SetComp, ast.DictComp)) and all(
-            not generator.is_async
-            and not generator.ifs
-            and isinstance(generator.iter, (ast.List, ast.Tuple, ast.Set))
-            and bool(generator.iter.elts)
-            and all(isinstance(item, ast.Constant) for item in generator.iter.elts)
-            for generator in node.generators
-        ):
+        if unfiltered_literal_comprehension(node):
             self.generic_visit(node)
         else:
             self._visit_copy_guarded(node)

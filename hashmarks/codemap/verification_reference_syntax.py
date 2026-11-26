@@ -11,6 +11,7 @@ from .python_binding_scope import (
     annotated_assignment_expressions,
     annotations_are_deferred,
     definition_time_expressions,
+    unfiltered_literal_comprehension,
 )
 from .python_bindings import PythonBindings
 
@@ -84,6 +85,12 @@ class _VerificationReferenceIndexVisitor(PythonReferenceVisitor):
             if name.startswith("test_")
             and binding.kind == "declaration"
             and isinstance(binding.node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        }
+
+        self.eager_comprehensions = {
+            scope
+            for scope in bindings.syntax.scopes
+            if unfiltered_literal_comprehension(scope.node, simple_targets=True)
         }
 
     def _guarded_branches(self, test: ast.expr) -> tuple[str | None, str | None]:
@@ -182,8 +189,15 @@ class _VerificationReferenceIndexVisitor(PythonReferenceVisitor):
             self.loads.append(node)
         self.generic_visit(node)
 
-    def _test(self, node: ast.AST) -> str | None:
+    def _test(self, node: ast.AST, *, qualified_use: bool = False) -> str | None:
         scope = self.bindings.syntax.owners.get(node)
+        # Only an already qualified import use can carry its test identity
+        # through these eager expression scopes. A shadowed loop variable
+        # remains local to its comprehension.
+        while (
+            qualified_use and scope is not None and scope in self.eager_comprehensions
+        ):
+            scope = scope.defining
         if (
             scope is not None
             and scope.defining is self.bindings.syntax.root
@@ -224,7 +238,7 @@ class _VerificationReferenceIndexVisitor(PythonReferenceVisitor):
                 self._unresolved_use(node)
                 continue
             imported = self.imports[alias]
-            test = self._test(node)
+            test = self._test(node, qualified_use=True)
             if isinstance(node, ast.Name):
                 names.setdefault(imported, set()).add(test)
             elif pair := self._attribute(node, alias, imported):

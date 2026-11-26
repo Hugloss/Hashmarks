@@ -107,6 +107,12 @@ ordinary method or a qualified `property` getter can qualify `self`. A
 decorators leave receiver identity uncertain, including a custom attribute
 whose final name happens to be `classmethod`.
 
+A `self.member()` or `cls.member()` call also requires a qualified member
+reference on the method's receiver parameter at that call site. An observed
+assignment through that receiver or its alias can invalidate the member
+binding. The call remains visible in `unresolved_calls`; an exact caller
+is reported only when the class declaration and the receiver evidence agree.
+
 ## Forwarding-only syntax
 
 For supported Python symbols, Hashmarks reports whether the function body is syntactically just one call/return-call after an optional docstring. This is a structural observation only.

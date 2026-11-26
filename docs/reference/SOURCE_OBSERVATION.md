@@ -39,8 +39,13 @@ completeness claim. The observer:
 - Reuses repository file admission, evidence-visibility policy, and canonical
   stable member reads; a read is rejected when indexed revision and bytes differ.
 - Returns literal case-sensitive, non-overlapping occurrences with 1-based physical
-  line and Unicode-codepoint column coordinates. Enclosing symbols are reported
-  only when a containing indexed symbol range is present.
+  line and Unicode-codepoint column coordinates. An enclosing symbol requires
+  a unique innermost indexed span containing the entire occurrence, bound to
+  the captured member revision. Python statement columns are measured in UTF-8
+  bytes, and Python syntax lines recognize bare CR as well as LF and CRLF.
+  Reported literal coordinates always refer to the original LF-delimited source.
+  Equal spans (for example, two names in one unpacking assignment) leave the
+  enclosing symbol unknown. The location and match count remain available.
 - For Python sources, attaches tokenizer-qualified `identifier`, `string-literal`,
   or `comment` occurrence kinds when the entire occurrence fits one supported
   single-line token. Other languages and ambiguous tokens report `unknown`; this

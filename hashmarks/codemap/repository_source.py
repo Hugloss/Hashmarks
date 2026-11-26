@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+import io
+import sys
+from collections.abc import Iterator, Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -19,6 +21,7 @@ from .decision_session import (
     decision_scoped,
 )
 from .model import EvidenceVisibility
+from .providers import source_grammar
 from .python_ast import estimate_tokens, python_source_byte_lines, python_symbol_bytes
 from .query_primitives import _WORD_RE
 from .repository_observation import evidence_identity, packet_digest
@@ -44,6 +47,51 @@ if TYPE_CHECKING:
 
 class SourceSymbolNotFound(KeyError):
     """An explicit source locator has no occurrence in the observed index."""
+
+
+@dataclass(frozen=True, slots=True)
+class _SourceSymbolRange:
+    symbol: str
+    start: tuple[int, int]
+    end: tuple[int, int]
+
+
+def _enclosing_symbol(
+    ranges: Sequence[_SourceSymbolRange], line: int, left: int, right: int
+) -> str | None:
+    """Only a unique innermost range containing the complete literal qualifies."""
+    start, end = (line, left), (line, right)
+    containing = [r for r in ranges if r.start <= start and end <= r.end]
+    if not containing:
+        return None
+    inner_start = max(r.start for r in containing)
+    inner_end = min(r.end for r in containing)
+    names = {
+        r.symbol for r in containing if r.start == inner_start and r.end == inner_end
+    }
+    return next(iter(names)) if len(names) == 1 else None
+
+
+def _literal_source_lines(
+    text: str, python: bool
+) -> Iterator[tuple[int, int, int, str]]:
+    """Yield syntax lines with their physical LF line and codepoint offset."""
+    physical_line, offset = 1, 0
+    for syntax_line, raw in enumerate(
+        io.StringIO(text, newline="" if python else "\n"), 1
+    ):
+        line = raw.removesuffix("\n")
+        yield (
+            syntax_line,
+            physical_line,
+            offset,
+            line.removesuffix("\r") if python else line,
+        )
+        if raw.endswith("\n"):
+            physical_line += 1
+            offset = 0
+        else:
+            offset += len(raw)
 
 
 def _symbol_columns(row: Mapping[str, object]) -> tuple[int, int] | None:
@@ -382,9 +430,8 @@ class RepositorySource(
         text: str, path: str
     ) -> dict[int, list[tuple[int, int, str]]]:
         """Classify exact lexical tokens without guessing semantic ownership."""
-        if not path.endswith((".py", ".pyi")):
+        if source_grammar(path) != "python":
             return {}
-        import io
         import tokenize
 
         kinds: dict[int, list[tuple[int, int, str]]] = {}
@@ -394,7 +441,9 @@ class RepositorySource(
             tokenize.COMMENT: "comment",
         }
         try:
-            for token in tokenize.generate_tokens(io.StringIO(text).readline):
+            for token in tokenize.generate_tokens(
+                io.StringIO(text, newline=None).readline
+            ):
                 kind = names.get(token.type)
                 if kind is None or token.start[0] != token.end[0]:
                     continue
@@ -405,21 +454,30 @@ class RepositorySource(
             return {}
         return kinds
 
-    @staticmethod
-    def _source_symbol_ranges(
-        symbols: Sequence[Mapping[str, object]],
-    ) -> list[tuple[Mapping[str, object], int, int]]:
-        """Bind each indexed declaration to its numeric source span once."""
-        ranges: list[tuple[Mapping[str, object], int, int]] = []
-        for row in symbols:
-            start, end = row.get("start_line"), row.get("end_line")
-            if start is None or end is None:
-                continue
-            if not isinstance(
-                start, (int, str, float, bytes, bytearray)
-            ) or not isinstance(end, (int, str, float, bytes, bytearray)):
-                raise TypeError("indexed symbol ranges must be numeric")
-            ranges.append((row, int(start), int(end)))
+    def _literal_symbol_ranges(
+        self, member: Mapping[str, object], text: str
+    ) -> list[_SourceSymbolRange]:
+        revision = member.get("member_revision")
+        if member.get("index_state") != "indexed" or not isinstance(revision, str):
+            return []
+        path = str(member["path"])
+        # With a bare CR, Python's line coordinates can diverge from those
+        # of a fallback provider. Only native Python ranges qualify there.
+        require_parsed = source_grammar(path) == "python" and text.count(
+            "\r"
+        ) != text.count("\r\n")
+        ranges = []
+        for row in self.store.source_symbol_ranges(
+            path, revision, require_parsed=require_parsed
+        ):
+            left, right = _symbol_columns(row) or (0, sys.maxsize)
+            ranges.append(
+                _SourceSymbolRange(
+                    str(row.get("qualname") or row.get("name") or ""),
+                    (row["start_line"], left),
+                    (row["end_line"], right),
+                )
+            )
         return ranges
 
     @staticmethod
@@ -429,64 +487,53 @@ class RepositorySource(
         *,
         member: Mapping[str, object],
         limit: int,
-        symbols: Sequence[Mapping[str, object]],
+        ranges: Sequence[_SourceSymbolRange],
         token_kinds: Mapping[int, Sequence[tuple[int, int, str]]],
     ) -> tuple[list[dict[str, object]], int]:
         """Bound returned locations, not the count over the admitted member."""
         hits: list[dict[str, object]] = []
-        ranges = RepositorySource._source_symbol_ranges(symbols)
         count = 0
-        for line_number, line in enumerate(text.split("\n"), 1):
-            column = 0
-            while (column := line.find(literal, column)) >= 0:
+        python = source_grammar(str(member["path"])) == "python"
+        for syntax_line, line_number, offset, line in _literal_source_lines(
+            text, python
+        ):
+            cursor = byte_cursor = 0
+            while (column := line.find(literal, cursor)) >= 0:
+                if len(hits) >= limit:
+                    count += line.count(literal, column)
+                    break
                 count += 1
-                if len(hits) < limit:
-                    owners = [
-                        span for span in ranges if span[1] <= line_number <= span[2]
-                    ]
-                    owner_span = min(
-                        owners,
-                        key=lambda span: (
-                            span[2] - span[1],
-                            str(span[0].get("qualname") or ""),
-                        ),
-                        default=None,
-                    )
-                    owner = None if owner_span is None else owner_span[0]
-                    occurrence_kind = next(
-                        (
-                            kind
-                            for start, end, kind in token_kinds.get(line_number, ())
-                            if start <= column and column + len(literal) <= end
-                        ),
-                        "unknown",
-                    )
-                    fact = {
-                        "occurrence_kind": occurrence_kind,
-                        "kind_basis": (
-                            "python-tokenizer"
-                            if occurrence_kind != "unknown"
-                            else "unknown"
-                        ),
-                        "path": member["path"],
-                        "member_revision": member["member_revision"],
-                        "line": line_number,
-                        "column": column + 1,
-                        "column_unit": "unicode-codepoint",
-                        "literal": literal,
-                        "enclosing_symbol": (
-                            str(owner.get("qualname") or owner.get("name") or "")
-                            if owner is not None
-                            else None
-                        ),
-                        "symbol_basis": (
-                            "indexed-containing-range"
-                            if owner is not None
-                            else "unknown"
-                        ),
-                    }
-                    hits.append(fact)
-                column += len(literal)
+                left = byte_cursor + len(line[cursor:column].encode("utf-8"))
+                byte_cursor = left + len(literal.encode("utf-8"))
+                owner = _enclosing_symbol(ranges, syntax_line, left, byte_cursor)
+                occurrence_kind = next(
+                    (
+                        kind
+                        for start, end, kind in token_kinds.get(syntax_line, ())
+                        if start <= column and column + len(literal) <= end
+                    ),
+                    "unknown",
+                )
+                fact = {
+                    "occurrence_kind": occurrence_kind,
+                    "kind_basis": (
+                        "python-tokenizer"
+                        if occurrence_kind != "unknown"
+                        else "unknown"
+                    ),
+                    "path": member["path"],
+                    "member_revision": member["member_revision"],
+                    "line": line_number,
+                    "column": offset + column + 1,
+                    "column_unit": "unicode-codepoint",
+                    "literal": literal,
+                    "enclosing_symbol": owner,
+                    "symbol_basis": (
+                        "indexed-containing-range" if owner is not None else "unknown"
+                    ),
+                }
+                hits.append(fact)
+                cursor = column + len(literal)
         return hits, count
 
     @staticmethod
@@ -648,17 +695,12 @@ class RepositorySource(
             self._attach_source_anchor_context(packet, text)
         if literal is None:
             return
-        symbols = (
-            self.store.symbols_for_path(str(member["path"]))
-            if member.get("index_state") == "indexed"
-            else []
-        )
         hits, count = self._source_occurrences(
             text,
             literal,
             member=member,
             limit=limit,
-            symbols=symbols,
+            ranges=self._literal_symbol_ranges(member, text),
             token_kinds=self._python_source_token_kinds(text, str(member["path"])),
         )
         context_lines = cast("dict[str, int]", packet["limits"]).get("context_lines", 0)
