@@ -290,26 +290,7 @@ class TaskEvidencePacketMixin(
         """Project the selected verification evidence into its existing plan contract."""
         if TYPE_CHECKING:
             self = cast("RepositoryTasks", self)
-        if verify is None or not verify.get("path"):
-            return {
-                "schema": "hashmarks.verification-plan.v1",
-                "available": False,
-                "reason": "no-verification-surface",
-            }
-        symbol = (
-            str(verify.get("verification_test_symbol"))
-            if verify.get("verification_test_symbol") is not None
-            else str(verify.get("name"))
-            if verify.get("name") is not None
-            else None
-        )
-        return self.verification.plan(
-            str(verify["path"]),
-            symbol=symbol,
-            qualname=str(verify.get("qualname"))
-            if verify.get("qualname") is not None
-            else None,
-        )
+        return self.verification._task_selection_plan(verify)
 
     @staticmethod
     def _task_action_brief_verification(

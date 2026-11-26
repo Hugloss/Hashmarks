@@ -14,6 +14,7 @@ import pytest
 from contract_assertions import assert_array, assert_object, assert_text
 
 from hashmarks.codemap import CodeMap
+from hashmarks.codemap.task_evidence_contract import read_initial_projection
 from hashmarks.codemap.task_evidence_initial import (
     decode_initial_collection,
     decode_initial_packet,
@@ -380,6 +381,50 @@ def test_initial_mode_rejects_unknown_mode_before_observation(tmp_path: Path) ->
         assert caught.value.reason == "invalid-request"
     finally:
         surface.close()
+
+
+def test_initial_ambiguity_bounds_only_oversized_python_signatures(
+    tmp_path: Path,
+) -> None:
+    default = "界" * 3000
+    (tmp_path / "writer.py").write_text(
+        f"def encode_record(value='{default}'):\n    return value\n"
+    )
+    (tmp_path / "encoder.py").write_text(
+        "def encode_record(value=1):\n    return value\n"
+    )
+    with CodeMap(tmp_path) as repository:
+        repository.index.sync()
+        full = repository.tasks.evidence("Fix encode_record", token_budget=64)
+        wire = repository.tasks.evidence(
+            "Fix encode_record", token_budget=64, result_mode="initial"
+        )
+    initial = read_initial_projection(decode_initial_packet(wire))
+    assert initial["source_evidence_identity"] == full["evidence_packet_identity"]
+    assert initial["freshness"] == full["freshness"]
+    ambiguity = initial["ownership"]["ambiguity"]
+    assert ambiguity["ambiguous"] and initial["ownership"]["owner"] is None
+    candidates = ambiguity["candidates"]
+    assert len(candidates) == 2
+    omitted = initial["initial_projection"]["omissions"]["sections"]
+    for i, (row, original) in enumerate(
+        zip(candidates, full["ownership"]["ambiguity"]["candidates"], strict=True)
+    ):
+        ref = f"/ownership/ambiguity/candidates/{i}/signature"
+        if row["path"] == "encoder.py":
+            assert row == original and ref not in omitted
+            continue
+        exact = assert_text(original.get("signature"))
+        preview = assert_text(row.get("signature_preview"))
+        assert default in exact and exact.startswith(preview)
+        assert 0 < len(preview.encode()) <= 512 and ref in omitted
+        assert row == {
+            **original,
+            "signature": None,
+            "signature_preview": preview,
+            "signature_truncated": True,
+        }
+    assert default not in json.dumps(initial, ensure_ascii=False)
 
 
 def test_initial_class_table_keeps_future_fields_and_preserves_source_packet(

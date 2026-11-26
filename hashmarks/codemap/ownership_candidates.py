@@ -417,7 +417,12 @@ class OwnershipCandidatesMixin(
         if existing is not None:
             return existing
         file_row = self.reads.file_row(selected_path)
-        symbols = self.reads.symbols_for_path(selected_path)
+        # Python node identity comes from the qualified reference below.
+        symbols = (
+            ()
+            if selected_path.endswith(".py")
+            else self.reads.symbols_for_path(selected_path)
+        )
         symbol = symbols[0] if symbols else {}
         projected = {
             "path": selected_path,
@@ -442,14 +447,34 @@ class OwnershipCandidatesMixin(
         rows.append(projected)
         return projected
 
-    @staticmethod
     def _task_action_verification_test_symbol(
-        row: dict[str, object], selected_verification: Mapping[str, object]
+        self, row: dict[str, object], selected_verification: Mapping[str, object]
     ) -> dict[str, object]:
+        if TYPE_CHECKING:
+            self = cast("RepositoryOwnership", self)
         test_symbol = selected_verification.get("test_symbol")
-        if not isinstance(test_symbol, str) or not test_symbol:
-            return row
-        return {**row, "verification_test_symbol": test_symbol}
+        path = str(row["path"])
+        if not path.endswith(".py"):
+            return (
+                {**row, "verification_test_symbol": test_symbol} if test_symbol else row
+            )
+        if test_symbol is not None and test_symbol == row.get("qualname"):
+            return {**row, "verification_test_symbol": test_symbol}
+        candidates = (
+            self.reads.symbols_for_path(path) if isinstance(test_symbol, str) else ()
+        )
+        symbol = next(
+            (symbol for symbol in candidates if symbol.get("qualname") == test_symbol),
+            {},
+        )
+        return {
+            **row,
+            **{
+                key: symbol.get(key)
+                for key in ("name", "qualname", "start_line", "end_line", "signature")
+            },
+            "verification_test_symbol": symbol.get("qualname"),
+        }
 
     def _task_action_finalize_verification_selection(
         self,

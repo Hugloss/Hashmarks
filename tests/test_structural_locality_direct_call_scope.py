@@ -9,6 +9,101 @@ from hashmarks.codemap import CodeMap
 from hashmarks.evidence_presentation import FORMATS, presentation_response
 
 
+def test_callable_kinds_and_bare_target_follow_their_lexical_scope(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "worker.py").write_text(
+        "def normalize(x): return x\n"
+        "def dispatch(x): return normalize(x)\n"
+        "def factory():\n"
+        "    def normalize(x): return x + 1\n"
+        "    class Preview:\n"
+        "        async def normalize(self):\n"
+        "            async def inner(): pass\n"
+        "            return inner\n"
+        "    return Preview\n"
+    )
+    with CodeMap(tmp_path) as codemap:
+        outline = codemap.source.outline("worker.py")
+        kinds = {
+            row["qualname"]: row["kind"] for row in assert_records(outline["symbols"])
+        }
+        assert (
+            kinds["factory.normalize"]
+            == kinds["factory.Preview.normalize.inner"]
+            == "function"
+        )
+        assert kinds["factory.Preview.normalize"] == "method"
+        exact = assert_records(codemap.search.packet("factory.normalize")["results"])
+        assert (
+            next(row["kind"] for row in exact if row["qualname"] == "factory.normalize")
+            == "function"
+        )
+        calls = assert_records(
+            codemap.structure.locality("worker.py::dispatch")["edges"]
+        )
+        assert [row["resolved_symbol_id"] for row in calls] == ["worker.py::normalize"]
+        for callee, expected in (
+            ("normalize", ["dispatch"]),
+            ("factory.normalize", []),
+            ("factory.Preview.normalize", []),
+        ):
+            node = assert_records(
+                codemap.structure.locality(f"worker.py::{callee}", max_depth=0)["nodes"]
+            )[0]
+            assert [
+                row["source"] for row in assert_records(node["exact_callers"])
+            ] == expected
+
+
+@pytest.mark.parametrize(
+    ("declaration", "call", "target"),
+    [
+        ("def process(): pass", "process()", "consumer.py::process"),
+        ("from provider import process as run", "run()", "provider.py::process"),
+        ("from provider import Job", "Job.process()", "provider.py::Job.process"),
+        ("import provider as lib", "lib.process()", "provider.py::process"),
+    ],
+)
+def test_module_call_requires_a_preceding_binding(
+    tmp_path: Path, declaration: str, call: str, target: str
+) -> None:
+    (tmp_path / "provider.py").write_text(
+        "def process(): pass\nclass Job:\n    @staticmethod\n    def process(): pass\n"
+    )
+    consumer = tmp_path / "consumer.py"
+    consumer.write_text(f"value = {call}\n{declaration}\n")
+    with CodeMap(tmp_path) as codemap:
+        before = assert_records(
+            codemap.structure.locality(target, max_depth=0)["nodes"]
+        )[0]
+        assert before["exact_callers"] == []
+        assert [
+            row["line"]
+            for row in assert_records(before["unresolved_caller_candidates"])
+        ] == [1]
+        consumer.write_text(f"{declaration}\nvalue = {call}\n")
+        after = assert_records(
+            codemap.structure.locality(target, max_depth=0)["nodes"]
+        )[0]
+        assert [
+            (row["path"], row["line"]) for row in assert_records(after["exact_callers"])
+        ] == [("consumer.py", 2)]
+
+
+def test_same_line_from_import_cannot_establish_call_order(tmp_path: Path) -> None:
+    (tmp_path / "provider.py").write_text("def process(): pass\n")
+    (tmp_path / "consumer.py").write_text("from provider import process; process()\n")
+    with CodeMap(tmp_path) as codemap:
+        node = assert_records(
+            codemap.structure.locality("provider.py::process", max_depth=0)["nodes"]
+        )[0]
+    assert node["exact_callers"] == []
+    assert [
+        row["line"] for row in assert_records(node["unresolved_caller_candidates"])
+    ] == [1]
+
+
 @pytest.mark.parametrize("asynchronous", [False, True])
 def test_nested_callback_calls_are_not_direct_calls_of_its_enclosing_function(
     tmp_path: Path, asynchronous: bool

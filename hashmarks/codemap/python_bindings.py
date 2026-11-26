@@ -8,9 +8,13 @@ separate conditional observations; neither can resolve a parameter use.
 from __future__ import annotations
 
 import ast
+from collections.abc import Mapping
 from dataclasses import dataclass, replace
-from typing import cast
+from functools import cached_property, lru_cache
+from types import MappingProxyType
+from typing import TYPE_CHECKING, cast
 
+from .model import symbol_occurrence_parts
 from .python_binding_scope import (
     FunctionNode,
     PythonBinding,
@@ -19,6 +23,7 @@ from .python_binding_scope import (
     function_defaults,
     function_parameters,
 )
+from .python_exports import python_source_functions
 from .source_binding_contract import (
     MAX_ALIAS_DEPTH,
     MAX_BINDING_DETAILS,
@@ -28,6 +33,9 @@ from .source_binding_contract import (
     MAX_LITERAL_BYTES,
     BindingObservationBound,
 )
+
+if TYPE_CHECKING:
+    from hashmarks.python_ast_cache import PythonAstSnapshot
 
 _ImportKey = tuple[str, str | None, int, tuple[str, ...]]
 _SymbolicKey = tuple[ast.AST, tuple[str, ...]]
@@ -56,6 +64,13 @@ class _Value:
         if self.target is None and self.literal is None:
             return "unknown"
         return "conditional" if self.conditions else "qualified"
+
+    @property
+    def qualified_absolute_import(self) -> tuple[str, tuple[str, ...]] | None:
+        key = _import_key(self.target)
+        if self.qualification != "qualified" or key is None or key[2]:
+            return None
+        return key[0], key[3]
 
 
 def _import_target(binding: PythonBinding) -> dict[str, object]:
@@ -134,7 +149,7 @@ def _import_key(target: dict[str, object] | None) -> _ImportKey | None:
     )
 
 
-class _PythonBindings:
+class PythonBindings:
     def __init__(self, tree: ast.Module, raw: bytes) -> None:
         self.raw = raw
         self.lines = _line_offsets(raw)
@@ -296,14 +311,7 @@ class _PythonBindings:
         key = _import_key(value.target)
         if key is None:
             return value
-        mutation = next(
-            (
-                self._property_mutations[(*key[:3], key[3][:depth])]
-                for depth in range(len(key[3]) + 1)
-                if (*key[:3], key[3][:depth]) in self._property_mutations
-            ),
-            None,
-        )
+        mutation = self._imported_property_mutation(key)
         if mutation is not None:
             return self._supported(
                 self._unknown("property-binding-may-be-mutated"),
@@ -311,6 +319,13 @@ class _PythonBindings:
                 (mutation,),
             )
         return value
+
+    def _imported_property_mutation(self, key: _ImportKey) -> ast.AST | None:
+        for depth in range(len(key[3]) + 1):
+            mutation = self._property_mutations.get((*key[:3], key[3][:depth]))
+            if mutation is not None:
+                return mutation
+        return None
 
     def _checked_symbolic(self, value: _Value) -> _Value:
         symbolic = value.symbolic
@@ -423,6 +438,58 @@ class _PythonBindings:
         if depth >= MAX_BINDING_EXPRESSION_DEPTH:
             return self._unknown("expression-depth-bound")
         return self._resolve_expression(node, scope, trail, depth)
+
+    def references_import_member(
+        self, node: ast.expr, module: str, member: str
+    ) -> bool:
+        """Match a qualified source-local use of an absolute imported member."""
+        scope = self.syntax.owners.get(node)
+        if scope is None or not isinstance(node, (ast.Name, ast.Attribute)):
+            return False
+        value = self.resolve(node, scope)
+        return value.qualified_absolute_import == (module, (member,))
+
+    @cached_property
+    def _custom_builtins(self) -> bool:
+        return self.syntax.lookup("__builtins__", self.syntax.root) is not None or any(
+            isinstance(root, ast.Name) and root.id == "__builtins__"
+            for root, _ in self._symbolic_mutations
+        )
+
+    def builtin_method_descriptor(self, node: ast.expr) -> str | None:
+        """Observe one authored descriptor spelling in its defining scope."""
+        if self._custom_builtins or not isinstance(node, (ast.Name, ast.Attribute)):
+            return None
+        value = self.resolve(node, self.syntax.owners[node])
+        origin = value.qualified_absolute_import
+        names = {"classmethod", "staticmethod", "property"}
+        if origin and origin[0] == "builtins" and len(origin[1]) == 1:
+            name = origin[1][0]
+            return name if name in names else None
+        ref = value.symbolic
+        if (
+            ref is None
+            or ref.root.kind != "unresolved-name"
+            or ref.properties
+            or ref.reasons
+            or value.conditions
+        ):
+            return None
+        name = ref.root.name
+        # Normal Python builtin lookup is eligible only when the source leaves
+        # the lexical name unbound and contains no competing builtin write.
+        mutation = self._imported_property_mutation(("builtins", None, 0, (name,)))
+        return name if name in names and mutation is None else None
+
+    def imported_alias(self, node: ast.Name | ast.Attribute) -> ast.alias | None:
+        """The exact import supplying this source use, when lexically qualified."""
+        scope = self.syntax.owners.get(node)
+        if scope is None:
+            return None
+        value = self.resolve(node, scope)
+        if value.qualification == "qualified" and isinstance(value.binding, ast.alias):
+            return value.binding
+        return None
 
     def _resolve_expression(
         self,
@@ -880,7 +947,7 @@ class _PythonBindings:
         if len(self.rows) + len(parsed) > MAX_BINDING_RESULTS:
             raise BindingObservationBound("forward-annotation-result-bound")
         for reference, descriptor in parsed:
-            self._locate_annotation_reference(reference, node)
+            self.locate_annotation_reference(reference, node)
             resolved = self.resolve(reference, self.syntax.owners[node])
             self.rows.append(self._forward_annotation_row(node, descriptor, resolved))
 
@@ -912,8 +979,9 @@ class _PythonBindings:
             )
         return result
 
-    def _locate_annotation_reference(
-        self, reference: ast.AST, container: ast.Constant
+    @staticmethod
+    def locate_annotation_reference(
+        reference: ast.AST, container: ast.Constant
     ) -> None:
         # Decoded offsets cannot be treated as source offsets: escapes, prefixes
         # and adjacent literals may change their physical representation.
@@ -1156,9 +1224,75 @@ def _supplied_arguments(
     ], None
 
 
+@dataclass(frozen=True)
+class PythonLocalCallBindings:
+    method_descriptors: Mapping[ast.expr, str]
+    nested_calls: Mapping[tuple[ast.AST, int, str], int]
+
+
+@lru_cache(maxsize=32)
+def python_local_call_bindings(snapshot: PythonAstSnapshot) -> PythonLocalCallBindings:
+    """Retain compact qualified call-site evidence for this exact source snapshot."""
+    try:
+        bindings = PythonBindings(snapshot.tree, snapshot.source.encode("utf-8"))
+    except BindingObservationBound:
+        return PythonLocalCallBindings(MappingProxyType({}), MappingProxyType({}))
+    descriptors: dict[ast.expr, str] = {}
+    nested_calls: dict[tuple[ast.AST, int, str], int] = {}
+    for node in bindings.syntax.nodes:
+        if (
+            isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and len(node.decorator_list) == 1
+        ):
+            decorator = node.decorator_list[0]
+            descriptor = bindings.builtin_method_descriptor(decorator)
+            if descriptor is not None:
+                descriptors[decorator] = descriptor
+        elif isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+            scope = bindings.syntax.owners[node]
+            candidate = scope.bindings.get(node.func.id)
+            if (
+                scope.kind != "function"
+                or candidate is None
+                or candidate.kind != "declaration"
+            ):
+                continue
+            value = bindings.resolve(node.func, scope)
+            if (
+                value.qualification == "qualified"
+                and isinstance(
+                    value.declaration, (ast.FunctionDef, ast.AsyncFunctionDef)
+                )
+                and value.declaration is candidate.node
+            ):
+                nested_calls[scope.node, node.lineno, node.func.id] = (
+                    value.declaration.lineno
+                )
+    return PythonLocalCallBindings(
+        MappingProxyType(descriptors), MappingProxyType(nested_calls)
+    )
+
+
+def python_nested_call_site(
+    snapshot: PythonAstSnapshot, source: str, name: str, line: int
+) -> tuple[str, int] | None:
+    """Prove a direct bare call to a declaration in its own named function body."""
+    parent, _ = symbol_occurrence_parts(source)
+    definitions = snapshot.function_definitions_by_qualname
+    if f"{parent}.{name}" not in definitions:
+        return None
+    callers = python_source_functions(definitions, source)
+    if len(callers) != 1:
+        return None
+    start = python_local_call_bindings(snapshot).nested_calls.get(
+        (callers[0], line, name)
+    )
+    return (parent, start) if start is not None else None
+
+
 def python_bindings(
     tree: ast.Module, raw: bytes, limit: int
 ) -> tuple[list[dict[str, object]], int]:
     """Qualify the entire bounded syntax scope before projecting result limits."""
-    rows = _PythonBindings(tree, raw).observe()
+    rows = PythonBindings(tree, raw).observe()
     return rows[:limit], len(rows)

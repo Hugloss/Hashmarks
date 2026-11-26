@@ -538,7 +538,7 @@ class TreeSitterRangeProvider:
 
     @staticmethod
     def _merge(
-        base: tuple[SymbolRecord, ...], structural: list[SymbolRecord]
+        base: tuple[SymbolRecord, ...], structural: list[SymbolRecord], language: str
     ) -> tuple[SymbolRecord, ...]:
         if not structural:
             return base
@@ -555,7 +555,11 @@ class TreeSitterRangeProvider:
                     candidates,
                     key=lambda candidate: abs(candidate.start_line - row.start_line),
                 )
-            if best is None:
+            if best is None or (
+                language == "python" and row.kind in {"binding", "type"}
+            ):
+                # Python already supplies the exact binding statement. A
+                # nearby same-name declaration cannot replace its range.
                 merged.append(row)
                 continue
             used.add((best.qualname, best.start_line))
@@ -616,7 +620,7 @@ class TreeSitterRangeProvider:
         symbols = (
             tuple(structural)
             if language in ECMASCRIPT_GRAMMARS
-            else self._merge(artifact.symbols, structural)
+            else self._merge(artifact.symbols, structural, language)
         )
         return replace(
             artifact,

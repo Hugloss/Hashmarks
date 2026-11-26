@@ -217,17 +217,19 @@ def test_public_symbol_fails_instead_of_mixing_committed_generations(
     harness = _PublicationHarness(tmp_path)
     evidence_read = threading.Event()
     writer_finished = threading.Event()
-    original_symbol = harness.reader.store.symbol
+    original_lookup = harness.reader.store.visible_symbol_candidates
 
-    def block_after_symbol_read(query: str) -> list[dict[str, object]]:
-        rows = original_symbol(query)
+    def block_after_symbol_read(query: str, *, limit: int) -> list[dict[str, object]]:
+        rows = original_lookup(query, limit=limit)
         if query == "before_owner":
             evidence_read.set()
             if not writer_finished.wait(timeout=5):
                 raise TimeoutError("writer did not publish the competing generation")
         return rows
 
-    monkeypatch.setattr(harness.reader.store, "symbol", block_after_symbol_read)
+    monkeypatch.setattr(
+        harness.reader.store, "visible_symbol_candidates", block_after_symbol_read
+    )
 
     def publish_next_generation() -> None:
         if not evidence_read.wait(timeout=5):

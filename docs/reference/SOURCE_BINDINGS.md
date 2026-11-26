@@ -119,6 +119,18 @@ dynamic namespace writes remain unknown. The expression is parsed separately
 and never evaluated, and imported implementations are not loaded or resolved.
 String values nested inside `Literal[...]` are not treated as root annotations.
 
+The Python CodeMap index uses source binding evidence to interpret argument
+positions in authored `typing` and `typing_extensions` annotations. For
+`Literal["blue"]` it records the wrapper name. For
+`Annotated["Payload", "label"]` it also records `Payload` as a forward
+type reference. Import aliases and assignment aliases must qualify in the
+lexical scope of the annotation. An uncertain wrapper retains its spelling
+and supplies no type edges for its arguments. These indexed edges carry
+`confidence="annotation"` and describe source syntax. The same member bytes
+retain that interpretation if the repository supplies a local `typing.py`.
+Runtime module resolution and the meaning of custom subscription implementations
+remain unobserved.
+
 Each fact's `range`, `expression` and `annotation.range` locate the exact source
 string container. `annotation` records the parser, `evaluation="not-performed"`
 and bounded `decoded_text`. `parsed_expression` records the native expression

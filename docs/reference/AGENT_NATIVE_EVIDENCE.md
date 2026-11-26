@@ -192,11 +192,20 @@ remains a producer claim. The complete native ownership/verification records
 remain visible in the original result. All projections preserve source
 pointers, current freshness and their producer-owned qualifications.
 
+In an initial task packet, Python ambiguity candidates and verification-origin
+locators retain short signatures. A longer signature carries a UTF-8 preview
+of up to 512 bytes, a null `signature`, and `signature_truncated: true`. The
+omission ledger identifies the exact signature field in the full packet.
+Candidate order, ambiguity and source locators remain available for follow-up.
+
 For a task that explicitly names a current source-visible Python file, its
 retrieval row also carries `field_declarations`. Tasks borrows the canonical
 RepositoryDeclarations owner and its built-in static Python producer; it does
-not parse fields independently. The first three classes with annotated fields
-appear in source order, with observed/returned/omitted class counts. Each value
+not parse fields independently. Tasks matches field names across the observed
+classes before selecting up to three classes. A field named literally in the
+task has priority over a field sharing only part of an identifier. Source
+order breaks ties and fills unused class slots. The retained classes appear
+in source order with observed/returned/omitted counts. Each value
 retains the producer's supported annotations, initializer references, source
 lines, unknown runtime binding, incomplete semantic coverage and unresolved
 correspondence. The source revision, repository qualification, provider
@@ -205,8 +214,10 @@ does not establish absence; provider failure yields unavailable disclosure with
 incomplete coverage. Outline/denied files disclose no field values.
 
 The initial profile retains at most three fields from those source groups.
-Tasks supplies a lexical field-name selection: matching task terms first, or
-source order when no field name matches. This is disclosure relevance only.
+Tasks applies the same literal-name and partial-term priorities to the field
+slots and uses source order when no field name matches. The explicit file
+path and output-format directive do not supply field terms. This is
+disclosure relevance only.
 Full packets retain all admitted fields; initial omissions count excluded
 fields and retain their original group/field indexes. Coverage stays incomplete
 and exclusions never establish absent declarations. Existing owner and verifier
@@ -227,7 +238,7 @@ configuration or execution authority.
 
 Tasks can attach `source_observation` and separate `source_selection` to a
 retrieval row for an explicit current source-visible Python file. Cached AST
-identifier loads nominate positions; Source alone observes the bytes and emits
+identifier loads nominate positions from a bounded Source member read. Source emits
 the unchanged native source packet. At most 4,096 AST nodes and three anchors
 are considered, with one context line per anchor and a 262,144-byte input bound.
 Selection prefers more matched normalized task-word families, then rarer
@@ -237,7 +248,10 @@ an arbitrary multiword requirement. This is retrieval ordering only and does
 not infer a control-flow edge, runtime guard, ownership or test sufficiency.
 Already disclosed field spans are excluded from duplicate nomination. Source
 coverage/freshness and selection coverage are independent; truncated lookup
-remains visible even when it returns no anchors. No result proves absence.
+remains visible even when it returns no anchors. Files containing a bare CR
+omit this optional excerpt because Python syntax and raw source anchors use
+different line coordinates there. Qualified symbol reads use Python's line
+coordinates. No result proves absence.
 
 The initial readable source view retains exact anchors, member binding,
 freshness, completeness, truncation and negative-evidence qualification.
@@ -245,6 +259,16 @@ Its `metadata_ref` names the complete original mapping in decoded native data;
 overlay its displayed fields to recover the exact source packet. Additional
 source-shape/identity/limit metadata remains in that native packet. Text and
 compact views use the same projection, with selection uncertainty alongside it.
+Text renders printable Unicode in field declarations and source excerpts
+directly. Records containing a nonprintable separator retain JSON escaping so
+each evidence record occupies one physical output line.
+When neighboring anchors display the same long excerpt from the same source
+line, initial text can print the literal once. Its `excerpt_text_refs` maps
+each omitted `text` field's JSON pointer to the first displayed literal's
+pointer in the same source view. Copy those strings into their referenced
+fields before overlaying the view on `metadata_ref`. Every occurrence retains
+its own line, role, column bounds and truncation. This encoding is used only
+when it shortens the rendered record.
 
 ### Qualified owner labels must match producer proof
 

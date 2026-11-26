@@ -182,28 +182,7 @@ class TaskReceiptsMixin:
     ) -> TaskVerificationPlan:
         if TYPE_CHECKING:
             self = cast("RepositoryTasks", self)
-        if verify is None:
-            return {
-                "schema": "hashmarks.verification-plan.v1",
-                "available": False,
-                "reason": "no-verification-surface",
-            }
-        test_symbol = verify.get("verification_test_symbol")
-        symbol = (
-            str(test_symbol)
-            if test_symbol is not None
-            else str(verify.get("name"))
-            if verify.get("name") is not None
-            else None
-        )
-        qualname = (
-            str(verify.get("qualname")) if verify.get("qualname") is not None else None
-        )
-        return self.verification.plan(
-            str(verify["path"]),
-            symbol=symbol,
-            qualname=qualname,
-        )
+        return self.verification._task_selection_plan(verify)
 
     @staticmethod
     def _downstream_verification_contract(

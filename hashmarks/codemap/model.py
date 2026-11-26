@@ -7,7 +7,27 @@ from typing import Any
 from hashmarks.operation_contract import operation_response, operation_schema
 
 CODEMAP_SCHEMA = "hashmarks.codemap.v1"
-PYTHON_PARSER = "hashmarks.python-ast.v10"
+PYTHON_PARSER = "hashmarks.python-ast.v19"
+_OCCURRENCE_MARKER = "@L"
+
+
+def symbol_occurrence_parts(key: str) -> tuple[str, str | None]:
+    qualname, marker, location = key.partition(_OCCURRENCE_MARKER)
+    return qualname, location if marker else None
+
+
+def allocate_symbol_occurrence(used: set[str], qualname: str, start_line: int) -> str:
+    """Allocate the persisted source occurrence key within one member."""
+    candidate = qualname
+    if candidate in used:
+        base = f"{qualname}{_OCCURRENCE_MARKER}{start_line}"
+        candidate = base
+        ordinal = 2
+        while candidate in used:
+            candidate = f"{base}-{ordinal}"
+            ordinal += 1
+    used.add(candidate)
+    return candidate
 
 
 class EvidenceVisibility(str, Enum):
@@ -40,6 +60,8 @@ class SymbolRecord:
     signature_tokens: int
     body_tokens: int
     parent: str | None = None
+    start_byte_column: int | None = None
+    end_byte_column: int | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -51,6 +73,14 @@ class SymbolRecord:
             "signature_tokens": self.signature_tokens,
             "body_tokens": self.body_tokens,
             "parent": self.parent,
+            **(
+                {
+                    "start_byte_column": self.start_byte_column,
+                    "end_byte_column": self.end_byte_column,
+                }
+                if self.start_byte_column is not None
+                else {}
+            ),
         }
 
 

@@ -21,6 +21,8 @@ class TaskCandidate(TypedDict):
     name: NotRequired[str | None]
     qualname: NotRequired[str | None]
     signature: NotRequired[str | None]
+    signature_preview: NotRequired[str]
+    signature_truncated: NotRequired[Literal[True]]
     canonical_rank: NotRequired[int | None]
     roles: NotRequired[list[str]]
     start_line: NotRequired[int | None]

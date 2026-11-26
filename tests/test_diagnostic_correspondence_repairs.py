@@ -56,19 +56,25 @@ def test_shadowed_export_never_becomes_an_exact_alias_call(
 
 
 @pytest.mark.parametrize(
-    "tail",
+    ("tail", "current"),
     [
-        "load_config: object\n",
-        "values = [load_config for load_config in items]\n",
-        "def unrelated():\n    load_config = None\n",
-        "load_config = None\ndef load_config():\n    return 2\n",
+        ("load_config: object\n", "load_config"),
+        ("values = [load_config for load_config in items]\n", "load_config"),
+        ("def unrelated():\n    load_config = None\n", "load_config"),
+        ("load_config = None\ndef load_config():\n    return 2\n", "load_config@L4"),
     ],
 )
 def test_current_unconditional_declaration_retains_alias_evidence(
-    tmp_path: Path, tail: str
+    tmp_path: Path, tail: str, current: str
 ) -> None:
     root = tmp_path / "repo"
-    _write(root, "config.py", "def load_config():\n    return 1\n" + tail)
+    _write(
+        root,
+        "config.py",
+        "def load_config():\n    return 1\n"
+        + tail
+        + "def direct(): return load_config()\n",
+    )
     _write(
         root,
         "service.py",
@@ -77,9 +83,22 @@ def test_current_unconditional_declaration_retains_alias_evidence(
     with CodeMap(root, state_dir=tmp_path / "state") as codemap:
         codemap.index.sync()
         packet: Any = codemap.structure.locality("service.py::handle")
-    assert {row["resolved_symbol_id"] for row in packet["edges"]} == {
-        "config.py::load_config"
-    }
+        target = f"config.py::{current}"
+        direct: Any = codemap.structure.locality("config.py::direct")
+        assert {row["resolved_symbol_id"] for row in direct["edges"]} == {target}
+        assert {row["resolved_symbol_id"] for row in packet["edges"]} == {target}
+        reverse: Any = codemap.structure.locality(target, max_depth=0)
+        assert {
+            (row["path"], row["source"]) for row in reverse["nodes"][0]["exact_callers"]
+        } == {("config.py", "direct"), ("service.py", "handle")}
+        if current == "load_config@L4":
+            assert (
+                codemap.source.read("config.py::load_config@L3")["content"]
+                == "load_config = None"
+            )
+            assert codemap.source.read(target)["lines"] == [4, 5]
+            old: Any = codemap.structure.locality("config.py::load_config", max_depth=0)
+            assert old["nodes"][0]["exact_callers"] == []
 
 
 def test_reverse_aliases_and_relative_reexports_find_real_callers_and_tests(

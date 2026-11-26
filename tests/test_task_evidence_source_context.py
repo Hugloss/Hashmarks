@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import hashlib
 import json
 from collections.abc import Mapping
@@ -24,7 +25,6 @@ from hashmarks.codemap.task_evidence_initial import (
 )
 from hashmarks.digest import FILE_DOMAIN, hash_file
 from hashmarks.evidence_presentation import FORMATS, presentation_response
-from hashmarks.python_ast_cache import PythonAstSnapshot
 
 TASK = "A cached stream adapter accepts unsupported settings. Inspect adapter.py."
 GUARD = "        if has_stream and use_cache:"
@@ -213,6 +213,89 @@ def _pointer(value: object, pointer: str) -> object:
     return value
 
 
+def test_default_text_shares_only_identical_overlapping_source_excerpts(
+    tmp_path: Path,
+) -> None:
+    comment = (
+        "This statement checks whether the supplied stream and cache configuration agree. "
+        * 2
+    )
+    (tmp_path / "adapter.py").write_text(
+        "def process_stream(use_cache, has_stream):\n"
+        + "".join(
+            f"    flag_{i} = use_cache and has_stream  # {comment}{i}\n"
+            for i in range(5)
+        )
+        + "    return flag_0\n"
+    )
+    with CodeMap(tmp_path) as repository:
+        repository.index.sync()
+        packet = decode_initial_packet(
+            repository.tasks.evidence(TASK, result_mode="initial")
+        )
+    source = _source(packet)
+    anchors = assert_records(source["line_anchors"])
+    assert len(anchors) == 3
+    # Identical line numbers do not qualify different slices of the same line.
+    alternative = assert_records(anchors[2]["context_excerpt"])[0]
+    alternative["text"] = str(alternative["text"])[10:]
+    alternative["start_column"] = 11
+    alternative["truncated_left"] = True
+    packet["evidence_packet_identity"] = initial_packet_identity(packet)
+    wire = encode_initial_packet(packet)
+    response = presentation_response(
+        "task_evidence", wire, result_mode="initial", format="text"
+    )
+    text = str(assert_object(response["presentation"])["text"])
+    line = next(
+        line for line in text.splitlines() if line.startswith("Source observation @ ")
+    )
+    view = assert_object(json.loads(line.partition(": ")[2]))
+    refs = assert_object(view.pop("excerpt_text_refs"))
+    assert refs and "/line_anchors/2/context_excerpt/0/text" not in refs
+    for target, first in refs.items():
+        original_row = assert_object(_pointer(view, target.rsplit("/", 1)[0]))
+        assert "text" not in original_row
+        original_row["text"] = _pointer(view, str(first))
+    assert view["line_anchors"] == source["line_anchors"]
+    assert view["negative_evidence"] == source["negative_evidence"]
+    assert decode_initial_packet(assert_object(response["result"])) == packet
+
+
+@pytest.mark.parametrize("separator", ["", "\u2028"])
+def test_initial_text_round_trips_localized_python_evidence(
+    tmp_path: Path, separator: str
+) -> None:
+    annotation = "缓存配置"
+    comment = "校验流式设置" + separator + "完成"
+    (tmp_path / "adapter.py").write_text(
+        f"class Adapter:\n    设置: {annotation}\n"
+        "    def configure(self, use_cache, has_stream):\n"
+        f"        return use_cache and has_stream  # {comment}\n"
+    )
+    with CodeMap(tmp_path) as repository:
+        repository.index.sync()
+        packet = repository.tasks.evidence(TASK, result_mode="initial")
+    response = presentation_response(
+        "task_evidence", packet, result_mode="initial", format="text"
+    )
+    text = str(assert_object(response["presentation"])["text"])
+    fields = next(
+        line
+        for line in text.splitlines()
+        if line.startswith("Declared field syntax @ ")
+    )
+    assert annotation in fields
+    line = next(
+        line for line in text.splitlines() if line.startswith("Source observation @ ")
+    )
+    assert (r"\u2028" in line) == bool(separator)
+    if not separator:
+        assert comment in line
+    observed = assert_object(json.loads(line.partition(": ")[2]))
+    assert observed["line_anchors"] == _source(packet)["line_anchors"]
+
+
 @pytest.mark.parametrize("format", ["compact", "text"])
 def test_source_view_recovers_every_native_value_and_future_metadata(
     tmp_path: Path, format: str
@@ -286,24 +369,47 @@ def test_task_source_packet_is_the_canonical_source_observation(tmp_path: Path) 
     assert _source(packet) == expected
 
 
+def test_mixed_newlines_never_anchor_the_task_at_an_unrelated_physical_line(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path)
+    path = tmp_path / "adapter.py"
+    path.write_bytes(path.read_bytes().replace(b"\n", b"\r", 1))
+    with CodeMap(tmp_path) as repository:
+        repository.index.sync()
+        packet = repository.tasks.evidence(TASK)
+        raw = repository.source.observe("adapter.py", lines=[3], anchor_context_lines=1)
+    anchor = assert_records(raw["line_anchors"])[0]
+    anchor_text = next(
+        row["text"]
+        for row in assert_records(anchor["context_excerpt"])
+        if row["line"] == 3
+    )
+    assert str(anchor_text).strip().startswith("raise ValueError")
+    retrieval = assert_records(assert_object(packet["retrieval"])["results"])
+    row = next(row for row in retrieval if row["path"] == "adapter.py")
+    assert "source_observation" not in row
+    assert "source_selection" not in row
+
+
 def test_source_change_between_candidate_lookup_and_observation_restarts_the_task(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from hashmarks.codemap import task_evidence_source_context
 
     _write(tmp_path)
-    original = task_evidence_source_context.read_python_ast
+    original = task_evidence_source_context.parse_python_ast
     changed = False
 
-    def read(path: Path) -> PythonAstSnapshot:
+    def parse(raw: bytes, *, filename: str) -> ast.Module:
         nonlocal changed
-        snapshot = original(path)
+        tree = original(raw, filename=filename)
         if not changed:
             changed = True
             _write(tmp_path, guard="        if has_stream and not use_cache:")
-        return snapshot
+        return tree
 
-    monkeypatch.setattr(task_evidence_source_context, "read_python_ast", read)
+    monkeypatch.setattr(task_evidence_source_context, "parse_python_ast", parse)
     with CodeMap(tmp_path) as repository:
         repository.index.sync()
         packet = repository.tasks.evidence(TASK, result_mode="initial")
@@ -343,15 +449,15 @@ def test_source_refusal_overrides_current_index_hints_before_ast_lookup(
         assert repository.index.is_current("adapter.py")
 
         def member(
-            path: str, *, include_bytes: bool = False
+            path: str, *, include_bytes: bool = False, max_bytes: int | None = None
         ) -> tuple[dict[str, object], bytes | None]:
             return {"path": path, "state": state, "reason": "source-refused"}, None
 
-        def forbidden(path: Path) -> PythonAstSnapshot:
+        def forbidden(raw: bytes, *, filename: str) -> ast.Module:
             raise AssertionError("source refusal must prevent AST byte reads")
 
         monkeypatch.setattr(repository.source, "member", member)
-        monkeypatch.setattr(task_evidence_source_context, "read_python_ast", forbidden)
+        monkeypatch.setattr(task_evidence_source_context, "parse_python_ast", forbidden)
         packet = repository.tasks.evidence(TASK, result_mode="initial")
     assert "source_observation" not in json.dumps(_logical(packet))
 

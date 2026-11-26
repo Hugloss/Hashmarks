@@ -6,7 +6,13 @@ import re
 from dataclasses import replace
 from typing import TYPE_CHECKING
 
-from .model import CODEMAP_SCHEMA, EdgeRecord, ParsedArtifact, SymbolRecord
+from .model import (
+    CODEMAP_SCHEMA,
+    EdgeRecord,
+    ParsedArtifact,
+    SymbolRecord,
+    allocate_symbol_occurrence,
+)
 from .providers import ECMASCRIPT_GRAMMARS, source_grammar
 from .python_ast import (
     PYTHON_PARSER,
@@ -246,16 +252,9 @@ def _unique_symbol_occurrences(
             value.kind,
         ),
     ):
-        qualname = row.qualname
-        if qualname in used:
-            base = f"{qualname}@L{row.start_line}"
-            candidate = base
-            ordinal = 2
-            while candidate in used:
-                candidate = f"{base}-{ordinal}"
-                ordinal += 1
+        candidate = allocate_symbol_occurrence(used, row.qualname, row.start_line)
+        if candidate != row.qualname:
             row = replace(row, qualname=candidate)
-        used.add(row.qualname)
         out.append(row)
     return tuple(out)
 

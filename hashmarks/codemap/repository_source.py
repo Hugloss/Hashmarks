@@ -19,10 +19,11 @@ from .decision_session import (
     decision_scoped,
 )
 from .model import EvidenceVisibility
-from .python_ast import estimate_tokens
+from .python_ast import estimate_tokens, python_source_byte_lines, python_symbol_bytes
 from .query_primitives import _WORD_RE
 from .repository_observation import evidence_identity, packet_digest
 from .scoped_source_literals import ScopedSourceLiteralsMixin
+from .signature_preview import outline_disclosure, signature_disclosure
 from .source_bindings import SourceBindingsMixin
 from .source_content import source_content_observation
 from .source_ecmascript import SourceEcmascriptMixin
@@ -39,6 +40,30 @@ from .source_range_receipt import (
 
 if TYPE_CHECKING:
     from .indexing_lifecycle import RepositoryIndex
+
+
+def _symbol_columns(row: Mapping[str, object]) -> tuple[int, int] | None:
+    start, end = row.get("start_byte_column"), row.get("end_byte_column")
+    if isinstance(start, int) and isinstance(end, int):
+        return start, end
+    return None
+
+
+def _column_fields(row: Mapping[str, object]) -> dict[str, int]:
+    columns = _symbol_columns(row)
+    return (
+        {"start_byte_column": columns[0], "end_byte_column": columns[1]}
+        if columns
+        else {}
+    )
+
+
+def _public_symbol(row: Mapping[str, object]) -> dict[str, object]:
+    return {
+        key: value
+        for key, value in row.items()
+        if value is not None or key not in {"start_byte_column", "end_byte_column"}
+    }
 
 
 def _instruction_scope(authority: str) -> str:
@@ -1004,45 +1029,66 @@ class RepositorySource(
     @decision_scoped
     def symbol(self, query: str) -> dict[str, object]:
         self.reads.ready()
-        matches = self.store.symbol(query)
-        if not matches:
-            raise KeyError(f"symbol not found: {query}")
-        visible = [
-            row
-            for row in matches
-            if EvidenceVisibility(str(row["evidence_visibility"]))
-            is not EvidenceVisibility.DENY
-        ]
+        limit = 50
+        visible = self.store.visible_symbol_candidates(query, limit=limit + 1)
         if not visible:
-            raise PermissionError(f"symbol exists but agent context is denied: {query}")
+            if self.store.has_symbol(query):
+                raise PermissionError(
+                    f"symbol exists but agent context is denied: {query}"
+                )
+            raise KeyError(f"symbol not found: {query}")
         return {
             "schema": operation_schema("symbol"),
             "query": query,
             **self.reads.freshness_fields(),
-            "matches": visible,
+            "matches": [
+                {
+                    **_public_symbol(row),
+                    **signature_disclosure(row["path"], row["signature"]),
+                }
+                for row in visible[:limit]
+            ],
+            "matches_truncated": len(visible) > limit,
         }
 
     def _source_visible_matches(
         self,
         query: str,
     ) -> list[dict[str, object]]:
-        if "::" in query:
-            raw_path, qualname = query.split("::", 1)
+        raw_path, separator, qualname = query.partition("::")
+        path = None
+        if separator:
             path = normalize_relative_path(raw_path, allow_root=False)
             self.ensure_current(path)
-            match = self.store.symbol_at(path, qualname)
-            matches = [] if match is None else [match]
-        else:
-            matches = self.store.symbol(query)
-        visible = [
-            dict(row)
-            for row in matches
-            if EvidenceVisibility(str(row["evidence_visibility"]))
-            is not EvidenceVisibility.DENY
-        ]
+        visible = self.store.visible_symbol_candidates(
+            qualname if separator else query, path=path, limit=21
+        )
         if not visible:
             raise KeyError(f"symbol not found: {query}")
         return visible
+
+    @staticmethod
+    def _source_choices(
+        visible: list[dict[str, object]], budget: int
+    ) -> dict[str, object]:
+        rows = visible[:20]
+        preview_bytes = 4 * budget // len(rows)
+        return {
+            "matches": [
+                {
+                    "symbol_id": f"{row['path']}::{row['qualname']}",
+                    "path": row["path"],
+                    "qualname": row["qualname"],
+                    "lines": [row["start_line"], row["end_line"]],
+                    **_column_fields(row),
+                    **signature_disclosure(
+                        str(row["path"]), str(row["signature"]), max_bytes=preview_bytes
+                    ),
+                }
+                for row in rows
+            ],
+            "matches_truncated": len(visible) > len(rows),
+        }
 
     def _source_current_content(
         self,
@@ -1074,51 +1120,34 @@ class RepositorySource(
         if token_budget < 16:
             raise ValueError("token budget must be at least 16")
         visible = self._source_visible_matches(query)
-        if len(visible) > 1 and "::" not in query:
-            return {
-                "schema": operation_schema("source"),
-                "query": query,
-                "ambiguous": True,
-                "matches": [
-                    {
-                        "symbol_id": f"{row['path']}::{row['qualname']}",
-                        "path": row["path"],
-                        "qualname": row["qualname"],
-                        "signature": row["signature"],
-                    }
-                    for row in visible[:20]
-                ],
-            }
-
-        path, qualname, current, body = self._source_current_content(query, visible[0])
-        tokens = estimate_tokens(body)
-        if tokens > token_budget:
-            return {
-                "schema": operation_schema("source"),
-                "query": query,
-                "symbol_id": f"{path}::{qualname}",
-                "path": path,
-                "qualname": qualname,
-                "signature": current["signature"],
-                "lines": [current["start_line"], current["end_line"]],
-                "estimated_tokens": tokens,
-                "budget": token_budget,
-                "too_large": True,
-                "guidance": "Use outline/deps or raise the explicit source budget.",
-            }
-        return {
+        result: dict[str, object] = {
             "schema": operation_schema("source"),
             "query": query,
-            "symbol_id": f"{path}::{qualname}",
-            "path": path,
-            "qualname": qualname,
-            "signature": current["signature"],
-            "lines": [current["start_line"], current["end_line"]],
-            "estimated_tokens": tokens,
-            "budget": token_budget,
-            "too_large": False,
-            "content": body,
         }
+        if len(visible) > 1:
+            result.update(self._source_choices(visible, token_budget))
+            if "::" not in query:
+                return {**result, "ambiguous": True}
+        path, qualname, current, body = self._source_current_content(query, visible[0])
+        tokens = estimate_tokens(body)
+        result.update(
+            symbol_id=f"{path}::{qualname}",
+            path=path,
+            qualname=qualname,
+            lines=[current["start_line"], current["end_line"]],
+            **_column_fields(current),
+            estimated_tokens=tokens,
+            budget=token_budget,
+            too_large=tokens > token_budget,
+            **signature_disclosure(
+                path, str(current["signature"]), max_bytes=4 * token_budget
+            ),
+        )
+        if tokens > token_budget:
+            result["guidance"] = "Use outline/deps or raise the explicit source budget."
+        else:
+            result["content"] = body
+        return result
 
     @staticmethod
     def _instruction_authority_projection(
@@ -1231,9 +1260,11 @@ class RepositorySource(
             "language": row["language"],
             "file_digest": row["file_digest"],
             "full_tokens": row["full_tokens"],
-            "outline_tokens": estimate_tokens(str(row["outline"])),
-            "outline": row["outline"],
-            "symbols": deepcopy(self.reads.symbols_for_path(rel)),
+            **outline_disclosure(
+                rel,
+                str(row["outline"]),
+                [_public_symbol(item) for item in self.reads.symbols_for_path(rel)],
+            ),
             "parse_error": row["parse_error"],
             "evidence_visibility": visibility.value,
             "generation": generation,
@@ -1253,11 +1284,13 @@ class RepositorySource(
             raise PermissionError(
                 f"source body is not visible under the evidence policy: {path}"
             )
+        columns = None
         if qualname is not None:
             current = self.store.symbol_at(path, qualname)
             if current is not None:
                 start = int(current["start_line"])
                 end = int(current["end_line"])
+                columns = _symbol_columns(current)
         observation, raw = self.member(path, include_bytes=True)
         if raw is None:
             if observation.get("reason") == "member-revision-mismatch":
@@ -1265,10 +1298,13 @@ class RepositorySource(
             raise OSError(
                 f"source observation unavailable for {path}: {observation['state']}"
             )
-        lines = self._physical_lines(raw)
+        if qualname is not None and row["language"] == "python":
+            return python_symbol_bytes(
+                python_source_byte_lines(raw), start, end, columns
+            ).decode("utf-8", errors="replace")
         return "\n".join(
             line.decode("utf-8", errors="replace").removesuffix("\n").removesuffix("\r")
-            for line in lines[start - 1 : end]
+            for line in self._physical_lines(raw)[start - 1 : end]
         )
 
     def packet_identity(

@@ -182,23 +182,34 @@ class WorkspaceMapQueryMixin:
             ).fetchall()
         return [dict(row) for row in rows]
 
-    def visible_symbol_candidates(self, query: str, *, limit: int = 33) -> list[dict]:
+    def visible_symbol_candidates(
+        self, query: str, *, limit: int = 33, path: str | None = None
+    ) -> list[dict]:
+        """Look up visible occurrences, including a repeated Python lexical name."""
         if TYPE_CHECKING:
             self = cast("WorkspaceMapStore", self)
         if limit < 1:
             raise ValueError("limit must be >= 1")
-        limit = min(int(limit), 1024)
         self._count_read("visible_symbol_candidates")
+        parent, _, name = query.rpartition(".")
+        scope = "" if path is None else "AND s.path=:path"
+        short_name = "OR s.name=:query" if path is None else ""
         with self._lock:
             rows = self._db.execute(
-                """SELECT s.*, f.evidence_visibility
-                FROM symbol s JOIN file_map f ON f.path=s.path
-                WHERE (s.qualname=? OR s.name=?)
-                  AND f.evidence_visibility!='deny'
-                ORDER BY CASE WHEN s.qualname=? THEN 0 ELSE 1 END,
-                         s.path,s.start_line,s.qualname
-                LIMIT ?""",
-                (query, query, query, limit),
+                f"""SELECT s.*, f.evidence_visibility FROM symbol s
+                JOIN file_map f ON f.path=s.path
+                WHERE f.evidence_visibility!='deny' {scope}
+                  AND (s.qualname=:query {short_name}
+                       OR (f.language='python' AND s.name=:name AND s.parent IS :parent))
+                ORDER BY CASE WHEN s.qualname=:query THEN 0 ELSE 1 END,
+                         s.path,s.start_line,s.qualname LIMIT :bound""",
+                {
+                    "query": query,
+                    "path": path,
+                    "name": name,
+                    "parent": parent or None,
+                    "bound": min(limit, 1024),
+                },
             ).fetchall()
         return [dict(row) for row in rows]
 
@@ -212,6 +223,19 @@ class WorkspaceMapQueryMixin:
                 (query, query, query),
             ).fetchall()
         return [dict(row) for row in rows]
+
+    def has_symbol(self, query: str) -> bool:
+        """Distinguish an inaccessible indexed name from a missing name."""
+        if TYPE_CHECKING:
+            self = cast("WorkspaceMapStore", self)
+        with self._lock:
+            return (
+                self._db.execute(
+                    "SELECT 1 FROM symbol WHERE qualname=? OR name=? LIMIT 1",
+                    (query, query),
+                ).fetchone()
+                is not None
+            )
 
     def edges_from(self, path: str, source: str | None = None) -> list[dict]:
         if TYPE_CHECKING:
@@ -228,18 +252,21 @@ class WorkspaceMapQueryMixin:
                 ).fetchall()
         return [dict(row) for row in rows]
 
-    def refs(self, target: str, *, limit: int = 100) -> list[dict]:
+    def refs(
+        self, target: str, *, limit: int = 100, visible_only: bool = False
+    ) -> list[dict]:
         if TYPE_CHECKING:
             self = cast("WorkspaceMapStore", self)
         if limit < 1:
             raise ValueError("limit must be >= 1")
         limit = min(int(limit), 1024)
         short = target.rsplit(".", 1)[-1]
+        visibility = "AND f.evidence_visibility!='deny'" if visible_only else ""
         self._count_read("refs")
         with self._lock:
             rows = self._db.execute(
-                """SELECT e.*, f.evidence_visibility FROM edge e JOIN file_map f ON f.path=e.path
-                WHERE e.target_short=? ORDER BY e.path,e.line LIMIT ?""",
+                f"""SELECT e.*, f.evidence_visibility FROM edge e JOIN file_map f ON f.path=e.path
+                WHERE e.target_short=? {visibility} ORDER BY e.path,e.line LIMIT ?""",
                 (short, limit),
             ).fetchall()
         return [dict(row) for row in rows]
@@ -874,13 +901,16 @@ class WorkspaceMapQueryMixin:
                 bucket.append(str(row[1]))
         return grouped
 
-    def symbols_named(self, name: str, limit: int = 20) -> list[dict]:
+    def symbols_named(
+        self, name: str, limit: int = 20, *, visible_only: bool = False
+    ) -> list[dict]:
         if TYPE_CHECKING:
             self = cast("WorkspaceMapStore", self)
+        visibility = "AND f.evidence_visibility!='deny'" if visible_only else ""
         with self._lock:
             rows = self._db.execute(
-                """SELECT s.*, f.evidence_visibility FROM symbol s JOIN file_map f ON f.path=s.path
-                WHERE s.name=? ORDER BY s.path,s.start_line LIMIT ?""",
+                f"""SELECT s.*, f.evidence_visibility FROM symbol s JOIN file_map f ON f.path=s.path
+                WHERE s.name=? {visibility} ORDER BY s.path,s.start_line LIMIT ?""",
                 (name, limit),
             ).fetchall()
         return [dict(row) for row in rows]

@@ -71,8 +71,36 @@ same import walk, not rediscovered by another graph. Syntax-qualified test
 helpers can be intermediate source consumers; they are not themselves promoted
 to test membership merely because their path is under `tests/`.
 
+For Python, each source use must resolve to the observed import in its own
+lexical scope. A helper-local import cannot establish a sibling test's use.
+A qualified absolute import of `typing.TYPE_CHECKING` identifies the type-only
+branch, including an alias or the `else` branch of a negated guard. A local
+flag, rebound import, or repository-owned `typing` module retains ordinary
+conditional source evidence. These relationships describe source uses. Native
+execution of a conditional branch remains unobserved. Inside a Python function,
+a local variable's annotation supplies type syntax. The verifier observes the
+assignment target and initializer separately for reachable references.
+With an authored `from __future__ import annotations` or the native Python
+3.14+ deferred evaluation semantics, function, class and module annotations
+supply type relationships. Indexed definition-time calls and verifier references
+still include evaluated defaults, decorator expressions and initializers.
+Python 3.12+ type statements and generic parameters retain their source syntax.
+A type-alias value, generic bound or constraint, and Python 3.13+ type-parameter
+default evaluate on access. Their declaration alone supplies no immediate
+call or verifier relationship. Later introspection remains outside this source
+observation.
+In a task packet, an exact test node comes from a supported top-level test
+declaration containing a qualified reference or literal read. When several
+such tests exist, the existing task-term comparison can distinguish them. A
+tie, class method, or use confined to a helper retains the file target.
+Changed-set membership continues to identify whole files.
+
 Python module data bindings and named type aliases participate in that same
-source relationship owner. They identify authored declarations, not callable
+source relationship owner. Tuple and list assignments include the lexical
+names they bind, including nested and starred targets. Each unpacked name
+has its own lookup key and short target spelling. Its source read returns
+the shared assignment statement. Attribute and subscript writes bind no
+module name. These records identify authored declarations, not callable
 targets or runtime values. A native Python parser that cannot interpret an
 alias's syntax leaves the observation unavailable. An explicit, source-qualified
 pytest `pythonpath` declaration may qualify test imports within that observation;

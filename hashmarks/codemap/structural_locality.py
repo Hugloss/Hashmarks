@@ -18,9 +18,11 @@ from hashmarks.producer_identity import native_producer_implementation_identity
 from hashmarks.python_ast_cache import read_python_ast
 
 from .decision_session import ReadScopeOwner, decision_scoped
-from .model import EvidenceVisibility
+from .model import EvidenceVisibility, symbol_occurrence_parts
 from .ownership.filesystem_lifecycle import locality_lifecycle
+from .python_bindings import python_local_call_bindings, python_nested_call_site
 from .python_exports import (
+    python_class_export_binding,
     python_class_member_binding,
     python_class_node,
     python_expression_call_binds,
@@ -38,6 +40,8 @@ from .structural_locality_model import (
 from .structural_search import AstGrepSearchProvider
 
 if TYPE_CHECKING:
+    from hashmarks.python_ast_cache import PythonAstSnapshot
+
     from .decision_session import DecisionScope
     from .evidence_graph import RepositoryRelationships
     from .import_resolution import RepositoryImports
@@ -255,85 +259,102 @@ class RepositoryStructure(ReadScopeOwner):
         self.source.ensure_current(path)
         return self.reads.symbols_for_path(path)
 
+    def _python_snapshot(self, path: str) -> PythonAstSnapshot | None:
+        try:
+            return read_python_ast(self.workspace / path, errors="replace")
+        except (OSError, SyntaxError, UnicodeError, ValueError):
+            return None
+
     def _python_function_locally_binds(self, path: str, source: str, name: str) -> bool:
         if not path.endswith(".py") or not source or not name:
             return False
-        try:
-            snapshot = read_python_ast(self.workspace / path, errors="replace")
-        except (OSError, SyntaxError, UnicodeError, ValueError):
+        snapshot = self._python_snapshot(path)
+        if snapshot is None:
             return True
         return python_function_scope_binds(
             snapshot.function_definitions_by_qualname, source, name
         )
 
-    def _python_expression_call_locally_binds(
-        self, edge: Mapping[str, object], name: str
-    ) -> bool:
-        try:
-            snapshot = read_python_ast(
-                self.workspace / str(edge["path"]), errors="replace"
-            )
-        except (OSError, SyntaxError, UnicodeError, ValueError):
-            return True
-        source = str(edge.get("source") or "")
-        body = snapshot.tree.body
-        if source:
-            functions = snapshot.function_definitions_by_qualname.get(source, ())
-            if len(functions) != 1:
-                return True
-            body = functions[0].body
-        return python_expression_call_binds(
-            body, name, locality_coordinate(edge.get("line") or 0)
-        )
-
     def _python_plain_call_binding(
         self,
-        *,
-        source_path: str,
-        source_qualname: str,
+        edge: Mapping[str, object],
         short: str,
         evidence: _NamedSymbolCandidateEvidence,
+        snapshot: PythonAstSnapshot,
     ) -> tuple[dict[str, object] | None, list[str], bool]:
         candidates = evidence.rows
         candidate_ids = sorted(_symbol_id(row) for row in candidates)
-        if self._python_function_locally_binds(source_path, source_qualname, short):
+        source_path = str(edge["path"])
+        source_qualname = str(edge.get("source") or "")
+        line = locality_coordinate(edge.get("line") or 0)
+        if not source_path.endswith(".py"):
             return None, candidate_ids, False
-        kind, targets = self.imports._python_export_binding(source_path, short)
+        visible = (
+            self.files.decide(source_path).evidence_visibility
+            is EvidenceVisibility.SOURCE
+        )
+        if source_qualname and python_function_scope_binds(
+            snapshot.function_definitions_by_qualname, source_qualname, short
+        ):
+            site = (
+                python_nested_call_site(snapshot, source_qualname, short, line)
+                if visible
+                else None
+            )
+            owned = (
+                [
+                    row
+                    for row in self._qualified_path_symbols(source_path)
+                    if (row.get("parent"), row.get("start_line")) == site
+                    and row.get("name") == short
+                ]
+                if site is not None
+                else []
+            )
+            return _binding_result(owned, candidates, unresolved=site is not None)
+        observed = self.imports._python_export_observation(
+            source_path, short, before_line=None if source_qualname else line
+        )
+        kind, targets = observed.kind, observed.targets
         if kind in {"ambiguous", "star"} or (kind == "local" and not evidence.complete):
             return None, candidate_ids, True
         if kind == "local":
-            declared = self.imports._python_export_is_declaration(source_path, short)
-            local = [
-                row
-                for row in candidates
-                if declared and str(row.get("path") or "") == source_path
-            ]
-            return _binding_result(
-                local, candidates, unresolved=not declared or len(local) > 1
+            local = (
+                observed.declaration_rows(
+                    short, [row for row in candidates if row.get("path") == source_path]
+                )
+                if visible
+                else []
             )
+            return _binding_result(local, candidates, unresolved=len(local) != 1)
         if kind == "reexport" and len(targets) == 1:
             symbols, unresolved = self.imports._resolve_import_symbol_evidence(
                 source_path, targets[0]
             )
-            if unresolved:
-                return None, candidate_ids, True
-            owned = [
-                row
-                for path, qualname in symbols
-                for row in self._qualified_path_symbols(path)
-                if str(row.get("qualname") or "") == qualname
-            ]
-            return _binding_result(owned, candidates, unresolved=bool(symbols))
+            return self._python_imported_symbol_binding(symbols, unresolved, candidates)
         return None, candidate_ids, False
+
+    def _python_imported_symbol_binding(
+        self,
+        symbols: list[tuple[str, str]],
+        unresolved: bool,
+        candidates: list[dict[str, object]],
+    ) -> tuple[dict[str, object] | None, list[str], bool]:
+        if unresolved:
+            return _binding_result([], candidates, unresolved=True)
+        owned = [
+            row
+            for path, qualname in symbols
+            for row in self._qualified_path_symbols(path)
+            if row.get("qualname") == qualname
+        ]
+        return _binding_result(owned, candidates, unresolved=bool(symbols))
 
     def _python_class_node(self, path: str, qualname: str) -> ast.ClassDef | None:
         if not path.endswith(".py") or not qualname:
             return None
-        try:
-            tree = read_python_ast(self.workspace / path, errors="replace").tree
-        except (OSError, SyntaxError, UnicodeError, ValueError):
-            return None
-        return python_class_node(tree, qualname)
+        snapshot = self._python_snapshot(path)
+        return python_class_node(snapshot.tree, qualname) if snapshot else None
 
     def _python_class_bases(
         self, path: str, qualname: str
@@ -341,35 +362,48 @@ class RepositoryStructure(ReadScopeOwner):
         node = self._python_class_node(path, qualname)
         if node is None:
             return [], True
+        enclosing, _, _ = qualname.rpartition(".")
+        parent = self._python_class_node(path, enclosing) if enclosing else None
+        if enclosing and parent is None:
+            return [], True
         bases: list[tuple[str, str]] = []
-        unresolved = False
         for base in node.bases:
             if not isinstance(base, ast.Name):
-                unresolved = True
-                continue
-            if self._python_class_node(path, base.id) is not None:
-                bases.append((path, base.id))
-                continue
-            kind, targets = self.imports._python_export_binding(path, base.id)
-            if kind != "reexport" or len(targets) != 1:
-                unresolved = True
-                continue
-            owners, import_unresolved = self.imports._resolve_import_owner_evidence(
-                path, targets[0]
+                return [], True
+            owner = self._python_class_header_base(path, base, enclosing, parent)
+            if owner is None:
+                return [], True
+            bases.append(owner)
+        return list(dict.fromkeys(bases)), False
+
+    def _python_class_header_base(
+        self, path: str, base: ast.Name, enclosing: str, parent: ast.ClassDef | None
+    ) -> tuple[str, str] | None:
+        # A nested class header reads its enclosing class namespace before the
+        # module. In either namespace, a later binding cannot prove this base.
+        local_name = base.id
+        observed = None
+        if parent is not None:
+            observed = python_class_export_binding(
+                parent, base.id, before_line=base.lineno
             )
-            class_name = targets[0].lstrip(".").rsplit(".", 1)[-1]
-            matching_paths = sorted(
-                {
-                    owner
-                    for owner in owners
-                    if self._python_class_node(owner, class_name) is not None
-                }
+            local_name = f"{enclosing}.{base.id}"
+        if observed is None or observed.kind == "unknown":
+            observed = self.imports._python_export_observation(
+                path, base.id, before_line=base.lineno
             )
-            if import_unresolved or len(matching_paths) != 1:
-                unresolved = True
-                continue
-            bases.append((matching_paths[0], class_name))
-        return list(dict.fromkeys(bases)), unresolved
+            local_name = base.id
+        if isinstance(observed.declaration, ast.ClassDef):
+            return path, local_name
+        if observed.kind != "reexport" or len(observed.targets) != 1:
+            return None
+        symbols, unresolved = self.imports._resolve_import_symbol_evidence(
+            path, observed.targets[0]
+        )
+        if unresolved or len(symbols) != 1:
+            return None
+        owner = symbols[0]
+        return owner if self._python_class_node(*owner) is not None else None
 
     def _python_method_owner(
         self,
@@ -457,36 +491,40 @@ class RepositoryStructure(ReadScopeOwner):
     def _python_receiver_method(
         class_node: ast.ClassDef, target: _SelfClsCallTarget
     ) -> ast.FunctionDef | ast.AsyncFunctionDef | None:
+        name, line = symbol_occurrence_parts(target.source_method)
         methods = [
             node
             for node in class_node.body
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-            and node.name == target.source_method
+            and node.name == name
+            and (line is None or str(node.lineno) == line)
         ]
         if len(methods) != 1:
             return None
         source_node = methods[0]
-        if (
-            python_class_member_binding(class_node, target.source_method)[1]
-            is not source_node
-        ):
+        if python_class_member_binding(class_node, name)[1] is not source_node:
             return None
         positional = [*source_node.args.posonlyargs, *source_node.args.args]
         if not positional or positional[0].arg != target.receiver:
             return None
-        decorators = {
-            (
-                decorator.id
-                if isinstance(decorator, ast.Name)
-                else decorator.attr
-                if isinstance(decorator, ast.Attribute)
-                else ""
-            )
-            for decorator in source_node.decorator_list
-        }
-        if target.receiver == "cls":
-            return source_node if "classmethod" in decorators else None
-        return source_node if not {"classmethod", "staticmethod"} & decorators else None
+        return source_node
+
+    def _python_method_receiver(
+        self, path: str, method: ast.FunctionDef | ast.AsyncFunctionDef
+    ) -> str | None:
+        if not method.decorator_list:
+            return "self"
+        if len(method.decorator_list) != 1:
+            return None
+        snapshot = self._python_snapshot(path)
+        if snapshot is None:
+            return None
+        descriptor = python_local_call_bindings(snapshot).method_descriptors.get(
+            method.decorator_list[0]
+        )
+        return {"classmethod": "cls", "staticmethod": "static", "property": "self"}.get(
+            descriptor or ""
+        )
 
     def _python_self_cls_call_binding(
         self,
@@ -508,6 +546,9 @@ class RepositoryStructure(ReadScopeOwner):
         if source_node is None:
             return None
         candidate_ids = sorted(_symbol_id(row) for row in candidates)
+        receiver = self._python_method_receiver(source_path, source_node)
+        if receiver != call_target.receiver:
+            return (None, candidate_ids, True) if receiver is None else None
         if python_function_body_binds(source_node, call_target.receiver):
             return None, candidate_ids, True
 
@@ -525,6 +566,7 @@ class RepositoryStructure(ReadScopeOwner):
         *,
         source_path: str,
         source_qualname: str,
+        line: int,
         target: str,
         candidates: list[dict[str, object]],
     ) -> tuple[dict[str, object] | None, list[str], bool, bool]:
@@ -540,6 +582,7 @@ class RepositoryStructure(ReadScopeOwner):
         return self._python_repository_qualified_call_binding(
             source_path=source_path,
             source_qualname=source_qualname,
+            line=line,
             target=target,
             candidates=candidates,
         )
@@ -612,19 +655,31 @@ class RepositoryStructure(ReadScopeOwner):
         *,
         source_path: str,
         source_qualname: str,
+        line: int,
         target: str,
         candidates: list[dict[str, object]],
     ) -> tuple[dict[str, object] | None, list[str], bool, bool]:
         candidate_ids = sorted(_symbol_id(row) for row in candidates)
         root = target.split(".", 1)[0]
-        if not root or self._python_function_locally_binds(
-            source_path, source_qualname, root
+        if (
+            not root.isidentifier()
+            or not source_path.endswith(".py")
+            or self._python_function_locally_binds(source_path, source_qualname, root)
         ):
             return None, candidate_ids, False, True
-        kind, targets = self.imports._python_export_binding(source_path, root)
-        if kind == "local" and self.imports._python_export_is_declaration(
-            source_path, root
-        ):
+        observed = self.imports._python_export_observation(
+            source_path, root, before_line=None if source_qualname else line
+        )
+        kind, targets = observed.kind, observed.targets
+        if kind == "module":
+            symbols, unresolved = self.imports._python_module_call_evidence(
+                observed, target
+            )
+            return (
+                *self._python_imported_symbol_binding(symbols, unresolved, candidates),
+                True,
+            )
+        if kind == "local" and observed.declaration is not None:
             return self._python_local_qualified_call_binding(
                 source_path, target, root, candidates
             )
@@ -642,39 +697,37 @@ class RepositoryStructure(ReadScopeOwner):
         if not short:
             return None, [], False, True
         source_path = str(edge.get("path") or "")
-        name = (
+        evidence = self._visible_named_symbol_candidates(
             self.imports._python_imported_call_name(source_path, short)
             if target == short
             else short
         )
-        evidence = self._visible_named_symbol_candidates(name)
         candidates = evidence.rows
         candidate_ids = sorted(_symbol_id(row) for row in candidates)
         source_qualname = str(edge.get("source") or "")
         source_row = self.store.file_row(source_path)
         language = "" if source_row is None else str(source_row["language"] or "")
-        expression_bound = (
-            language == "python"
-            and self._python_expression_call_locally_binds(
-                edge, target.split(".", 1)[0]
-            )
+        snapshot = self._python_snapshot(source_path) if language == "python" else None
+        unshadowed = snapshot is not None and not python_expression_call_binds(
+            snapshot,
+            source_qualname,
+            target.split(".", 1)[0],
+            locality_coordinate(edge.get("line") or 0),
         )
-        if language == "python" and not expression_bound and target != short:
+        if unshadowed and target != short:
             binding = self._python_qualified_call_binding(
                 source_path=source_path,
                 source_qualname=source_qualname,
+                line=locality_coordinate(edge.get("line") or 0),
                 target=target,
                 candidates=candidates,
             )
             if binding[0] is not None or evidence.complete:
                 return binding
             return None, binding[1], True, False
-        if language == "python" and not expression_bound:
+        if snapshot is not None and unshadowed:
             resolved, ids, unresolved = self._python_plain_call_binding(
-                source_path=source_path,
-                source_qualname=source_qualname,
-                short=short,
-                evidence=evidence,
+                edge, short, evidence, snapshot
             )
             if resolved is not None:
                 return resolved, ids, False, True

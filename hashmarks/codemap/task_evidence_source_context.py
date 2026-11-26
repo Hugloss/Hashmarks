@@ -9,7 +9,7 @@ from collections.abc import Mapping, Sequence
 from itertools import islice
 from typing import TYPE_CHECKING, cast
 
-from hashmarks.python_ast_cache import read_python_ast
+from hashmarks.python_ast_cache import parse_python_ast
 
 from .model import EvidenceVisibility
 from .query_primitives import _TASK_STOPWORDS
@@ -72,23 +72,28 @@ class TaskEvidenceSourceContextMixin:
         if len(groups) < 2:
             return None
         self.source.ensure_current(path)
-        member, _ = self.source.member(path)
+        member, raw = self.source.member(
+            path, include_bytes=True, max_bytes=_MAX_SOURCE_BYTES
+        )
         if (
             member.get("state") != "known-present"
             or member.get("evidence_visibility") != "source"
+            or raw is None
         ):
             return None
+        # Python treats a bare CR as a newline. Raw Source anchors count LF
+        # only, so the same line number may refer to unrelated source.
+        if re.search(rb"\r(?!\n)", raw):
+            return None
         try:
-            if (self.workspace / path).stat().st_size > _MAX_SOURCE_BYTES:
-                return None
-            snapshot = read_python_ast(self.workspace / path)
-        except (OSError, UnicodeError, SyntaxError, ValueError):
+            tree = parse_python_ast(raw, filename=path)
+        except (UnicodeError, SyntaxError, ValueError):
             return None
         self.source.ensure_current(path)
         current_member, _ = self.source.member(path)
         if current_member != member:
             return None
-        names, nodes_truncated = _loaded_names(snapshot.tree)
+        names, nodes_truncated = _loaded_names(tree)
         excluded = _declared_field_spans(row)
         selected = self._task_source_ranked_lines(names, groups, excluded)
         return selected[:_MAX_SOURCE_ANCHORS], {
