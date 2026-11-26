@@ -50,6 +50,12 @@ completeness claim. The observer:
   or `comment` occurrence kinds when the entire occurrence fits one supported
   single-line token. Other languages and ambiguous tokens report `unknown`; this
   is lexical classification, not runtime or semantic identity.
+- In formatted and template strings, a tokenizer that reports replacement-field
+  tokens separately can distinguish names inside braces from literal text.
+  A tokenizer that returns a whole formatted string leaves its kind unknown
+  when the token may contain a replacement field. Hard keywords and conversion
+  flags such as `!r` also have unknown kind. Exact match locations remain
+  available in each case.
 - Records the canonical member revision on each occurrence, and a deterministic
   occurrence identity. It never invents ownership or dynamic binding.
 - Reports UTF-8 BOM, byte size, physical line count, LF/CRLF terminators, maximum

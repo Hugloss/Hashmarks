@@ -1,9 +1,69 @@
+import tokenize
 from pathlib import Path
 
 import pytest
 from contract_assertions import assert_integer, assert_object, assert_records
 
 from hashmarks import CodeMap
+
+
+@pytest.mark.parametrize("prefix", ["f", "Rf", "Fr"])
+def test_formatted_string_fields_cannot_be_labelled_ordinary_string_text(
+    tmp_path: Path, prefix: str
+) -> None:
+    text = (
+        "def fmt(needle, width, r):\n"
+        f'    return {prefix}"tag:{{needle!r:>{{width}}}}" + "return" + f"fixed"\n'
+    )
+    (tmp_path / "value.py").write_text(text)
+    with CodeMap(tmp_path) as repository:
+        packet = repository.source.scoped_literals(
+            ["value.py"], ["needle", "width", "tag:", "r", "return", "fixed", "{needle"]
+        )
+    hits = assert_records(packet["occurrences"])
+    kinds = {
+        (hit["line"], hit["column"], hit["literal"]): hit["occurrence_kind"]
+        for hit in hits
+    }
+    first, second = text.splitlines()
+    split_tokens = hasattr(tokenize, "FSTRING_MIDDLE")
+    for field in ("needle", "width"):
+        assert kinds[(1, first.index(field) + 1, field)] == "identifier"
+        assert kinds[(2, second.index(field) + 1, field)] == (
+            "identifier" if split_tokens else "unknown"
+        )
+    assert kinds[(2, second.index("tag:") + 1, "tag:")] == (
+        "string-literal" if split_tokens else "unknown"
+    )
+    assert kinds[(2, second.index("!r") + 2, "r")] == "unknown"
+    assert kinds[(2, second.index("{needle") + 1, "{needle")] == "unknown"
+    assert kinds[(2, second.index("return") + 1, "return")] == "unknown"
+    assert kinds[(2, second.rindex("return") + 1, "return")] == "string-literal"
+    assert kinds[(2, second.index("fixed") + 1, "fixed")] == "string-literal"
+
+
+@pytest.mark.skipif(
+    not hasattr(tokenize, "TSTRING_MIDDLE"),
+    reason="Native template-string tokens required",
+)
+def test_template_string_text_and_replacement_fields_keep_separate_kinds(
+    tmp_path: Path,
+) -> None:
+    text = 'message = t"label: {item}"\n'
+    (tmp_path / "value.py").write_text(text)
+    with CodeMap(tmp_path) as repository:
+        for literal, expected in (
+            ("label:", "string-literal"),
+            ("item", "identifier"),
+            ("{item", "unknown"),
+        ):
+            (hit,) = assert_records(
+                repository.source.observe("value.py", literal=literal)["occurrences"]
+            )
+            assert (hit["occurrence_kind"], hit["column"]) == (
+                expected,
+                text.index(literal) + 1,
+            )
 
 
 @pytest.mark.parametrize("mode", ["member", "scope", "literals"])

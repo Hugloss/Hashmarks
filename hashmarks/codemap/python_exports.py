@@ -313,6 +313,20 @@ def _call_uses_name(node: ast.Call, name: str) -> bool:
     return isinstance(target, ast.Name) and target.id == name
 
 
+def _comprehension_body(
+    node: ast.ListComp | ast.SetComp | ast.DictComp | ast.GeneratorExp,
+) -> Iterator[ast.expr]:
+    yield from (generator.iter for generator in node.generators[1:])
+    yield from (
+        condition for generator in node.generators for condition in generator.ifs
+    )
+    if isinstance(node, ast.DictComp):
+        yield node.key
+        yield node.value
+    else:
+        yield node.elt
+
+
 def _expression_bound_call(
     node: ast.AST, name: str, line: int, bound: bool = False
 ) -> bool:
@@ -353,16 +367,12 @@ def _expression_bound_call(
         local = bound or any(
             _writes_name(generator.target, name) for generator in node.generators
         )
-        inside = [generator.iter for generator in node.generators[1:]]
-        inside.extend(
-            condition for generator in node.generators for condition in generator.ifs
-        )
-        inside.extend(
-            (node.key, node.value) if isinstance(node, ast.DictComp) else (node.elt,)
-        )
         return _expression_bound_call(
             node.generators[0].iter, name, line, bound
-        ) or any(_expression_bound_call(value, name, line, local) for value in inside)
+        ) or any(
+            _expression_bound_call(value, name, line, local)
+            for value in _comprehension_body(node)
+        )
     return any(
         _expression_bound_call(child, name, line, bound)
         for child in _binding_children(node)
@@ -636,21 +646,80 @@ def _all_statement_exports(
             ) as call
         ) if method in {"append", "extend"}:
             return _call_all_exports(exports, call, method)
-    if _writes_name(node, "__all__", annotation_targets_bind=False) or any(
-        _may_mutate_all(child) for child in _binding_nodes(node)
-    ):
+    if _writes_name(
+        node, "__all__", annotation_targets_bind=False
+    ) or _mutates_module_all(node):
         return AllExportStatus.UNKNOWN
     return exports
 
 
 def _may_mutate_all(node: ast.AST) -> bool:
     match node:
+        case ast.AugAssign(target=ast.Name(id="__all__")):
+            return True
         case ast.Subscript(value=ast.Name(id="__all__"), ctx=ast.Store() | ast.Del()):
             return True
         case ast.Call(func=ast.Attribute(value=ast.Name(id="__all__"), attr=method)):
             # The supported unconditional append/extend cases have already
             # been consumed. Do not execute other methods to derive membership.
             return method not in {"copy", "count", "index"}
+    return False
+
+
+def _all_value_children(node: ast.AST) -> Iterator[ast.AST]:
+    discarded: ast.AST | None = None
+    if isinstance(node, ast.Expr):
+        discarded = node.value
+    elif isinstance(node, (ast.If, ast.While, ast.Assert)):
+        discarded = node.test
+    for child in _binding_children(node):
+        if child is discarded:
+            # Discarding or truth-testing a generator only constructs its
+            # outermost iterable. Stored or passed generators can be consumed.
+            while isinstance(child, ast.GeneratorExp):
+                child = child.generators[0].iter
+        yield child
+
+
+def _mutates_module_all(node: ast.AST, *, class_local: bool = False) -> bool:
+    if not class_local and _may_mutate_all(node):
+        return True
+    if isinstance(node, ast.ClassDef) and _class_mutates_module_all(node):
+        return True
+    if isinstance(node, (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)):
+        # Only the first iterable reads the enclosing class namespace.
+        return (
+            _mutates_module_all(node.generators[0].iter, class_local=class_local)
+            or any(_mutates_module_all(g.target) for g in node.generators)
+            or any(_mutates_module_all(expr) for expr in _comprehension_body(node))
+        )
+    return any(
+        _mutates_module_all(child, class_local=class_local)
+        for child in _all_value_children(node)
+    )
+
+
+def _class_mutates_module_all(node: ast.ClassDef) -> bool:
+    # A fresh class-local container is independent of module membership.
+    class_local = False
+    for statement in node.body:
+        rebinds = _writes_name(statement, "__all__", annotation_targets_bind=False)
+        # A simple augmented assignment reads the previous class-local
+        # receiver. Its right-hand expression can still affect the module.
+        if (
+            class_local
+            and isinstance(statement, ast.AugAssign)
+            and _targets_all([statement.target])
+        ):
+            expression = statement.value
+        else:
+            expression = statement
+        if _mutates_module_all(expression, class_local=class_local and not rebinds):
+            return True
+        if rebinds:
+            class_local = isinstance(
+                _all_assignment(statement), (ast.List, ast.Dict, ast.Set, ast.Tuple)
+            )
     return False
 
 

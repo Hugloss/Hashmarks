@@ -22,6 +22,7 @@ from hashmarks.python_ast_cache import read_python_ast
 from .model import EvidenceVisibility
 from .python_binding_scope import unfiltered_literal_comprehension
 from .verification_defaults import VERIFICATION_RELEVANCE_DEFAULTS
+from .verification_reference_syntax import possible_boolean_operands
 
 if TYPE_CHECKING:
     from .evidence_verification import (
@@ -340,9 +341,10 @@ class _LiteralReadVisitor(ast.NodeVisitor):
             self.generic_visit(node)
 
     def visit_BoolOp(self, node: ast.BoolOp) -> None:
-        self.visit(node.values[0])
+        operands = possible_boolean_operands(node)
+        self.visit(next(operands))
         with self._copy_guard():
-            for operand in node.values[1:]:
+            for operand in operands:
                 self.visit(operand)
 
     def visit_IfExp(self, node: ast.IfExp) -> None:

@@ -429,6 +429,11 @@ occurrence and lists up to 20 matching spans and symbol IDs when the natural
 name repeats. `matches_truncated` describes that list. A line-qualified ID
 such as `codec.py::Codec.encode@L12` reads that occurrence directly.
 
+Python declaration signatures include class keyword unpacking such as
+`**options` and type parameter lists when the native grammar supports them.
+The symbol locator keeps the declaration name, so a generic class `Bucket[T]`
+is still addressable as `api.py::Bucket`.
+
 Python `find`, `symbol`, `deps` candidate records, and symbol source responses show at most 512 UTF-8 bytes per
 signature preview. Source also applies the caller's smaller source budget.
 When a qualified Python source read lists repeated occurrences, the selected
@@ -452,6 +457,10 @@ in the numbered `symbols` array. `outline_signature_previews` counts those
 entries. The symbol path, indexed qualname and source span locate each
 declaration. `outline_tokens` estimates the displayed outline string, while
 `full_tokens`, `signature_tokens` and `body_tokens` retain their indexed costs.
+When several Python module names share an untruncated, single-line assignment,
+the outline text displays that statement once. Each bound name keeps
+its own indexed qualname, span and signature in `symbols`. Statements with
+distinct line or byte-column ranges retain their separate occurrences.
 
 The CLI `symbol` command and `CodeMap.source.symbol()` look up all indexed
 occurrences of a Python lexical name, including overload declarations. They

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections import Counter
+
 from .model import PYTHON_SIGNATURE_PREVIEW_BYTES
 from .python_ast import estimate_tokens
 
@@ -56,6 +58,37 @@ def share_source_signature_budget(
     _fit_signature(selected, budget_bytes - choices_used)
 
 
+def _distinct_whole_binding_lines(
+    outline: str, symbols: list[dict[str, object]]
+) -> str:
+    """Display one whole-line assignment once even when it declares several names."""
+    bindings = Counter(
+        (row["signature"], row["start_line"])
+        for row in symbols
+        if row["kind"] == "binding"
+        and isinstance(row["signature"], str)
+        and row["start_line"] == row["end_line"]
+        and row.get("start_byte_column") is None
+        and row.get("end_byte_column") is None
+    )
+    shared = {
+        f"{signature}  [{line}-{line}]"
+        for (signature, line), count in bindings.items()
+        if count > 1
+    }
+    if not shared:
+        return outline
+    rendered = []
+    displayed: set[str] = set()
+    for line in outline.split("\n"):
+        if line in displayed:
+            continue
+        rendered.append(line)
+        if line in shared:
+            displayed.add(line)
+    return "\n".join(rendered)
+
+
 def outline_disclosure(
     path: str, outline: str, symbols: list[dict[str, object]]
 ) -> dict[str, object]:
@@ -81,6 +114,8 @@ def outline_disclosure(
                 f"{'  ' * qualname.count('.')}{display}  [{symbol['start_line']}-{symbol['end_line']}]"
             )
         outline = "\n".join(lines)
+    if path.lower().endswith((".py", ".pyi")):
+        outline = _distinct_whole_binding_lines(outline, symbols)
     return {
         "outline": outline,
         "outline_tokens": estimate_tokens(outline),

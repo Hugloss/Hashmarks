@@ -503,6 +503,13 @@ or deleted `__all__` declarations retain unresolved export authority.
 Supported unconditional `append` and `extend` operations preserve explicit
 membership. Operations such as `clear()`, slice writes and conditional
 reassignment withdraw it while the original declaration remains readable.
+A class suite can mutate the module's `__all__` during class construction.
+A preceding assignment of a fresh container in that class qualifies subsequent
+direct mutations as class-local. A nested class has its own namespace.
+Only a comprehension's first iterable shares the enclosing class namespace.
+Discarding or truth-testing a generator evaluates that iterable, while its
+body remains deferred. A generator passed or stored for possible consumption
+retains uncertainty about effects in its body.
 A wildcard import inside a compound statement can rebind a name previously
 declared or imported at module scope. Until a later unconditional binding
 qualifies that name, its call and re-export identity remain uncertain.
