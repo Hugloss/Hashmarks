@@ -1200,3 +1200,75 @@ def test_assertion_guard_inputs_and_possible_failure_messages_keep_their_evidenc
         changed = repository.verification.changed_set(["owner.py"])
     assert bool(changed["targets"]) is direct
     assert changed["negative_evidence_admissible"] is False
+
+
+def test_empty_comprehension_cannot_displace_the_actual_test_caller(
+    tmp_path: Path,
+) -> None:
+    with _repository(
+        tmp_path,
+        "from owner import calculate_tax\ndef test_calculate_tax():\n"
+        "    assert [calculate_tax() for _ in []] == []\n",
+    ) as repository:
+        active = "tests/test_live.py"
+        (tmp_path / active).write_text(
+            "from owner import calculate_tax\ndef test_amount():\n"
+            "    assert [calculate_tax() for _ in (1,)] == [2]\n"
+        )
+        repository.index.sync()
+        verify = repository.tasks.evidence("Change calculate_tax in owner.py")[
+            "verification"
+        ]
+        changed = repository.verification.changed_set(["owner.py"])
+        calls = repository.structure.locality("owner.py::calculate_tax", max_depth=0)
+    decoy = next(
+        r
+        for r in verify["relevance"]["candidates"]
+        if r["path"] == "tests/test_amounts.py"
+    )
+    assert decoy.get("reference_strength") == "reachable-import"
+    assert decoy.get("direct_reference") is False
+    assert assert_object(verify["plan"])["test_symbol"] == "test_amount"
+    assert [r["path"] for r in assert_records(changed["targets"])] == [active]
+    assert changed["negative_evidence_admissible"] is False
+    assert {
+        r["source"]
+        for r in assert_records(assert_records(calls["nodes"])[0]["exact_callers"])
+    } == {"test_amount", "test_calculate_tax"}
+
+
+@pytest.mark.parametrize(
+    ("expression", "direct"),
+    [
+        ("{calculate_tax() for _ in {}}", False),
+        ("{calculate_tax(): item for item in ()}", False),
+        ("{item: calculate_tax() for item in ()}", False),
+        ("list(calculate_tax() for _ in b'')", False),
+        ("[True for calculate_tax()[0] in ()]", False),
+        ("[True for calculate_tax()[0] in (1,)]", True),
+        ("[item for item in () if calculate_tax()]", False),
+        ("[item for _ in () for item in calculate_tax()]", False),
+        ("[calculate_tax() for _ in rows if not True]", False),
+        ("[item for item in rows if False if calculate_tax()]", False),
+        ("[calculate_tax() for _ in rows for item in ()]", False),
+        ("[item for _ in calculate_tax() for item in ()]", True),
+        ("[item for _ in rows if calculate_tax() for item in ()]", True),
+        ("[item for item in rows if calculate_tax() if False]", True),
+        ("[calculate_tax() for _ in [*rows]]", True),
+        ("[calculate_tax() for _ in rows if flag]", True),
+    ],
+)
+def test_comprehension_reachability_respects_clause_order(
+    tmp_path: Path, expression: str, direct: bool
+) -> None:
+    with _repository(
+        tmp_path,
+        "from owner import calculate_tax\ndef test_values(rows, flag):\n    result = "
+        + expression
+        + "\n",
+    ) as repository:
+        (tmp_path / "owner.py").write_text("def calculate_tax(): return [1]\n")
+        repository.index.sync()
+        changed = repository.verification.changed_set(["owner.py"])
+    assert bool(changed["targets"]) is direct
+    assert changed["negative_evidence_admissible"] is False

@@ -55,6 +55,29 @@ def _source(packet: Mapping[str, object]) -> dict[str, object]:
 
 
 @pytest.mark.parametrize("mode", ["default", "initial"])
+def test_multiline_loaded_attribute_excerpt_contains_the_requested_spelling(
+    tmp_path: Path, mode: str
+) -> None:
+    (tmp_path / "adapter.py").write_text(
+        "def read(config):\n    return (\n        config\n"
+        "        # Select the declared preference below.\n"
+        "        # Preserve the default for missing options.\n"
+        "        .retry_interval\n    )\n"
+    )
+    with CodeMap(tmp_path) as cm:
+        observation = _source(
+            cm.tasks.evidence("Inspect retry interval in adapter.py", result_mode=mode)
+        )
+    (anchor,) = assert_records(observation["line_anchors"])
+    assert anchor["line"] == 6
+    assert [
+        r["text"]
+        for r in assert_records(anchor["context_excerpt"])
+        if r["role"] == "anchor"
+    ] == ["        .retry_interval"]
+
+
+@pytest.mark.parametrize("mode", ["default", "initial"])
 @pytest.mark.parametrize("limit", [1, 3, 20])
 def test_literal_task_exposes_the_exact_guard_without_owner_or_runtime_inference(
     tmp_path: Path, mode: str, limit: int

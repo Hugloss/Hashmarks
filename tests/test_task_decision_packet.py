@@ -1,13 +1,96 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import TYPE_CHECKING
 
-from contract_assertions import assert_array, assert_number, assert_object, assert_text
+import pytest
+from contract_assertions import (
+    assert_array,
+    assert_number,
+    assert_object,
+    assert_records,
+    assert_text,
+)
 
 from hashmarks.codemap import CodeMap
+from hashmarks.codemap.decision_contract import DecisionPacketContract
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+
+def _assert_decision_signature(row: object, source: object) -> None:
+    if source is None:
+        assert row is None
+        return
+    original = assert_object(source)
+    signature = original.get("signature")
+    if not isinstance(signature, str) or len(signature.encode()) <= 512:
+        assert row == original
+        return
+    assert row == {
+        **original,
+        "signature": None,
+        "signature_preview": signature.encode()[:512].decode("utf-8", errors="ignore"),
+        "signature_truncated": True,
+    }
+
+
+@pytest.mark.parametrize(
+    ("ambiguous", "long_verifier"), [(False, False), (False, True), (True, False)]
+)
+def test_python_decision_locators_do_not_repeat_full_defaults(
+    tmp_path: Path,
+    ambiguous: bool,
+    long_verifier: bool,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    opening = "def encode_record(value='"
+    literal = "a" * (511 - len(opening)) + "界" * 1000
+    definition = f"{opening}{literal}'):\n    return value\n"
+    (tmp_path / "writer.py").write_text(definition, encoding="utf-8")
+    if ambiguous:
+        (tmp_path / "reader.py").write_text(definition, encoding="utf-8")
+    else:
+        argument = f"flag='{literal}'" if long_verifier else ""
+        (tmp_path / "test_writer.py").write_text(
+            f"from writer import encode_record\ndef test_encode_record({argument}): return encode_record()\n",
+            encoding="utf-8",
+        )
+    task = "Fix encode_record"
+    with CodeMap(tmp_path) as repository:
+        repository.index.sync()
+        full = repository.tasks.evidence(task)
+        action = repository.tasks.action_map(task)
+        original = deepcopy(action)
+        monkeypatch.setattr(
+            repository.tasks, "action_map", lambda *args, **kwargs: action
+        )
+        packet = repository.tasks.decision_packet(task)
+    assert action == original and packet["evidence_receipt"] == full["evidence_receipt"]
+    assert packet["ownership_authority"] == action["ownership_authority"]
+    assert packet["verification_relevance"] == action["verification_relevance"]
+    contract = DecisionPacketContract.parse(packet)
+    assert contract.ambiguous is ambiguous
+    for key, source in (
+        ("edit", action["action_edit"]),
+        ("candidate", action["edit"]),
+        ("verify", action["verify"]),
+        ("contract", action["contract"]),
+    ):
+        _assert_decision_signature(packet[key], source)
+    uncertainty = assert_object(packet["ambiguity"])
+    for group in ("candidates", "alternatives", "task_local_verification_origins"):
+        for row, source in zip(
+            assert_records(uncertainty[group]),
+            assert_records(assert_object(action["ambiguity"])[group]),
+            strict=True,
+        ):
+            _assert_decision_signature(row, source)
+    assert (
+        assert_object(full["ownership"]["candidate"])["signature"]
+        == f"{opening}{literal}')"
+    )
 
 
 def test_decision_packet_discriminates_unproven_ranked_candidate(

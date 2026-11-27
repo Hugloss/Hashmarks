@@ -115,6 +115,11 @@ A type-alias value, generic bound or constraint, and Python 3.13+ type-parameter
 default evaluate on access. Their declaration alone supplies no immediate
 call or verifier relationship. Later introspection remains outside this source
 observation.
+For supported Python comprehension uses, the verifier observes iterables and
+filters in evaluation order. An explicitly empty synchronous iterable or a false
+literal filter precludes later clauses and the result expression, including
+both the key and value of a dictionary comprehension. Earlier possible uses
+retain their source evidence.
 A standalone lambda or generator expression is discarded. A direct assertion
 of either object tests its truth without calling the lambda or iterating the
 generator. In these positions the verifier and call index retain creation-time

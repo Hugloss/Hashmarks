@@ -11,7 +11,7 @@ from __future__ import annotations
 import ast
 from collections import Counter
 from collections.abc import Iterator
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING, cast
@@ -31,6 +31,7 @@ from .verification_reference_syntax import (
     empty_loop_else_exits,
     literal_truth,
     possible_boolean_operands,
+    possible_comprehension_inputs,
     visit_suite_fields,
 )
 
@@ -316,13 +317,19 @@ class _LiteralReadVisitor(ast.NodeVisitor):
     def visit_Lambda(self, node: ast.Lambda) -> None:
         return
 
-    def _visit_comprehension(self, node: ast.expr) -> None:
+    def _visit_comprehension(
+        self, node: ast.ListComp | ast.SetComp | ast.DictComp
+    ) -> None:
         outer_targets = self.iterated_targets
         self.iterated_targets = set()
-        if unfiltered_literal_comprehension(node):
-            self.generic_visit(node)
-        else:
-            self._visit_copy_guarded(node)
+        guard = (
+            nullcontext()
+            if unfiltered_literal_comprehension(node)
+            else self._copy_guard()
+        )
+        with guard:
+            for expression in possible_comprehension_inputs(node):
+                self.visit(expression)
         self.iterated_targets = outer_targets
 
     visit_ListComp = _visit_comprehension

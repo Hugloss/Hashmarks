@@ -44,16 +44,40 @@ def assertion_message_unreachable(test: ast.expr) -> bool:
     )
 
 
-def empty_literal_loop(node: ast.For | ast.While) -> bool:
-    """Only literal inputs whose syntax guarantees zero iterations."""
-    if isinstance(node, ast.While):
-        return literal_truth(node.test) is False
-    match node.iter:
+def _empty_literal_iterable(node: ast.expr) -> bool:
+    match node:
         case ast.List(elts=[]) | ast.Tuple(elts=[]) | ast.Dict(keys=[]):
             return True
         case ast.Constant(value="" | b""):
             return True
     return False
+
+
+def empty_literal_loop(node: ast.For | ast.While) -> bool:
+    """Only literal inputs whose syntax guarantees zero iterations."""
+    if isinstance(node, ast.While):
+        return literal_truth(node.test) is False
+    return _empty_literal_iterable(node.iter)
+
+
+def possible_comprehension_inputs(
+    node: ast.ListComp | ast.SetComp | ast.DictComp | ast.GeneratorExp,
+) -> Iterator[ast.expr]:
+    """Yield possible source uses in comprehension evaluation order."""
+    for clause in node.generators:
+        yield clause.iter
+        if not clause.is_async and _empty_literal_iterable(clause.iter):
+            return
+        yield clause.target
+        for condition in clause.ifs:
+            yield condition
+            if literal_truth(condition) is False:
+                return
+    if isinstance(node, ast.DictComp):
+        yield node.key
+        yield node.value
+    else:
+        yield node.elt
 
 
 def empty_loop_else_exits(statement: ast.stmt) -> bool:
@@ -217,6 +241,17 @@ class _VerificationReferenceIndexVisitor(PythonReferenceVisitor):
     def visit_BoolOp(self, node: ast.BoolOp) -> None:
         for operand in possible_boolean_operands(node):
             self.visit(operand)
+
+    def _visit_comprehension(
+        self, node: ast.ListComp | ast.SetComp | ast.DictComp | ast.GeneratorExp
+    ) -> None:
+        for expression in possible_comprehension_inputs(node):
+            self.visit(expression)
+
+    visit_ListComp = _visit_comprehension
+    visit_SetComp = _visit_comprehension
+    visit_DictComp = _visit_comprehension
+    visit_GeneratorExp = _visit_comprehension
 
     def visit_For(self, node: ast.For) -> None:
         self.visit(node.iter)

@@ -186,6 +186,11 @@ and completeness still qualify every claimed direct relationship.
 
 Task packets and briefs now use `CodeMap.tasks.evidence()`, `.action_brief()`,
 `.decision_packet()`, `.decision_brief()` and `.decision_brief_budget_sweep()`.
+In `.decision_packet()`, the edit, candidate, verifier, contract and ambiguity
+locators retain up to 512 UTF-8 bytes of Python signature text. An oversized
+signature has `signature: null`, `signature_truncated: true` and a
+`signature_preview`. Its indexed path, qualified name and source span remain
+available for an exact source read.
 The task component borrows Context and reuses its scoped task observation across
 all projections. Its Source comes from the supplied Search owner, rather than a
 second independently supplied source argument. Flat root packet methods and

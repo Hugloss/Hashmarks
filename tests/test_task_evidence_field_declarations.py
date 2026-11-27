@@ -217,6 +217,88 @@ def test_task_matches_field_before_limiting_classes(tmp_path: Path) -> None:
     ] == [[2, 0]]
 
 
+@pytest.mark.parametrize("mode", ["default", "initial"])
+@pytest.mark.parametrize("selector", ["Client.timeout", "settings.Client.timeout"])
+def test_dotted_field_uses_declaring_class_before_the_group_limit(
+    tmp_path: Path, mode: str, selector: str
+) -> None:
+    (tmp_path / "settings.py").write_text(
+        "class Batch:\n    timeout: int = 1\n"
+        "class Database:\n    timeout: int = 2\n"
+        "class Proxy:\n    timeout: int = 3\n"
+        "class Client:\n    timeout: int = 15\n    attempts: int = 2\n"
+    )
+    with CodeMap(tmp_path) as cm:
+        ctx = _context(
+            cm.tasks.evidence(f"Inspect {selector} in settings.py", result_mode=mode)
+        )
+        bare = _context(
+            cm.tasks.evidence("Inspect timeout in settings.py", result_mode=mode)
+        )
+        unknown = [
+            _context(
+                cm.tasks.evidence(
+                    f"Inspect {expression} in settings.py", result_mode=mode
+                )
+            )
+            for expression in (
+                "instance.timeout",
+                "items[0].Client.timeout",
+                "store.current().Client.timeout",
+            )
+        ]
+    assert (ctx["observed"], ctx["returned"], ctx["omitted"]) == (4, 1, 3)
+    assert (
+        ctx["coverage"] == "incomplete" and ctx["negative_evidence_admissible"] is False
+    )
+    (group,) = assert_records(ctx["groups"])
+    assert assert_object(group["scope"])["class_name_syntax"] == "Client"
+    fields = assert_records(assert_object(group["value"])["fields"])
+    assert [f["name"] for f in fields] == (
+        ["timeout", "attempts"] if mode == "default" else ["timeout"]
+    )
+    assert fields[0]["line"] == 8
+    choice = assert_object(ctx["initial_field_selection"])
+    assert choice["fields"] == [[0, 0]] and choice["selection_authority"] is False
+    for fallback in (bare, *unknown):
+        assert [
+            assert_object(g["scope"])["class_name_syntax"]
+            for g in assert_records(fallback["groups"])
+        ] == ["Batch", "Database", "Proxy"]
+
+
+def test_nested_and_repeated_qualified_fields_keep_each_real_occurrence(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "settings.py").write_text(
+        "class First:\n    class Options:\n        timeout: int = 1\n"
+        "class Second:\n    class Options:\n        timeout: int = 2\n"
+        "class Second:\n    class Options:\n        timeout: int = 3\n"
+        "class Café:\n    retries: int = 4\n"
+    )
+    with CodeMap(tmp_path) as cm:
+        for task in (
+            "Second.Options.timeout and Café.retries",
+            "Second.Options.timeout and retries",
+        ):
+            ctx = _context(
+                cm.tasks.evidence(
+                    f"Inspect {task} in settings.py", result_mode="initial"
+                )
+            )
+            assert [
+                (f["name"], f["line"])
+                for g in assert_records(ctx["groups"])
+                for f in assert_records(assert_object(g["value"])["fields"])
+            ] == [("timeout", 6), ("timeout", 9), ("retries", 11)]
+        decomposed = _context(
+            cm.tasks.evidence(
+                "Inspect Cafe\u0301.retries in settings.py", result_mode="initial"
+            )
+        )
+        assert (decomposed["returned"], decomposed["omitted"]) == (1, 3)
+
+
 def test_literal_field_survives_competing_partial_class_and_field_matches(
     tmp_path: Path,
 ) -> None:

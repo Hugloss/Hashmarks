@@ -517,6 +517,11 @@ declaration, including one re-exported by `pkg.service`. Qualification uses
 the indexed module identity, the imported spelling and the existing member
 resolver. Local shadowing, visible writes through the imported receiver,
 and competing module paths keep the call unqualified.
+A write through a qualified assignment alias, such as `patch = svc` followed
+by `patch.publish = replacement`, also leaves `svc.publish()` unresolved.
+Relative imports of the written receiver are qualified against the caller's
+indexed package, keeping same-named sibling modules distinct.
+An exact call to `replacement` requires separate call-site evidence.
 
 For a computed receiver such as `items[0].save()`, the indexed call spells
 the target `<expression>.save`. The named suffix remains visible without

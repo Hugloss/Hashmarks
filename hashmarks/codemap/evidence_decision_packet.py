@@ -9,10 +9,12 @@ from hashmarks.operation_contract import operation_response, operation_schema
 
 from .decision_session import ReadScopeOwner, incomplete_decision_scoped
 from .repository_observation import packet_digest
+from .signature_preview import bounded_signature_locator
 from .verification_relevance_model import _VerificationSelectionState
 
 if TYPE_CHECKING:
     from .repository_tasks import RepositoryTasks
+    from .task_evidence_types import TaskAmbiguity
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,6 +27,16 @@ class TaskDecisionOptions:
 
 
 TASK_DECISION_DEFAULT_OPTIONS = TaskDecisionOptions()
+
+
+def _decision_ambiguity(ambiguity: TaskAmbiguity) -> dict[str, object]:
+    return {
+        **ambiguity,
+        **{
+            key: [bounded_signature_locator(row) for row in ambiguity[key]]
+            for key in ("candidates", "alternatives", "task_local_verification_origins")
+        },
+    }
 
 
 def _append_decision_candidate(
@@ -264,8 +276,9 @@ class DecisionPacketMixin(ReadScopeOwner):
             per_role=per_role,
         )
         timing.record("action_map")
-        edit_value = action.get("action_edit")
-        edit = edit_value if isinstance(edit_value, Mapping) else None
+        edit = action.get("action_edit")
+        if not isinstance(edit, Mapping):
+            edit = None
         verify = (
             action.get("verify") if isinstance(action.get("verify"), dict) else None
         )
@@ -294,16 +307,21 @@ class DecisionPacketMixin(ReadScopeOwner):
             )
         )
         evidence_receipt = self._decision_evidence_receipt(task, action, verification)
+        locators = {
+            "edit": bounded_signature_locator(edit),
+            "candidate": bounded_signature_locator(action.get("edit")),
+            "verify": bounded_signature_locator(verify),
+            "contract": bounded_signature_locator(action.get("contract")),
+            "ambiguity": _decision_ambiguity(action["ambiguity"]),
+        }
         timing.record("packet_assembly")
         timing.finish()
 
         return {
             "schema": operation_schema("task_decision_packet"),
             "task": task,
-            "edit": edit,
-            "candidate": action.get("edit"),
+            **locators,
             "ownership_authority": action.get("ownership_authority"),
-            "verify": verify,
             "verification_relevance": action.get("verification_relevance"),
             "symbolic_nomination": self.search._symbolic_task_nomination(task),
             "verification_plan": verification,
@@ -320,12 +338,10 @@ class DecisionPacketMixin(ReadScopeOwner):
                 if verify is None
                 else self.index._index_surface_for_path(str(verify.get("path") or "")),
             },
-            "contract": action.get("contract"),
             "ownership_resolution": action.get("ownership_resolution"),
             "structural_start_summary": self._decision_packet_structural_start_summary(
                 action
             ),
-            "ambiguity": action.get("ambiguity"),
             "discrimination": discrimination,
             "evidence_receipt": evidence_receipt,
             "canonical_generation": identity["codemap_generation"],
