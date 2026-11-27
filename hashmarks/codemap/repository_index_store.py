@@ -321,6 +321,9 @@ class WorkspaceMapStore(WorkspaceMapQueryMixin):
               index_surface TEXT NOT NULL DEFAULT 'other',
               lexical_count INTEGER NOT NULL DEFAULT 0
             );
+            CREATE INDEX IF NOT EXISTS file_python_package_idx
+              ON file_map(substr(module_name,1,instr(module_name||'.','.')-1))
+              WHERE language='python';
             CREATE TABLE IF NOT EXISTS symbol (
               path TEXT NOT NULL,
               name TEXT NOT NULL,

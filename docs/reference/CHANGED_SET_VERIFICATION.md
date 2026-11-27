@@ -74,8 +74,11 @@ to test membership merely because their path is under `tests/`.
 For Python, each source use must resolve to the observed import in its own
 lexical scope. A helper-local import cannot establish a sibling test's use.
 A qualified absolute import of `typing.TYPE_CHECKING` identifies the type-only
-branch, including an alias or the `else` branch of a negated guard. A local
-flag, rebound import, or repository-owned `typing` module retains ordinary
+branch, including an alias or the `else` branch of a negated guard. For an
+`if` or conditional expression, a qualified leading prefix of a flat `and` or
+`or` guard can also establish that later operands and one arm are unreachable.
+Earlier possible source uses remain visible. An unknown prefix leaves branch
+identity open. A local flag, rebound import, or repository-owned `typing` module retains ordinary
 conditional source evidence. These relationships describe source uses. Native
 execution of a conditional branch remains unobserved. The verifier treats
 statements following a direct `return`, `raise`, `break` or `continue` in the

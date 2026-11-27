@@ -102,6 +102,13 @@ class _ImpactCandidate:
     force_role: str | None = None
     verification: dict[str, object] | None = None
 
+    def attach_route(self, row: dict[str, object]) -> None:
+        row.update(via=self.reason, depth=self.depth)
+        if self.relation:
+            row["relation"] = self.relation
+        else:
+            row.pop("relation", None)
+
 
 @dataclass
 class _ImpactState:
@@ -123,7 +130,7 @@ class _ImpactState:
             )
         }
     )
-    seen: set[tuple[str, str]] = field(default_factory=set)
+    by_role_path: dict[tuple[str, str], dict[str, object]] = field(default_factory=dict)
     impacted_projects: set[str] = field(default_factory=set)
     project_roots: set[str] = field(default_factory=set)
     project_depths: dict[str, int] = field(default_factory=dict)
@@ -160,15 +167,6 @@ class _ImpactState:
             is not EvidenceVisibility.DENY
         )
 
-    def _promote_verification(
-        self, role: str, path: str, verification: dict[str, object]
-    ) -> None:
-        for existing in self.surfaces[role]:
-            if str(existing.get("path") or "") == path:
-                existing["verify"] = verification
-                existing["selected"] = True
-                break
-
     def add(self, candidate: _ImpactCandidate) -> None:
         path = candidate.path
         if not path or path in self.changed or not self.visible(path):
@@ -179,28 +177,26 @@ class _ImpactState:
             else self.roles(path)
         )
         for role in roles:
-            if (
-                role not in self.surfaces
-                or len(self.surfaces[role]) >= self.per_surface_limit
-            ):
+            surface = self.surfaces.get(role)
+            if surface is None:
                 continue
             key = (role, path)
-            if key in self.seen:
-                if candidate.verification:
-                    self._promote_verification(role, path, candidate.verification)
-                continue
-            row: dict[str, object] = {
-                "path": path,
-                "depth": int(candidate.depth),
-                "via": candidate.reason,
-            }
-            if candidate.relation:
-                row["relation"] = candidate.relation
+            row = self.by_role_path.get(key)
+            if row is None:
+                if len(surface) >= self.per_surface_limit:
+                    continue
+                row = dict[str, object](path=path)
+                candidate.attach_route(row)
+                self.by_role_path[key] = row
+                surface.append(row)
+            elif (
+                row["via"] == "reverse-impact" and candidate.reason == "task-owner-path"
+            ):
+                # The observed owner chain also identifies the relation for this row.
+                candidate.attach_route(row)
             if candidate.verification:
                 row["verify"] = candidate.verification
                 row["selected"] = True
-            self.surfaces[role].append(row)
-            self.seen.add(key)
 
     def merge_project_fragment(self, fragment: dict[str, Any]) -> None:
         self.project_roots.update(

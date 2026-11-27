@@ -5,6 +5,7 @@ from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass, replace
 from enum import Enum
 from functools import cached_property, lru_cache
+from itertools import chain
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
@@ -374,11 +375,15 @@ def _expression_bound_call(
         local = bound or any(
             _writes_name(generator.target, name) for generator in node.generators
         )
+        # Assigning to an attribute or subscript evaluates its receiver here.
+        expressions = chain(
+            (generator.target for generator in node.generators),
+            _comprehension_body(node),
+        )
         return _expression_bound_call(
             node.generators[0].iter, name, line, bound
         ) or any(
-            _expression_bound_call(value, name, line, local)
-            for value in _comprehension_body(node)
+            _expression_bound_call(value, name, line, local) for value in expressions
         )
     return any(
         _expression_bound_call(child, name, line, bound)

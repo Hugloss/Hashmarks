@@ -1316,6 +1316,7 @@ def _supplied_arguments(
 class PythonLocalCallBindings:
     method_descriptors: Mapping[ast.expr, str]
     nested_calls: Mapping[tuple[ast.AST, int, str], int]
+    function_module_imports: Mapping[tuple[ast.AST, str], ast.alias]
     receiver_calls: frozenset[tuple[ast.AST, int, str]]
     class_member_writes: frozenset[tuple[ast.ClassDef, str | None]] | None
     imported_member_writes: frozenset[tuple[int, tuple[str, ...]]] | None
@@ -1366,6 +1367,7 @@ def python_local_call_bindings(snapshot: PythonAstSnapshot) -> PythonLocalCallBi
         return PythonLocalCallBindings(
             MappingProxyType({}),
             MappingProxyType({}),
+            MappingProxyType({}),
             frozenset(),
             None,
             None,
@@ -1399,6 +1401,15 @@ def python_local_call_bindings(snapshot: PythonAstSnapshot) -> PythonLocalCallBi
     return PythonLocalCallBindings(
         MappingProxyType(descriptors),
         MappingProxyType(nested_calls),
+        MappingProxyType(
+            {
+                (scope.node, binding.name): cast(ast.alias, binding.node)
+                for scope in bindings.syntax.function_scopes.values()
+                for binding in scope.bindings.values()
+                if isinstance(binding.imported, ast.Import)
+                and bindings.syntax.lookup(binding.name, scope) is binding
+            }
+        ),
         frozenset(receiver_calls),
         bindings.class_member_writes,
         frozenset(
@@ -1553,6 +1564,25 @@ def python_nested_call_site(
         (callers[0], line, name)
     )
     return (source, start) if start is not None else None
+
+
+def python_function_module_import(
+    snapshot: PythonAstSnapshot, source: str, name: str, line: int
+) -> ast.alias | None:
+    """Observe a uniquely bound explicit module import in this function before the call."""
+    callers = python_source_functions(snapshot.function_definitions_by_qualname, source)
+    if len(callers) != 1 or not any(
+        isinstance(node, ast.Import) for node in callers[0].body
+    ):
+        return None
+    alias = python_local_call_bindings(snapshot).function_module_imports.get(
+        (callers[0], name)
+    )
+    return (
+        alias
+        if alias is not None and (alias.end_lineno or alias.lineno) < line
+        else None
+    )
 
 
 def python_bindings(

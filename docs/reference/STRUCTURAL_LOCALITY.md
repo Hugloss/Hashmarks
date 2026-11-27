@@ -48,6 +48,15 @@ For a wrapped call, the edge points to the line spelling the callee name. A
 multiline dotted call points to its final attribute. Forward edges, reverse
 callers and verifier witnesses share that location. Import edges point to the
 start of the individual imported name, including each entry in a grouped import.
+
+Python file impact (`affected` and `tests`) expands a relative import against
+the importing member's indexed package, including configured source roots
+and package initializers. Forward dependency paths and reverse levels use
+the longest module prefix with a unique repository owner. A collision at
+that prefix leaves the owner unresolved. A relative import from a top-level
+script, or above its top-level package, has no qualified repository path.
+The indexed reverse traversal reads relative imports once for each top-level
+package it enters and reuses them across depth levels in that request.
 When a header calls the name its declaration will publish, the final file
 binding cannot prove that earlier call's target. Such calls remain unresolved;
 ordinary body recursion and parameter names do not change that boundary.
@@ -517,6 +526,11 @@ declaration, including one re-exported by `pkg.service`. Qualification uses
 the indexed module identity, the imported spelling and the existing member
 resolver. Local shadowing, visible writes through the imported receiver,
 and competing module paths keep the call unqualified.
+An unconditional module import inside a function can qualify a later call
+in that function, including a call in a nested definition's default. The
+function's binding takes precedence over a same-named module-level import.
+Calls before or on the import line, competing assignments, and receivers
+shadowed inside an expression retain uncertainty.
 A write through a qualified assignment alias, such as `patch = svc` followed
 by `patch.publish = replacement`, also leaves `svc.publish()` unresolved.
 Relative imports of the written receiver are qualified against the caller's

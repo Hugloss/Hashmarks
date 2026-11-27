@@ -212,7 +212,7 @@ class _VerificationReferenceIndexVisitor(PythonReferenceVisitor):
     def generic_visit(self, node: ast.AST) -> None:
         visit_suite_fields(node, self.visit, self._visit_suite)
 
-    def _guarded_branches(
+    def _operand_guards(
         self, test: ast.expr, *, allow_typing_guard: bool = True
     ) -> tuple[str | None, str | None]:
         truth = literal_truth(test)
@@ -227,10 +227,43 @@ class _VerificationReferenceIndexVisitor(PythonReferenceVisitor):
                 )
             ):
                 return None, None
-            self.used_typing_guard = True
             reason = "type-checking-only"
             truth = negated
         return (None, reason) if truth else (reason, None)
+
+    def _visit_boolean_guard(self, node: ast.BoolOp) -> tuple[str | None, str | None]:
+        """Observe a flat guard in order; only a qualified prefix can decide its arms."""
+        stop_if_true = isinstance(node.op, ast.Or)
+        prefix_reason: str | None = "statically-dead"
+        for operand in possible_boolean_operands(node):
+            self.visit(operand)
+            if prefix_reason is None:
+                continue
+            body, otherwise = self._operand_guards(operand)
+            stop_reason = otherwise if stop_if_true else body
+            if stop_reason is not None:
+                return body, otherwise
+            next_reason = body if stop_if_true else otherwise
+            if next_reason is None or next_reason == "type-checking-only":
+                prefix_reason = next_reason
+        return (prefix_reason, None) if stop_if_true else (None, prefix_reason)
+
+    def _visit_guard(
+        self, test: ast.expr, *, allow_typing_guard: bool = True
+    ) -> tuple[str | None, str | None]:
+        operand, negated = _unnegated_test(test)
+        if allow_typing_guard and isinstance(operand, ast.BoolOp):
+            body, otherwise = self._visit_boolean_guard(operand)
+            if negated:
+                body, otherwise = otherwise, body
+        else:
+            self.visit(test)
+            body, otherwise = self._operand_guards(
+                test, allow_typing_guard=allow_typing_guard
+            )
+        if "type-checking-only" in (body, otherwise):
+            self.used_typing_guard = True
+        return body, otherwise
 
     def visit_Assert(self, node: ast.Assert) -> None:
         if assertion_message_unreachable(node.test):
@@ -264,8 +297,7 @@ class _VerificationReferenceIndexVisitor(PythonReferenceVisitor):
         self._visit_suite(node.orelse)
 
     def visit_IfExp(self, node: ast.IfExp) -> None:
-        self.visit(node.test)
-        body_guard, else_guard = self._guarded_branches(node.test)
+        body_guard, else_guard = self._visit_guard(node.test)
         if body_guard is None:
             self.visit(node.body)
         if else_guard is None:
@@ -273,9 +305,8 @@ class _VerificationReferenceIndexVisitor(PythonReferenceVisitor):
 
     def _visit_guarded_suites(self, node: ast.If | ast.While) -> None:
         previous = self.guard
-        self.visit(node.test)
         # Only a literal has fixed truth across every loop-condition check.
-        body, otherwise = self._guarded_branches(
+        body, otherwise = self._visit_guard(
             node.test, allow_typing_guard=isinstance(node, ast.If)
         )
         self.guard = previous or body

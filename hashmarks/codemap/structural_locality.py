@@ -23,12 +23,14 @@ from .ownership.filesystem_lifecycle import locality_lifecycle
 from .python_bindings import (
     PythonMethodCall,
     python_direct_method,
+    python_function_module_import,
     python_import_member_changed,
     python_initializer_effect,
     python_local_call_bindings,
     python_nested_call_site,
 )
 from .python_exports import (
+    PythonExportBinding,
     python_class_export_binding,
     python_class_node,
     python_expression_call_binds,
@@ -265,14 +267,19 @@ class RepositoryStructure(ReadScopeOwner):
         except (OSError, SyntaxError, UnicodeError, ValueError):
             return None
 
-    def _python_function_locally_binds(self, path: str, source: str, name: str) -> bool:
-        if not path.endswith(".py") or not source or not name:
-            return False
-        snapshot = self._python_snapshot(path)
-        if snapshot is None:
-            return True
-        return python_function_scope_binds(
+    def _python_call_root_binding(
+        self, path: str, source: str, name: str, line: int, snapshot: PythonAstSnapshot
+    ) -> PythonExportBinding:
+        if source and python_function_scope_binds(
             snapshot.function_definitions_by_qualname, source, name
+        ):
+            if self.files.decide(path).evidence_visibility is EvidenceVisibility.SOURCE:
+                alias = python_function_module_import(snapshot, source, name, line)
+                if alias is not None:
+                    return PythonExportBinding("module", module_import=alias)
+            return PythonExportBinding("unknown")
+        return self.imports._python_export_observation(
+            path, name, before_line=None if source else line
         )
 
     def _python_plain_call_binding(
@@ -666,16 +673,16 @@ class RepositoryStructure(ReadScopeOwner):
         if (
             not root.isidentifier()
             or not source_path.endswith(".py")
-            or self._python_function_locally_binds(source_path, source_qualname, root)
+            or (snapshot := self._python_snapshot(source_path)) is None
         ):
             return None, candidate_ids, False, True
-        observed = self.imports._python_export_observation(
-            source_path, root, before_line=None if source_qualname else line
+        observed = self._python_call_root_binding(
+            source_path, source_qualname, root, line, snapshot
         )
         kind, targets = observed.kind, observed.targets
         if kind == "module":
             symbols, unresolved = self.imports._python_module_call_evidence(
-                source_path, observed, target, self._python_snapshot(source_path)
+                source_path, observed, target, snapshot
             )
             return (
                 *self._python_imported_symbol_binding(symbols, unresolved, candidates),

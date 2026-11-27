@@ -9,7 +9,13 @@ from hashmarks.operation_contract import operation_response, operation_schema
 from hashmarks.paths import normalize_relative_path
 
 from .decision_session import ReadScopeOwner, decision_scoped
+from .import_resolution import (
+    python_import_spelling,
+    python_module_prefixes,
+    unique_python_module_owner,
+)
 from .model import EvidenceVisibility
+from .providers import source_grammar
 from .repository_domains import is_test_path
 from .signature_preview import signature_disclosure
 
@@ -17,7 +23,7 @@ if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
     from .decision_session import DecisionScope
-    from .import_resolution import RepositoryImports
+    from .import_resolution import PythonImportSites, RepositoryImports
     from .native_evidence import RepositoryNativeEvidence
 
 
@@ -48,20 +54,6 @@ class RepositoryRelationships(ReadScopeOwner):
         return self._reads
 
     @staticmethod
-    def _python_file_graph_targets(
-        target: str, module_paths: dict[str, list[str]]
-    ) -> set[str]:
-        if target.startswith("."):
-            return set()
-        candidate = target
-        while candidate:
-            resolved = module_paths.get(candidate)
-            if resolved:
-                return set(resolved)
-            candidate = candidate.rsplit(".", 1)[0] if "." in candidate else ""
-        return set()
-
-    @staticmethod
     def _script_file_graph_targets(
         source: str,
         target: str,
@@ -88,25 +80,28 @@ class RepositoryRelationships(ReadScopeOwner):
     def _file_graph(
         self, *, native_edges: Sequence[Mapping[str, object]]
     ) -> dict[str, set[str]]:
-        rows = [dict(row) for row in self.store.all_file_rows()]
-        graph: dict[str, set[str]] = {str(row["path"]): set() for row in rows}
-        language_by_path = {
-            str(row["path"]): str(row.get("language") or "") for row in rows
-        }
+        rows = {row["path"]: row for row in self.store.all_file_rows()}
+        graph: dict[str, set[str]] = {path: set() for path in rows}
         module_paths: dict[str, list[str]] = {}
-        for row in rows:
-            module = str(row.get("module_name") or "")
-            module_paths.setdefault(module, []).append(str(row["path"]))
+        for path, row in rows.items():
+            if row["language"] == "python" and row["module_name"]:
+                module_paths.setdefault(row["module_name"], []).append(path)
         known_paths = set(graph)
 
         for edge in self.store.all_edges("import"):
             source = str(edge["path"])
             target = str(edge["target"] or "").strip()
-            if not target:
+            if not target or source not in rows:
                 continue
-            language = language_by_path.get(source, "")
+            language = rows[source]["language"]
             if language == "python":
-                targets = self._python_file_graph_targets(target, module_paths)
+                spelling = python_import_spelling(
+                    source, rows[source]["module_name"] or "", target
+                )
+                owner = unique_python_module_owner(
+                    python_module_prefixes(spelling), module_paths.get
+                )
+                targets = {owner} if owner is not None else set()
             else:
                 targets = self._script_file_graph_targets(
                     source, target, language, known_paths
@@ -120,49 +115,71 @@ class RepositoryRelationships(ReadScopeOwner):
                 graph[source].add(target)
         return graph
 
-    @staticmethod
-    def _longest_module_paths(target: str, resolved: dict[str, list[str]]) -> list[str]:
-        parts = target.split(".")
-        for index in range(len(parts), 0, -1):
-            paths = resolved.get(".".join(parts[:index]), [])
-            if paths:
-                return paths
-        return []
+    def _python_import_dependents(
+        self, imports: set[tuple[str, str]]
+    ) -> dict[str, set[str]]:
+        prefixes = {p for _, target in imports for p in python_module_prefixes(target)}
+        resolved = self.store.module_paths_many(prefixes)
+        reverse: dict[str, set[str]] = {}
+        for source, target in imports:
+            if owner := unique_python_module_owner(
+                python_module_prefixes(target), resolved.get
+            ):
+                reverse.setdefault(owner, set()).add(source)
+        return reverse
 
     def _python_reverse_frontier(
-        self, frontier: set[str], seen: set[str]
+        self,
+        frontier: set[str],
+        seen: set[str],
+        scanned_packages: set[str],
+        relative: dict[str, set[str]],
     ) -> set[str] | None:
-        ordered_frontier = sorted(frontier)
-        rows = [self.reads.file_row(path) for path in ordered_frontier]
+        rows = self.reads.file_rows(frontier)
         modules_by_path = {
             path: str(row.get("module_name") or "")
-            for path, row in zip(ordered_frontier, rows, strict=True)
-            if row is not None and str(row.get("module_name") or "")
+            for path, row in rows.items()
+            if row.get("module_name")
         }
         if len(modules_by_path) != len(frontier):
             return None
         candidates = self.store.python_import_candidates_for_modules(
             modules_by_path.values()
         )
-        raw_rows = [row for bucket in candidates.values() for row in bucket]
-        prefixes = {
-            prefix
-            for row in raw_rows
-            for prefix in (
-                ".".join(str(row.get("target") or "").split(".")[:index])
-                for index in range(1, len(str(row.get("target") or "").split(".")) + 1)
+        absolute = self._python_import_dependents(
+            {
+                (row["path"], row["target"])
+                for bucket in candidates.values()
+                for row in bucket
+            }
+        )
+        # A relative import cannot leave its top-level package. Qualify its
+        # indexed spellings once when the traversal first enters that package.
+        packages = {
+            name.partition(".")[0] for name in modules_by_path.values()
+        } - scanned_packages
+        if packages:
+            relative.update(
+                self._python_import_dependents(
+                    {
+                        (
+                            row["path"],
+                            python_import_spelling(
+                                row["path"], row["module_name"], row["target"]
+                            ),
+                        )
+                        for row in self.store.relative_python_imports(packages)
+                    }
+                )
             )
-            if prefix
+            scanned_packages.update(packages)
+        return {
+            source
+            for path in frontier
+            for reverse in (absolute, relative)
+            for source in reverse.get(path, ())
+            if source not in seen
         }
-        resolved = self.store.module_paths_many(prefixes)
-        nxt: set[str] = set()
-        for row in raw_rows:
-            paths = self._longest_module_paths(str(row.get("target") or ""), resolved)
-            if len(paths) == 1 and frontier.intersection(paths):
-                source = str(row.get("path") or "")
-                if source and source not in seen:
-                    nxt.add(source)
-        return nxt
 
     def _python_reverse_levels(
         self, roots: set[str], *, max_depth: int
@@ -172,12 +189,11 @@ class RepositoryRelationships(ReadScopeOwner):
         Returns ``None`` when the bounded fast path cannot prove semantic
         equivalence, causing callers to use the established full graph.
         """
-        root_rows = [self.reads.file_row(path) for path in sorted(roots)]
-        if any(
-            row is None
-            or str(row.get("language") or "") != "python"
+        root_rows = self.reads.file_rows(roots)
+        if len(root_rows) != len(roots) or any(
+            str(row.get("language") or "") != "python"
             or not str(row.get("module_name") or "")
-            for row in root_rows
+            for row in root_rows.values()
         ):
             return None
         # Native file evidence can add cross-language/path relationships that
@@ -192,8 +208,12 @@ class RepositoryRelationships(ReadScopeOwner):
         seen = set(roots)
         frontier = set(roots)
         levels: list[list[str]] = []
+        scanned_packages: set[str] = set()
+        relative: dict[str, set[str]] = {}
         for _ in range(max_depth):
-            nxt = self._python_reverse_frontier(frontier, seen)
+            nxt = self._python_reverse_frontier(
+                frontier, seen, scanned_packages, relative
+            )
             if nxt is None:
                 return None
             if not nxt:
@@ -240,21 +260,32 @@ class RepositoryRelationships(ReadScopeOwner):
             for row in self.store.visible_symbol_candidates(query, limit=50)
         }
 
-    def _resolve_edge(self, edge: dict) -> dict:
+    def _resolve_edge(
+        self, edge: dict, import_sites: dict[str, PythonImportSites]
+    ) -> dict:
         value = dict(edge)
+        path = str(value.get("path", ""))
         target = str(value.get("target", ""))
         resolved_paths = (
-            self.imports._resolve_import_paths(str(value.get("path", "")), target)
+            self.imports._resolve_import_paths(path, target)
             if value.get("kind") == "import"
             else []
         )
-        short = target.rsplit(".", 1)[-1]
-        candidates = self.store.symbols_named(short, limit=9, visible_only=True)
+        if value.get("kind") == "import" and source_grammar(path) == "python":
+            if path not in import_sites:
+                import_sites[path] = self.imports.python_import_sites(path)
+            site = import_sites[path].get((value["line"], target))
+            candidates, value["symbol_resolution"] = (
+                self.imports.python_dependency_symbols(path, target, site)
+            )
+        else:
+            short = target.rsplit(".", 1)[-1]
+            candidates = self.store.symbols_named(short, limit=9, visible_only=True)
         resolved_symbols = [
             {
                 "path": row["path"],
                 "qualname": row["qualname"],
-                **signature_disclosure(row["path"], row["signature"]),
+                **signature_disclosure(str(row["path"]), str(row["signature"])),
             }
             for row in candidates[:8]
         ]
@@ -267,6 +298,7 @@ class RepositoryRelationships(ReadScopeOwner):
     @decision_scoped
     def deps(self, query: str) -> dict[str, object]:
         self.reads.ready()
+        import_sites: dict[str, PythonImportSites] = {}
         matches = self.store.visible_symbol_candidates(query, limit=51)
         if matches:
             visible_matches = matches[:50]
@@ -296,7 +328,7 @@ class RepositoryRelationships(ReadScopeOwner):
                 "query": query,
                 "matches_truncated": len(matches) > len(visible_matches),
                 **self.reads.freshness_fields(),
-                "edges": [self._resolve_edge(row) for row in rows],
+                "edges": [self._resolve_edge(row, import_sites) for row in rows],
                 "native_edges": native_rows,
                 "native_file_edges": [
                     row
@@ -319,7 +351,10 @@ class RepositoryRelationships(ReadScopeOwner):
             "schema": "hashmarks.deps.v1",
             "query": query,
             **self.reads.freshness_fields(),
-            "edges": [self._resolve_edge(row) for row in self.store.edges_from(rel)],
+            "edges": [
+                self._resolve_edge(row, import_sites)
+                for row in self.store.edges_from(rel)
+            ],
             "native_edges": self.native._fresh_native_edges_from(rel),
             "native_file_edges": self.native._fresh_native_file_edges_from(rel),
         }

@@ -204,6 +204,14 @@ remains a producer claim. The complete native ownership/verification records
 remain visible in the original result. All projections preserve source
 pointers, current freshness and their producer-owned qualifications.
 
+In a full task-evidence text view, the `/ownership` overview can refer to a
+large Python owner or candidate locator that is already displayed in its own
+finding. The overview's `record` retains its other fields. For each
+`value_refs` entry, copy the value at `value_ref_base` plus the source
+pointer into the destination pointer in `record`. The individual role finding
+contains the same value at that source reference. The native response and
+the structured finding details remain complete.
+
 In an initial task packet, Python ambiguity candidates and verification-origin
 locators retain short signatures. A longer signature carries a UTF-8 preview
 of up to 512 bytes, a null `signature`, and `signature_truncated: true`. The

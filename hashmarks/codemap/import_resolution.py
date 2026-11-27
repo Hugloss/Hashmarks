@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import os
 import posixpath
 from collections import deque
@@ -8,7 +9,7 @@ from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING
 
-from hashmarks.python_ast_cache import read_python_ast
+from hashmarks.python_ast_cache import parse_python_ast, read_python_ast
 
 from .go_module_declaration import declared_go_module
 from .python_bindings import python_import_member_changed
@@ -17,14 +18,56 @@ from .python_exports import (
     PythonExportBinding,
     python_export_bindings,
     python_import_alias_targets,
+    python_import_target,
     python_reexport_targets,
     static_all_exports,
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Sequence
+
     from hashmarks.python_ast_cache import PythonAstSnapshot
 
     from .repository_source import RepositorySource
+
+
+PythonImportSites = dict[tuple[int, str], ast.Import | ast.ImportFrom | None]
+
+
+def python_import_spelling(path: str, module: str, target: str) -> str:
+    """Expand leading dots only when the indexed source package contains that level."""
+    suffix = target.lstrip(".")
+    level = len(target) - len(suffix)
+    if not level:
+        return target
+    if not module:
+        return ""
+    package = module.split(".")
+    if PurePosixPath(path).stem != "__init__":
+        package.pop()
+    if len(package) < level:
+        return ""
+    retained = package[: len(package) - level + 1]
+    return ".".join([*retained, suffix] if suffix else retained)
+
+
+def python_module_prefixes(target: str) -> tuple[str, ...]:
+    """Return qualified module spellings in longest-first resolution order."""
+    prefixes = []
+    while target:
+        prefixes.append(target)
+        target = target.rpartition(".")[0]
+    return tuple(prefixes)
+
+
+def unique_python_module_owner(
+    prefixes: tuple[str, ...], paths_for: Callable[[str], Sequence[str] | None]
+) -> str | None:
+    """A collision at the longest observed prefix cannot qualify a shorter one."""
+    for prefix in prefixes:
+        if paths := paths_for(prefix):
+            return paths[0] if len(paths) == 1 else None
+    return None
 
 
 @dataclass
@@ -33,6 +76,7 @@ class _OwnerWalk:
 
     resolver: RepositoryImports
     pythonpath: tuple[str, ...] = ()
+    declarations_only: bool = False
     leaves: set[str] = field(default_factory=set)
     symbol_leaves: set[tuple[str, str]] = field(default_factory=set)
     visited: set[tuple[str, str]] = field(default_factory=set)
@@ -99,11 +143,18 @@ class _OwnerWalk:
         ][:16]
 
     def _follow_target(self, facade_path: str, target: str, depth: int) -> bool:
-        nested_name = target.lstrip(".").rsplit(".", 1)[-1]
         resolver = self.resolver
-        owners = resolver._resolve_import_paths(
-            facade_path, target, pythonpath=self.pythonpath
-        )[:20]
+        nested_name = target.lstrip(".").rsplit(".", 1)[-1]
+        if self.declarations_only:
+            # A parent package may be a valid file-level dependency even when
+            # the module named by this from-import supplies no declaration.
+            owners = resolver._python_from_target_paths(facade_path, target)
+            if len(owners) != 1:
+                self.symbol_unresolved = True
+        else:
+            owners = resolver._resolve_import_paths(
+                facade_path, target, pythonpath=self.pythonpath
+            )[:20]
         if len(owners) > 1:
             self.unresolved = True
         progress = False
@@ -297,12 +348,11 @@ class RepositoryImports:
         self, source_path: str, target: str
     ) -> tuple[list[tuple[str, str]], bool]:
         """Expose exact declaration leaves from the existing bounded import walk."""
-        paths = self._resolve_import_paths(source_path, target)
-        unresolved = len(paths) > 1 or self._python_import_identity_ambiguous(
-            source_path, target
-        )
+        paths = self._python_from_target_paths(source_path, target)
         name = target.lstrip(".").rsplit(".", 1)[-1]
-        return self._python_member_symbol_evidence(paths, name, unresolved=unresolved)
+        return self._python_member_symbol_evidence(
+            paths, name, unresolved=len(paths) != 1
+        )
 
     def _python_module_call_evidence(
         self,
@@ -340,10 +390,70 @@ class RepositoryImports:
             return [], True
         return self._python_member_symbol_evidence(paths, member)
 
+    def python_import_sites(self, path: str) -> PythonImportSites:
+        """Identify authored import forms on the same revision as the indexed edges."""
+        self.source.ensure_current(path)
+        _, raw = self.source.member(path, include_bytes=True)
+        if raw is None:
+            return {}
+        try:
+            tree = parse_python_ast(raw, filename=path)
+        except (SyntaxError, ValueError):
+            return {}
+        sites: PythonImportSites = {}
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.Import, ast.ImportFrom)):
+                for alias in node.names:
+                    target = (
+                        python_import_target(node, alias.name)
+                        if isinstance(node, ast.ImportFrom)
+                        else alias.name
+                    )
+                    key = (alias.lineno, target)
+                    # A plain import and a from-import can share both line and target.
+                    sites[key] = (
+                        node if type(sites.get(key, node)) is type(node) else None
+                    )
+        return sites
+
+    def python_dependency_symbols(
+        self, path: str, target: str, site: ast.Import | ast.ImportFrom | None
+    ) -> tuple[list[dict[str, object]], str]:
+        """Qualify a declaration in the authored module, including supported re-exports."""
+        if isinstance(site, ast.Import):
+            return [], "module-import"
+        member = target.rsplit(".", 1)[-1]
+        if site is None or member == "*":
+            return [], "unresolved"
+        paths = self._python_from_target_paths(path, target)
+        if (
+            len(paths) != 1
+            or self.files.decide(paths[0]).evidence_visibility.value != "source"
+        ):
+            return [], "unresolved"
+        symbols, unresolved = self._python_member_symbol_evidence(paths, member)
+        if unresolved or len(symbols) != 1:
+            kind, _ = self._python_export_binding(paths[0], member)
+            if kind not in {"local", "ambiguous"}:
+                return [], "unresolved"
+            candidates = [
+                row
+                for row in self.reads.symbols_for_path(paths[0])
+                if row["name"] == member and row["parent"] is None
+            ]
+            return candidates, "unresolved"
+        owner, qualname = symbols[0]
+        rows = [
+            row
+            for row in self.reads.symbols_for_path(owner)
+            if row["qualname"] == qualname
+        ]
+        return (rows, "qualified-import") if len(rows) == 1 else ([], "unresolved")
+
     def _python_member_symbol_evidence(
         self, paths: list[str], name: str, *, unresolved: bool = False
     ) -> tuple[list[tuple[str, str]], bool]:
-        walk = _OwnerWalk(self, unresolved=unresolved)
+        walk = _OwnerWalk(self, declarations_only=True, unresolved=unresolved)
         for path in paths[:20]:
             walk.visit(path, name, 0)
         return sorted(walk.symbol_leaves), (
@@ -353,6 +463,16 @@ class RepositoryImports:
             or len(walk.symbol_leaves) > 1
             or (bool(paths) and not walk.symbol_leaves)
         )
+
+    def _python_from_target_paths(self, path: str, target: str) -> list[str]:
+        """Resolve the containing module exactly before looking up its imported member."""
+        bare = target.lstrip(".")
+        module = bare.rpartition(".")[0]
+        if target.startswith("."):
+            module = self._python_relative_module_candidate(
+                path, target[: len(target) - len(bare)] + module
+            )
+        return self.reads.module_paths(module) if module else []
 
     def _python_reexport_targets(
         self, facade_path: str, exported_name: str
@@ -498,22 +618,11 @@ class RepositoryImports:
         self, source_path: str, candidate: str
     ) -> str:
         """Resolve a relative module against the indexed source package."""
-        leading = len(candidate) - len(candidate.lstrip("."))
-        suffix = candidate[leading:]
         source_row = self.reads.file_row(source_path)
         source_module = (
             "" if source_row is None else str(source_row.get("module_name") or "")
         )
-        if source_module:
-            source_parts = source_module.split(".")
-            if Path(source_path).stem != "__init__":
-                source_parts = source_parts[:-1]
-        else:
-            source_parts = list(Path(source_path).with_suffix("").parts[:-1])
-        keep = len(source_parts) - max(0, leading - 1)
-        if keep < 0:
-            return ""
-        return ".".join(source_parts[:keep] + ([suffix] if suffix else []))
+        return python_import_spelling(source_path, source_module, candidate)
 
     def _python_import_module_candidates(
         self, source_path: str, target: str
@@ -522,13 +631,7 @@ class RepositoryImports:
         candidate = target.strip()
         if candidate.startswith("."):
             candidate = self._python_relative_module_candidate(source_path, candidate)
-        if not candidate:
-            return ()
-        ordered: list[str] = []
-        while candidate:
-            ordered.append(candidate)
-            candidate = candidate.rsplit(".", 1)[0] if "." in candidate else ""
-        return tuple(ordered)
+        return python_module_prefixes(candidate)
 
     def _resolve_python_import_paths(
         self, source_path: str, target: str, *, pythonpath: tuple[str, ...] = ()
@@ -539,14 +642,18 @@ class RepositoryImports:
         ambiguity, not deterministic ownership.  Path ordering may stabilize the
         evidence but must never choose an owner.
         """
-        for candidate in self._python_import_module_candidates(source_path, target):
+        candidates = self._python_import_module_candidates(source_path, target)
+        if not pythonpath:
+            owner = unique_python_module_owner(candidates, self.reads.module_paths)
+            return [owner] if owner is not None else []
+        for candidate in candidates:
             resolved = set(self.reads.module_paths(candidate))
             # An explicit caller-qualified native import context only applies to
             # this observation. It never changes Index's packaging/module roots.
-            if pythonpath and not target.startswith("."):
+            if not target.startswith("."):
                 resolved.update(self._pythonpath_module_paths(candidate, pythonpath))
             if resolved:
-                return sorted(resolved) if pythonpath or len(resolved) == 1 else []
+                return sorted(resolved)
         return []
 
     def _pythonpath_module_paths(
