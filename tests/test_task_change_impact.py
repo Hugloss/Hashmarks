@@ -57,8 +57,10 @@ def _task_verification_path(packet: Mapping[str, object]) -> str:
     return str(selected.get("path") or "")
 
 
+@pytest.mark.parametrize("surface_limit", [1, 3])
 def test_task_change_impact_composes_owner_path_and_verification(
     tmp_path: Path,
+    surface_limit: int,
 ) -> None:
     task = _repo(tmp_path)
     with CodeMap(tmp_path) as codemap:
@@ -69,7 +71,11 @@ def test_task_change_impact_composes_owner_path_and_verification(
             "def apply_ember(value: str) -> str:\n    return 'new' if value == 'accepted' else value\n",
             encoding="utf-8",
         )
-        impact = codemap.changes.task_impact(task, ["src/case/engine.py"])
+        impact = codemap.changes.task_impact(
+            task,
+            ["src/case/engine.py"],
+            options=ChangeImpactOptions(impact_limit_per_surface=surface_limit),
+        )
 
     assert impact["schema"] == "hashmarks.task-change-impact.v1"
     assert impact["owner"] == "external"
@@ -80,7 +86,10 @@ def test_task_change_impact_composes_owner_path_and_verification(
     verification = assert_records(surfaces["verification"])
     assert implementations[0]["path"] == "src/case/route.py"
     assert implementations[0]["via"] == "task-owner-path"
+    assert implementations[0]["relation"] == "imports"
     assert verification[0]["path"] == "tests/test_behavior.py"
+    assert verification[0]["via"] == "task-owner-path"
+    assert verification[0]["relation"] == "imports"
     assert assert_object(verification[0]["verify"])["runner"] == "pytest"
     assert verification[0]["selected"] is True
     encoded = json.dumps(impact, sort_keys=True)
