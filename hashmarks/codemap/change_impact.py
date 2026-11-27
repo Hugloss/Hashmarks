@@ -185,7 +185,7 @@ class _ImpactState:
             if row is None:
                 if len(surface) >= self.per_surface_limit:
                     continue
-                row = {"path": path}
+                row = dict[str, object](path=path)
                 candidate.attach_route(row)
                 self.by_role_path[key] = row
                 surface.append(row)
