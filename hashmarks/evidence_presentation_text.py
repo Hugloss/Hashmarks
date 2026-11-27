@@ -7,6 +7,8 @@ from collections.abc import Mapping
 from copy import deepcopy
 from typing import Any
 
+from hashmarks.operation_contract import operation_schema
+
 
 def _encode(value: object) -> str:
     encoded = json.dumps(
@@ -243,6 +245,38 @@ def initial_semantic_relationship_text(packet: Mapping[str, object]) -> list[str
     ]
 
 
+def _task_ownership_text_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Reference large Python locators already printed independently in this group."""
+    from hashmarks.codemap.signature_preview import bounded_signature_locator
+
+    by_ref = {ref: row for row in rows for ref in row["source_refs"]}
+    parent = by_ref.get("/ownership")
+    if parent is None or not isinstance(parent["details"], Mapping):
+        return rows
+    details = parent["details"]
+    refs = {}
+    for key in ("owner", "candidate"):
+        child = by_ref.get(f"/ownership/{key}")
+        locator = details.get(key)
+        if (
+            child is not None
+            and isinstance(locator, Mapping)
+            and bounded_signature_locator(locator) is not locator
+            and _encode(locator) == _encode(child["details"])
+        ):
+            refs[f"/{key}"] = f"/{key}"
+    if not refs:
+        return rows
+    shortened = {
+        "record": {
+            key: value for key, value in details.items() if f"/{key}" not in refs
+        },
+        "value_refs": refs,
+        "value_ref_base": "/ownership",
+    }
+    return [{**row, "details": shortened} if row is parent else row for row in rows]
+
+
 def evidence_projection_text(result: Mapping[str, Any]) -> str:
     """Lead with semantic changes, then encode every selected record exactly."""
     groups = result["groups"]
@@ -261,7 +295,12 @@ def evidence_projection_text(result: Mapping[str, Any]) -> str:
         lines.append(
             f"{group['family']}: {group['count_observed_in_packet']} observed ({group['omitted_from_presentation']} omitted from presentation)"
         )
-        lines.extend("  " + _encode(item) for item in group["findings"])
+        findings = group["findings"]
+        if group["family"] == "ownership_evidence" and result.get(
+            "source_schema"
+        ) == operation_schema("task_evidence"):
+            findings = _task_ownership_text_rows(findings)
+        lines.extend("  " + _encode(item) for item in findings)
     if not groups:
         lines.append(
             "No displayed findings in this projection"

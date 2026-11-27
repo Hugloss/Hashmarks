@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import json
 from copy import deepcopy
 from typing import Any
 
 import pytest
-from contract_assertions import assert_object, assert_records, assert_text
+from contract_assertions import assert_array, assert_object, assert_records, assert_text
 
 from hashmarks.evidence_presentation import present_repository_evidence
+from hashmarks.evidence_presentation_text import evidence_projection_text
 
 
 def _packet() -> dict[str, Any]:
@@ -223,3 +225,54 @@ def test_incomplete_owner_does_not_hide_native_qualification_or_source() -> None
         for group in assert_records(result["groups"])
         for row in assert_records(group["findings"])
     )
+
+
+def _ownership_in_text(text: str) -> dict[str, Any]:
+    for line in text.splitlines():
+        if line.startswith("  {"):
+            finding = json.loads(line)
+            if finding["source_refs"] == ["/ownership"]:
+                return finding["details"]
+    raise AssertionError("Missing ownership finding")
+
+
+@pytest.mark.parametrize("oversized", [False, True])
+def test_full_task_text_recovers_exact_owner_and_candidate_without_repeating_large_locators(
+    oversized: bool,
+) -> None:
+    packet = _packet()
+    signature = "def archive(name='" + ("界" * 300 if oversized else "short") + "')"
+    owner = packet["ownership"]["owner"]
+    owner["signature"] = signature
+    packet["ownership"]["candidate"] = {**owner, "future_qualifier": None}
+    original = deepcopy(packet)
+    result = present_repository_evidence(packet, format="text")
+    group = next(
+        g
+        for g in assert_records(result["groups"])
+        if g["family"] == "ownership_evidence"
+    )
+    rows = assert_records(group["findings"])
+    by_ref = {
+        assert_text(assert_array(row["source_refs"])[0]): row["details"] for row in rows
+    }
+    assert by_ref["/ownership"] == original["ownership"]
+    details = _ownership_in_text(assert_text(result["text"]))
+    if oversized:
+        assert details["value_ref_base"] == "/ownership"
+        assert details["value_refs"] == {"/owner": "/owner", "/candidate": "/candidate"}
+        restored = deepcopy(details["record"])
+        for destination, ref in details["value_refs"].items():
+            assert destination[1:] not in restored
+            restored[destination[1:]] = by_ref[details["value_ref_base"] + ref]
+        assert restored == original["ownership"]
+        # A capped or unavailable candidate finding cannot supply a text reference.
+        group["findings"] = [
+            row for row in rows if row["source_refs"] != ["/ownership/candidate"]
+        ]
+        capped = _ownership_in_text(evidence_projection_text(result))
+        assert capped["value_refs"] == {"/owner": "/owner"}
+        assert capped["record"]["candidate"] == original["ownership"]["candidate"]
+    else:
+        assert details == original["ownership"]
+    assert packet == original

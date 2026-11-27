@@ -920,11 +920,12 @@ class WorkspaceMapQueryMixin:
         if not unique:
             return {}
         self._count_read("module_paths_many")
-        placeholders = ",".join("?" for _ in unique)
         with self._lock:
             rows = self._db.execute(
-                f"SELECT module_name,path FROM file_map WHERE module_name IN ({placeholders}) ORDER BY module_name,path",
-                tuple(unique),
+                """SELECT module_name,path FROM file_map
+                   WHERE module_name IN (SELECT value FROM json_each(?))
+                   ORDER BY module_name,path""",
+                (json.dumps(unique),),
             ).fetchall()
         grouped: dict[str, list[str]] = {module: [] for module in unique}
         for row in rows:
@@ -987,27 +988,37 @@ class WorkspaceMapQueryMixin:
         if not unique:
             return {}
         self._count_read("python_import_candidates_for_modules")
-        clauses: list[str] = []
-        params: list[object] = []
-        for module in unique:
-            prefix = module + "."
-            clauses.append("(e.target=? OR (e.target>=? AND e.target<?))")
-            params.extend((module, prefix, prefix + "\uffff"))
-        sql = f"""SELECT e.path,e.target,e.line FROM edge e
-                  JOIN file_map f ON f.path=e.path
-                  WHERE e.kind='import' AND f.language='python'
-                    AND ({" OR ".join(clauses)})
-                  ORDER BY e.path,e.line,e.target"""
+        sql = """SELECT m.value,e.path,e.target,e.line FROM json_each(?) m
+                 JOIN edge e ON e.target=m.value
+                     OR (e.target>=m.value||'.' AND e.target<m.value||'/')
+                 JOIN file_map f ON f.path=e.path
+                 WHERE e.kind='import' AND f.language='python'
+                 ORDER BY e.path,e.line,e.target"""
         with self._lock:
-            rows = self._db.execute(sql, tuple(params)).fetchall()
+            rows = self._db.execute(sql, (json.dumps(unique),)).fetchall()
         out: dict[str, list[dict]] = {module: [] for module in unique}
-        for raw in rows:
-            row = dict(raw)
-            target = str(row.get("target") or "")
-            for module in unique:
-                if target == module or target.startswith(module + "."):
-                    out[module].append(row)
+        for module, path, target, line in rows:
+            out[module].append({"path": path, "target": target, "line": line})
         return out
+
+    def relative_python_imports(self, packages: set[str]) -> list[dict]:
+        """Fetch authored relative imports in the newly visited top-level packages."""
+        if TYPE_CHECKING:
+            self = cast("WorkspaceMapStore", self)
+        self._count_read("relative_python_imports")
+        with self._lock:
+            rows = self._db.execute(
+                """SELECT DISTINCT e.path,e.target,f.module_name
+                   FROM (SELECT 1 FROM edge WHERE kind='import'
+                         AND target>='.' AND target<'/' LIMIT 1) AS has_relative
+                   CROSS JOIN file_map f JOIN edge e ON e.path=f.path
+                   WHERE e.kind='import' AND e.target>='.' AND e.target<'/'
+                     AND f.language='python'
+                     AND substr(f.module_name,1,instr(f.module_name||'.','.')-1)
+                         IN (SELECT value FROM json_each(?))""",
+                (json.dumps(sorted(packages)),),
+            ).fetchall()
+        return [dict(row) for row in rows]
 
     def all_edges(self, kind: str | None = None) -> list[dict]:
         if TYPE_CHECKING:

@@ -1272,3 +1272,118 @@ def test_comprehension_reachability_respects_clause_order(
         changed = repository.verification.changed_set(["owner.py"])
     assert bool(changed["targets"]) is direct
     assert changed["negative_evidence_admissible"] is False
+
+
+def test_compound_typing_guard_cannot_displace_the_real_verifier(
+    tmp_path: Path,
+) -> None:
+    with _repository(
+        tmp_path,
+        "from typing import TYPE_CHECKING as only_types\nfrom owner import calculate_tax\n"
+        "def test_calculate_tax():\n"
+        "    if only_types and calculate_tax(): pass\n"
+        "    if only_types and some_condition(): calculate_tax()\n",
+    ) as repository:
+        active = "tests/test_live.py"
+        (tmp_path / active).write_text(
+            "from owner import calculate_tax\ndef test_amount(): assert calculate_tax() == 2\n"
+        )
+        repository.index.sync()
+        verification = repository.tasks.evidence("Change calculate_tax in owner.py")[
+            "verification"
+        ]
+        changed = repository.verification.changed_set(["owner.py"])
+        callers = repository.structure.locality("owner.py::calculate_tax", max_depth=0)
+    decoy = next(
+        r
+        for r in verification["relevance"]["candidates"]
+        if r["path"] == "tests/test_amounts.py"
+    )
+    assert decoy.get("reference_strength") == "reachable-import"
+    assert decoy.get("test_symbol") is None
+    assert assert_object(verification["plan"])["test_symbol"] == "test_amount"
+    assert [r["path"] for r in assert_records(changed["targets"])] == [active]
+    assert changed["negative_evidence_admissible"] is False
+    assert {
+        r["source"]
+        for r in assert_records(assert_records(callers["nodes"])[0]["exact_callers"])
+    } == {"test_calculate_tax", "test_amount"}
+
+
+@pytest.mark.parametrize(
+    ("body", "possible"),
+    [
+        ("if True and only_types and flag: calculate_tax()", False),
+        ("if not only_types or calculate_tax(): pass", False),
+        ("if not (only_types and flag): pass\n    else: calculate_tax()", False),
+        ("if only_types or False: calculate_tax()", False),
+        ("result = calculate_tax() if only_types and flag else None", False),
+        ("if only_types or calculate_tax(): pass", True),
+        ("if only_types and flag: pass\n    else: calculate_tax()", True),
+        ("if calculate_tax() and only_types: pass", True),
+        ("if flag() and only_types: calculate_tax()", True),
+        ("while not only_types or flag: break\n    else: calculate_tax()", True),
+    ],
+)
+def test_compound_guard_only_qualifies_decisive_source_prefixes(
+    tmp_path: Path, body: str, possible: bool
+) -> None:
+    source = (
+        "from typing import TYPE_CHECKING as only_types\nfrom owner import calculate_tax\ndef test_value(flag):\n    "
+        + body
+        + "\n"
+    )
+    with _repository(tmp_path, source) as repository:
+        repository.index.sync()
+        changed = repository.verification.changed_set(["owner.py"])
+    assert bool(changed["targets"]) is possible
+    assert changed["negative_evidence_admissible"] is False
+
+
+def test_compound_typing_guard_rechecks_repository_shadow_and_provenance(
+    tmp_path: Path,
+) -> None:
+    with _repository(
+        tmp_path,
+        "import typing as hints\nfrom owner import calculate_tax\n"
+        "def test_value(flag):\n    if hints.TYPE_CHECKING and flag: calculate_tax()\n",
+    ) as repository:
+        repository.index.sync()
+        assert repository.verification.changed_set(["owner.py"])["targets"] == []
+        (tmp_path / "typing.py").write_text("TYPE_CHECKING = True\n")
+        repository.index.sync()
+        changed = repository.verification.changed_set(["owner.py"])
+    assert [r["path"] for r in assert_records(changed["targets"])] == [
+        "tests/test_amounts.py"
+    ]
+    relation = assert_records(assert_records(changed["changes"])[0]["relationships"])[0]
+    assert "typing.py" in {
+        r["path"] for r in assert_records(relation["supporting_source_members"])
+    }
+
+
+@pytest.mark.parametrize(
+    ("prefix", "arguments", "condition"),
+    [
+        ("from typing import TYPE_CHECKING as flag", "flag", "flag"),
+        (
+            "import typing as hints\nhints.TYPE_CHECKING = True",
+            "",
+            "hints.TYPE_CHECKING",
+        ),
+    ],
+)
+def test_shadowed_or_rebound_flag_does_not_suppress_compound_reference(
+    tmp_path: Path, prefix: str, arguments: str, condition: str
+) -> None:
+    source = (
+        prefix
+        + "\nfrom owner import calculate_tax\n"
+        + f"def test_value({arguments}):\n    if {condition} and calculate_tax(): pass\n"
+    )
+    with _repository(tmp_path, source) as repository:
+        repository.index.sync()
+        changed = repository.verification.changed_set(["owner.py"])
+    assert [row["path"] for row in assert_records(changed["targets"])] == [
+        "tests/test_amounts.py"
+    ]

@@ -6,6 +6,76 @@ from contract_assertions import assert_records
 from hashmarks.codemap import CodeMap
 
 
+def test_function_local_module_calls_use_the_import_in_the_caller(
+    tmp_path: Path,
+) -> None:
+    package = tmp_path / "pkg"
+    package.mkdir()
+    (package / "__init__.py").write_text("")
+    (package / "service.py").write_text("def build(): return {}\n")
+    (tmp_path / "other.py").write_text("def build(): return {}\n")
+    (tmp_path / "worker.py").write_text(
+        "import other as svc\n"
+        "def outside(): return svc.build()\n"
+        "def local():\n    import pkg.service as svc\n    return svc.build()\n"
+        "async def dotted():\n    import pkg.service\n    return pkg.service.build()\n"
+        "def header():\n    import pkg.service as svc\n"
+        "    def inner(value=svc.build()): return value\n    return inner\n"
+        "def target(items):\n    import pkg.service as svc\n"
+        "    return [None for svc.build()[0] in items]\n"
+    )
+    with CodeMap(tmp_path) as codemap:
+        for caller in ("local", "dotted", "header", "target", "outside"):
+            expected = (
+                "other.py::build" if caller == "outside" else "pkg/service.py::build"
+            )
+            packet = codemap.structure.locality(f"worker.py::{caller}", max_depth=1)
+            assert [
+                row["resolved_symbol_id"] for row in assert_records(packet["edges"])
+            ] == [expected]
+        for path, callers in (
+            ("pkg/service.py", {"local", "dotted", "header", "target"}),
+            ("other.py", {"outside"}),
+        ):
+            reverse = codemap.structure.locality(f"{path}::build", max_depth=0)
+            node = assert_records(reverse["nodes"])[0]
+            assert {
+                row["source"] for row in assert_records(node["exact_callers"])
+            } == callers
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "    result = svc.build()\n    import service as svc\n    return result\n",
+        "    import service as svc; return svc.build()\n",
+        "    if values: import service as svc\n    return svc.build()\n",
+        "    import service as svc\n    svc = values[0]\n    return svc.build()\n",
+        "    import service as svc\n    patch = svc\n    patch.build = values[0]\n    return svc.build()\n",
+        "    import service as svc\n    return [None for svc in values for svc.build()[0] in values]\n",
+        "    import service as svc\n    return (lambda svc: svc.build())\n",
+    ],
+)
+def test_local_module_import_requires_an_unshadowed_preceding_binding(
+    tmp_path: Path, body: str
+) -> None:
+    (tmp_path / "service.py").write_text("def build(): return {}\n")
+    (tmp_path / "other.py").write_text("def build(): return {}\n")
+    (tmp_path / "worker.py").write_text(
+        "import other as svc\ndef local(values):\n" + body
+    )
+    with CodeMap(tmp_path) as codemap:
+        packet = codemap.structure.locality("worker.py::local")
+        assert [
+            row["resolved_symbol_id"]
+            for row in assert_records(packet["edges"])
+            if row["target_text"] == "svc.build"
+        ] == [None]
+        for path in ("other.py", "service.py"):
+            reverse = codemap.structure.locality(f"{path}::build", max_depth=0)
+            assert assert_records(reverse["nodes"])[0]["exact_callers"] == []
+
+
 def test_computed_receivers_cannot_prove_bare_callers(tmp_path: Path) -> None:
     (tmp_path / "worker.py").write_text(
         "def save(): return 1\n"

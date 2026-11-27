@@ -442,6 +442,15 @@ as an authored annotation reference. Parameter, return and attribute type edges
 locate the first written reference to each type in that annotation. A decoded
 forward reference uses the source line of its containing string.
 
+For Python import edges, `deps` keeps the authored target and its resolved
+module paths. A uniquely qualified from-import has
+`symbol_resolution: "qualified-import"` and the declared symbol locator,
+including a supported re-export. A plain `import` has
+`symbol_resolution: "module-import"`. An unresolved member can retain
+visible top-level candidates from its own module. Its
+`symbol_resolution: "unresolved"` preserves uncertainty, including when
+the candidate list is empty.
+
 Python `find`, `symbol`, `deps` candidate records, structural-locality nodes
 and symbol source responses show at most 512 UTF-8 bytes per signature preview.
 Source also applies the caller's smaller source budget.
